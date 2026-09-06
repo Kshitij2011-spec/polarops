@@ -1,0 +1,58 @@
+# ========================
+# PolarOps .gitignore
+# ========================
+
+# --- Dependencies ---
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# --- Environment / Secrets ---
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# --- Database ---
+*.db
+*.sqlite3
+
+# --- Build Output ---
+dist/
+build/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Python ---
+.pytest_cache/
+htmlcov/
+coverage/
+*.cover
+.mypy_cache/
+.ruff_cache/
+
+# --- Playwright ---
+test-results/
+playwright-report/
+blob-report/
+.playwright-mcp/
+
+# --- Misc ---
+*.log
+*.tmp
+*.bak
