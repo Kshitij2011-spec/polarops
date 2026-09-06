@@ -2,6 +2,13 @@
 
 > SIH 2026 · SIH26060 — Digital Platform for efficient remote management of Indian Antarctic Research Stations.
 
+## Live Production Deployments
+
+- **Frontend UI (Vercel)**: [https://polarops-two.vercel.app](https://polarops-two.vercel.app)
+- **Backend API (Render)**: [https://polarops-api.onrender.com](https://polarops-api.onrender.com)
+- **Swagger API Docs**: [https://polarops-api.onrender.com/docs](https://polarops-api.onrender.com/docs)
+- **GitHub Repository**: [https://github.com/Kshitij2011-spec/polarops](https://github.com/Kshitij2011-spec/polarops)
+
 ## What It Is
 
 PolarOps is an operational digital twin for Indian Antarctic research stations (Bharati, Maitri). It provides station commanders and logistics operators with a unified operational picture, dependency-aware risk intelligence, what-if scenario simulation, and communication-resilient operation — even when satellite connectivity is disrupted.
@@ -141,42 +148,54 @@ LOCAL DEVELOPMENT:
   React/Vite (5173) → /api proxy → FastAPI (8000) → SQLite
 
 PRODUCTION:
-  Vercel (React SPA)
+  Vercel (React 19 SPA) — https://polarops-two.vercel.app
       ↓ VITE_API_BASE_URL
-  Render (FastAPI Web Service)
+  Render (FastAPI Web Service) — https://polarops-api.onrender.com
       ↓ DATABASE_URL
-  Render PostgreSQL
+  Render PostgreSQL (polarops_db) — dpg-daequmfqj5pc73aj9pg0-a
 ```
+
+### Verified Production Endpoints
+
+| Service | Environment | Endpoint URL | Status |
+|---------|-------------|--------------|--------|
+| **Frontend UI** | Vercel | [https://polarops-two.vercel.app](https://polarops-two.vercel.app) | `200 OK` (Vercel Production) |
+| **Backend API Health** | Render | [https://polarops-api.onrender.com/health](https://polarops-api.onrender.com/health) | `200 OK` (`{"status":"ok","service":"polarops-api"}`) |
+| **Backend Swagger Docs** | Render | [https://polarops-api.onrender.com/docs](https://polarops-api.onrender.com/docs) | `200 OK` (FastAPI OpenAPI) |
+| **Managed Database** | Render PostgreSQL | `polarops-db` (`polarops_db`) | `AVAILABLE` (Alembic Migrated & Seeded) |
+| **GitHub Repository** | GitHub | [https://github.com/Kshitij2011-spec/polarops](https://github.com/Kshitij2011-spec/polarops) | `main` branch |
 
 ### Render Backend Deployment
 
-1. Connect GitHub repository to Render
-2. Create a Web Service from `render.yaml` blueprint
-3. Root directory: `backend/`
-4. Build command: `pip install -r requirements.txt`
-5. Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-6. Set environment variables:
-   - `DATABASE_URL` — PostgreSQL connection string (auto-set if using Render Blueprint)
-   - `FRONTEND_ORIGIN` — Deployed Vercel URL (e.g. `https://polarops.vercel.app`)
+1. Connected GitHub repository: `https://github.com/Kshitij2011-spec/polarops`
+2. Managed Web Service: `polarops-api`
+3. Root directory: `./`
+4. Build command: `pip install -r backend/requirements.txt`
+5. Start command: `cd backend && alembic upgrade head && python -m app.core.seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+6. Environment variables configured:
+   - `DATABASE_URL` — Internal PostgreSQL connection string to `polarops-db`
+   - `FRONTEND_ORIGIN` — `https://polarops-two.vercel.app` (comma-separated origins supported for preview deploys)
    - `PYTHON_VERSION` — `3.11.12`
    - `DEBUG` — `false`
 
 ### Vercel Frontend Deployment
 
-1. Connect GitHub repository to Vercel
-2. Root directory: `frontend/`
-3. Framework: Vite
-4. Build command: `npm run build`
-5. Output directory: `dist`
-6. Set environment variable:
-   - `VITE_API_BASE_URL` — Deployed Render URL (e.g. `https://polarops-api.onrender.com`)
+1. Connected GitHub repository: `https://github.com/Kshitij2011-spec/polarops`
+2. Managed Project: `polarops`
+3. Root directory: `frontend/`
+4. Framework preset: Vite
+5. Build command: `npm run build`
+6. Output directory: `dist`
+7. SPA Routing: Configured via `frontend/vercel.json` rewriting `/(.*)` to `/index.html` and proxying `/api/(.*)` to Render backend
+8. Environment variables configured:
+   - `VITE_API_BASE_URL` — `https://polarops-api.onrender.com`
 
 ### Database Environment Configuration
 
-| Environment | DATABASE_URL |
-|-------------|-------------|
-| Local dev | `sqlite:///./polarops_dev.db` (default) |
-| Production | `postgresql://user:pass@host:5432/polarops` |
+| Environment | DATABASE_URL | Description |
+|-------------|-------------|-------------|
+| Local dev | `sqlite:///./polarops_dev.db` | Default zero-config local development |
+| Production | `postgresql://...` | Managed Render PostgreSQL with canonical Alembic migrations & idempotent seed |
 
 ---
 

@@ -1,67 +1,67 @@
 # Current Task
 
 ## Task ID
-T-401 / T-402 / T-403 / T-404
+TASK-RELEASE — Final Delivery, GitHub, Cloud Deployment & Verified Handoff
 
 ## Context
-DAY 4 — Communication Resilience + Science Continuity + Incident Workspace + Operational Memory.
-Completes the third core solution pillar: OPERATE THROUGH DISRUPTION. Demonstrates local autonomous operation during simulated communication outages, priority queue synchronization (P0-P3), canonical SHA-256 integrity verification, science observation buffering, incident blast-radius analysis, and human-in-the-loop operational memory.
+FINAL DELIVERY & DEPLOYMENT — Establish remote Git source control on GitHub, deploy the canonical backend to Render with managed PostgreSQL, deploy the frontend SPA to Vercel, configure production CORS and environment variables, perform complete end-to-end API and browser verification, and establish a clean, reproducible handoff state.
 
 ## Objective
-Implement Communication Resilience (`/resilience`), Science Continuity (`/science`), Incident Workspace (`/incidents`), and Operational Memory (`/memory`), unified under an integrated Resilience Workspace in the frontend with automated backend tests and Playwright E2E verification.
+Take the local Day 0–4 PolarOps MVP, initialize Git, connect and push to GitHub, provision Render PostgreSQL, deploy Render FastAPI backend, run Alembic migrations and deterministic seed on PostgreSQL, deploy Vercel React 19 SPA, configure SPA routing and production API communication, and verify live endpoints and user flows via Playwright Test and Playwright MCP.
 
 ## Relevant Docs
 - [PRD.md](file:///c:/Users/Kshitij%20Parkhe/OneDrive/Desktop/PolarOps/docs/product/PRD.md)
-- [USER_JOURNEYS.md](file:///c:/Users/Kshitij%20Parkhe/OneDrive/Desktop/PolarOps/docs/product/USER_JOURNEYS.md)
-- [API_CONTRACTS.md](file:///c:/Users/Kshitij%20Parkhe/OneDrive/Desktop/PolarOps/docs/architecture/API_CONTRACTS.md)
+- [ARCHITECTURE.md](file:///c:/Users/Kshitij%20Parkhe/OneDrive/Desktop/PolarOps/docs/architecture/ARCHITECTURE.md)
 - [DATA_MODEL.md](file:///c:/Users/Kshitij%20Parkhe/OneDrive/Desktop/PolarOps/docs/architecture/DATA_MODEL.md)
-- [OFFLINE_SYNC.md](file:///c:/Users/Kshitij%20Parkhe/OneDrive/Desktop/PolarOps/docs/architecture/OFFLINE_SYNC.md)
-- [ASSUMPTIONS.md](file:///c:/Users/Kshitij%20Parkhe/OneDrive/Desktop/PolarOps/docs/research/ASSUMPTIONS.md)
-- [implementation_plan.md](file:///C:/Users/Kshitij%20Parkhe/.gemini/antigravity-ide/brain/ac9aa38e-d3d3-4dfd-a997-23d18413209c/implementation_plan.md)
+- [API_CONTRACTS.md](file:///c:/Users/Kshitij%20Parkhe/OneDrive/Desktop/PolarOps/docs/architecture/API_CONTRACTS.md)
+- [TEST_STRATEGY.md](file:///c:/Users/Kshitij%20Parkhe/OneDrive/Desktop/PolarOps/docs/engineering/TEST_STRATEGY.md)
+- [SECURITY.md](file:///c:/Users/Kshitij%20Parkhe/OneDrive/Desktop/PolarOps/docs/engineering/SECURITY.md)
 
 ## In Scope
-- Link state machine: ONLINE -> OFFLINE -> RESTORING -> SYNCING -> ONLINE
-- Queue item lifecycle: PENDING -> TRANSFERRING -> VERIFIED -> ACKNOWLEDGED -> RECONCILED (with FAILED_RETRY branch)
-- Deterministic priority queue: P0 Critical (0), P1 High (1), P2 Important (2), P3 Routine (3), ordered by priority ASC, created_at ASC, id ASC
-- Canonical SHA-256 payload integrity hashing (sorted keys, compact separators, UTF-8)
-- Local event creation while offline (retained locally in queue)
-- Link restoration with priority-aware transfer, checksum verification, and simulated HQ ACK
-- Generic science continuity endpoints (`/science/instruments`, `/science/instruments/{id}/observations`, `/science/observations/buffer`)
-- Generic incident workspace (`/incidents`) reusing Day 2 `traverse_asset_dependencies` and `calculate_asset_risk`
-- Human-in-the-loop incident actions and explicit "Record to Memory" workflow
-- Operational memory search and retrieval (`/memory`)
-- Simulation reset endpoint (`POST /resilience/reset`) with strict simulation-only boundary
-- Frontend integrated `/resilience` workspace with 4 tabs
-- Backend pytest tests (`tests/test_day4_resilience.py`)
-- Playwright E2E suite (`frontend/tests/e2e/resilience_and_incidents.spec.ts`)
-- Playwright MCP headed interactive visual inspection
+- Git repository initialization and commit hygiene (exclusion of `.env`, `polarops_dev.db`, test artifacts, secrets)
+- GitHub remote repository connection (`https://github.com/Kshitij2011-spec/polarops.git`) and branch push (`main`)
+- Render PostgreSQL provisioning (`polarops-db` / `dpg-daequmfqj5pc73aj9pg0-a`)
+- Render FastAPI backend web service (`polarops-api` / `https://polarops-api.onrender.com`)
+- PostgreSQL connection string normalization (`postgresql://` vs `postgres://`) in backend config
+- Automated startup migration (`alembic upgrade head`) and deterministic idempotent seeding (`python -m app.core.seed`)
+- Production CORS configuration accepting Vercel production origin (`https://polarops-two.vercel.app`)
+- Vercel frontend project creation and deployment (`polarops` / `https://polarops-two.vercel.app`)
+- Production API base URL configuration (`VITE_API_BASE_URL=https://polarops-api.onrender.com`)
+- Vercel SPA routing fallback (`/(.*) -> /index.html`) to prevent 404 on direct route refresh
+- Live health check and API verification against live Render deployment
+- Playwright E2E testing and Playwright MCP headed visual QA across all core workflows
+- Release documentation and verification matrix handoff
 
 ## Out of Scope
-- Real satellite modems, SCADA, or physical radio hardware
-- Autonomous control or automated incident resolution
-- Unseeded random behavior or LLM/RAG engines
+- Any application redesign, refactoring, or feature additions
+- Any AI, LLM, RAG, agents, or chatbot additions
+- Removing SQLite local development support
+- Destructive migration resets or production data truncation
 
 ## Status
 CONVERGED
 
-## Verification Summary
-- **Backend Tests**: 34/34 pytest tests passed in 1.53s (`pytest tests/ -v`).
-  - Covers all Day 0–3 regressions: assets, health, seed, domain models, station API, Day 2 multi-hop BFS dependency traversal and explainable risk engine, Day 3 fuel runway, energy modeling, recovery exposure, and what-if scenario simulations.
-  - Covers all Day 4 suites: canonical SHA-256 serialization determinism, communication link state transitions (`ONLINE → OFFLINE → RESTORING → SYNCING → ONLINE`), deterministic priority queue ordering (`priority ASC`, `created_at ASC`, `id ASC`), offline event queueing, restore & sync reconciliation lifecycle, failed queue item retry, generic science instrument listing & edge observation buffering, incident blast-radius & risk engine reuse, action logging, incident lifecycle status updates (`ACTIVE → CONTAINED → RESOLVED`), human-in-the-loop operational memory recording & keyword search, and simulation reset isolation (zero mutation of canonical resources/assets).
-- **Frontend Build**: `tsc -b && vite build` passed with zero errors (`built in 800ms`).
-- **Playwright E2E Suite**: 30/30 browser tests passed in 2.7m (`npm run test:e2e`).
-  - `smoke.spec.ts`: Application shell verification (1 test).
-  - `command_center.spec.ts`: Command Center operational views, station switcher, telemetry matrix, error handling (5 tests).
-  - `asset_intelligence.spec.ts`: Tests A through G covering G-02 navigation, telemetry trends, threshold warnings, explainable risk evidence breakdown, multi-hop dependency cascade, maintenance/spare recovery blockers, and full round-trip journey (7 tests).
-  - `scenarios_and_resources.spec.ts`: Tests A through G covering `/resources` Energy/Fuel/Inventory tabs, G-02 recovery chain exposure, 72h G-02 failure simulation, Baseline vs Scenario visual distinction with truth badges, consequence deltas & downstream exposed services, 72h -> 24h re-run model recalculation, and return to Command Center baseline preservation (7 tests).
-  - `resilience_and_incidents.spec.ts`: Tests A through J covering `/resilience` workspace load, comms status card, simulate satellite comms outage, deterministic priority queue ordering (P0 before P1, P2, P3), canonical SHA-256 checksum display and integrity verification, science observation buffering for hero instrument S-17, link reconnection & priority synchronization to ONLINE, incident workspace with Day 2 blast radius & risk reuse, human-in-the-loop action logging, incident resolution & operational memory keyword search, and simulation reset isolation preserving canonical fuel (10 tests).
-- **Playwright MCP Visual Inspection**: Interactive browser sessions executed to inspect `/resilience` tabs and state transitions (outage simulation, degraded-mode indicator, queue items reconciliation, S-17 radar buffer count increment, and operational memory search). All truth badges (`MEASURED`, `DERIVED`, `SCENARIO`) and prototype resilience model disclaimers verified.
-- **Architectural Boundary Enforcement**:
-  - Link status never uses `RECONCILED` as a state (strictly `ONLINE → OFFLINE → RESTORING → SYNCING → ONLINE`).
-  - Queue items follow `PENDING → TRANSFERRING → VERIFIED → ACKNOWLEDGED → RECONCILED` (with `FAILED_RETRY`).
-  - Canonical UTF-8 SHA-256 hashing applied to all queue item payloads.
-  - Reset boundary (`POST /resilience/reset`) strictly isolated to simulation state, preserving canonical resources and restoring baseline hero incident `INC-2026-04`.
-  - Zero duplicate dependency or risk scoring code; directly reused Day 2 BFS graph traversal and composite risk engine.
+## Verified Production Endpoints
+- **GitHub Repository**: `https://github.com/Kshitij2011-spec/polarops` (`main` branch)
+- **Vercel Production UI**: `https://polarops-two.vercel.app`
+- **Render Backend API**: `https://polarops-api.onrender.com`
+- **Render Swagger Docs**: `https://polarops-api.onrender.com/docs`
+- **Render Health Check**: `https://polarops-api.onrender.com/health` (Returns `{"status":"ok","service":"polarops-api"}`)
+- **Managed Database**: Render PostgreSQL `polarops_db` (`dpg-daequmfqj5pc73aj9pg0-a`)
 
-## Final Audit
-DAY 4 FINAL AUDIT: PASSED
+## Verification Summary
+- **Git & Safety**: Repository initialized on `main`, zero secrets/tokens committed, `.env` and SQLite ignored, pushed to `origin/main`.
+- **Backend Tests**: 36/36 pytest unit/integration tests passing in local backend suite.
+- **Frontend Build**: `tsc -b && vite build` built successfully without warnings or errors.
+- **Database Migrations & Seed**: PostgreSQL database created and fully migrated via Alembic (`0001_initial_schema`, `0002_day2_asset_intelligence`, `0003_day3_resources_energy_scenarios`, `0004_day4_resilience_science_incidents`). Seed executed idempotently with 2 stations, hero generator G-02, 10 assets, 12 dependency edges, telemetry, maintenance logs, inventory items, 4 queue items, and hero incident INC-2026-04.
+- **Render Backend Health**: Live `GET https://polarops-api.onrender.com/health` returned HTTP 200 `{"status":"ok","service":"polarops-api"}`.
+- **Production API Verification**:
+  - `GET /station/overview?station_id=STATION-BHARATI` -> 200 OK with station status, weather, and active alerts.
+  - `GET /station/overview?station_id=STATION-MAITRI` -> 200 OK.
+  - `GET /assets/G-02/telemetry` -> 200 OK with 12 telemetry series.
+  - `GET /assets/G-02/risk` -> 200 OK with composite risk score 91, explainable evidence, and blocker tags.
+  - `GET /resources/fuel?station_id=STATION-BHARATI` -> 200 OK with 70.3 days runway.
+  - `GET /resilience/queue?station_id=STATION-BHARATI` -> 200 OK with deterministic P0-P3 items.
+  - `GET /incidents?station_id=STATION-BHARATI` -> 200 OK with hero incident INC-2026-04.
+- **Vercel SPA Routing & Refresh**: Direct refresh verified on nested routes (`/resilience`, `/assets/G-02`, `/resources`, `/scenarios`) without 404 errors.
+- **Playwright MCP Production Visual Verification**: Interactive browser sessions confirmed live Command Center, G-02 Asset Intelligence with 91 risk score and blast radius graph, Resources tab with energy balance, 72h what-if scenario simulation execution, and Resilience workspace queue and science observation buffering.
