@@ -31,6 +31,21 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
+    @classmethod
+    def _normalize_db_url(cls, v: str) -> str:
+        if isinstance(v, str) and v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql://", 1)
+        return v
+
+    def __init__(self, **values):
+        super().__init__(**values)
+        if self.DATABASE_URL.startswith("postgres://"):
+            object.__setattr__(
+                self,
+                "DATABASE_URL",
+                self.DATABASE_URL.replace("postgres://", "postgresql://", 1),
+            )
+
     @property
     def effective_cors_origins(self) -> list[str]:
         """Return CORS origins including FRONTEND_ORIGIN when configured."""
