@@ -50,8 +50,11 @@ class Settings(BaseSettings):
     def effective_cors_origins(self) -> list[str]:
         """Return CORS origins including FRONTEND_ORIGIN when configured."""
         origins = list(self.CORS_ORIGINS)
-        if self.FRONTEND_ORIGIN and self.FRONTEND_ORIGIN not in origins:
-            origins.append(self.FRONTEND_ORIGIN)
+        if self.FRONTEND_ORIGIN:
+            for o in self.FRONTEND_ORIGIN.split(","):
+                o = o.strip()
+                if o and o not in origins:
+                    origins.append(o)
         return origins
 
 
