@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
 
+from app.schemas.explainability import RecoveryConstraint
+
 
 class ScenarioSimulateRequest(BaseModel):
     """Stateless input specification for an operational what-if simulation."""
@@ -83,6 +85,13 @@ class ScenarioSimulateResponse(BaseModel):
     baseline_risk_level: str
     scenario_risk_level: str
     decision_options: list[ScenarioDecisionOption]
+    thermal_demand_kw: float = 0.0
+    projected_load_kw: float = 0.0
+    available_capacity_kw: float = 0.0
+    reserve_margin_kw: float = 0.0
+    reserve_margin_percent: float = 0.0
+    recovery_constraints: list[RecoveryConstraint] = []
     assumptions: list[str] = []
     computed_at: datetime
     truth_type: str = "SCENARIO"
+    source_context: list[str] = ["scenario_service", "energy_service", "dependency_service", "risk_service", "resource_service"]

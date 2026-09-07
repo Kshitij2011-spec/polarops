@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models import Asset
+from app.models.enums import OperationalEventType, TruthType
+from app.schemas.explainability import RecoveryConstraint
 from app.schemas.scenario import (
     ScenarioAffectedService,
     ScenarioDecisionOption,
@@ -14,6 +16,8 @@ from app.schemas.scenario import (
 )
 from app.services.dependency_service import traverse_asset_dependencies
 from app.services.energy_service import calculate_energy_balance
+from app.services.event_service import record_operational_event
+from app.services.resource_service import get_asset_recovery_exposure
 from app.services.risk_service import calculate_asset_risk
 
 
@@ -104,7 +108,16 @@ def simulate_operational_scenario(
     scenario_risk_score = min(100, baseline_risk_score + duration_factor)
     risk_delta = scenario_risk_score - baseline_risk_score
 
-    # 6. Metric Deltas Calculation
+    # 6. Metric Deltas Calculation & Reserve Margin Coupling
+    available_capacity_kw = scenario_energy.available_generation_capacity_kw
+    projected_load_kw = scenario_energy.projected_electrical_load_kw
+    thermal_demand_kw = scenario_energy.thermal_demand_kw
+    reserve_margin_kw = round(available_capacity_kw - projected_load_kw, 1)
+    reserve_margin_percent = round((reserve_margin_kw / available_capacity_kw) * 100, 1) if available_capacity_kw > 0 else 0.0
+
+    baseline_reserve_kw = round(baseline_energy.available_generation_capacity_kw - baseline_energy.baseline_electrical_load_kw, 1)
+    reserve_delta = round(reserve_margin_kw - baseline_reserve_kw, 1)
+
     cap_delta = scenario_energy.available_generation_capacity_kw - baseline_energy.available_generation_capacity_kw
     genset_delta = scenario_energy.online_generators_count - baseline_energy.online_generators_count
     load_delta = scenario_energy.projected_electrical_load_kw - baseline_energy.baseline_electrical_load_kw
@@ -120,6 +133,15 @@ def simulate_operational_scenario(
             unit="kW",
             impact_direction="NEGATIVE" if cap_delta < 0 else "POSITIVE",
             description=f"Modeled online generator capacity reduced from {baseline_energy.available_generation_capacity_kw:.0f} kW to {scenario_energy.available_generation_capacity_kw:.0f} kW.",
+        ),
+        ScenarioMetricDelta(
+            name="Generation Reserve Margin",
+            baseline_value=baseline_reserve_kw,
+            scenario_value=reserve_margin_kw,
+            delta=reserve_delta,
+            unit="kW",
+            impact_direction="NEGATIVE" if reserve_delta < 0 else "POSITIVE",
+            description=f"Reserve margin drops from {baseline_reserve_kw:.1f} kW to {reserve_margin_kw:.1f} kW ({reserve_margin_percent:.1f}% spare margin) during outage.",
         ),
         ScenarioMetricDelta(
             name="Online Generators Fleet",
@@ -195,6 +217,44 @@ def simulate_operational_scenario(
         ),
     ]
 
+    # 8. Recovery & Logistics Coupling (Querying canonical inventory and resupply)
+    recovery_constraints_list: list[RecoveryConstraint] = []
+    rec_exposure = get_asset_recovery_exposure(db, asset.code)
+    if rec_exposure:
+        if rec_exposure.required_spare_part_number and rec_exposure.quantity_available <= 0:
+            recovery_constraints_list.append(
+                RecoveryConstraint(
+                    constraint_type="INVENTORY_STOCKOUT",
+                    resource_id=rec_exposure.required_spare_part_number,
+                    description=(
+                        f"Critical spare '{rec_exposure.required_spare_part_name}' ({rec_exposure.required_spare_part_number}) "
+                        f"has 0 units in local warehouse stock. Overhaul blocked on-site."
+                    ),
+                    impact_level="BLOCKING",
+                )
+            )
+        if rec_exposure.active_work_order_id:
+            recovery_constraints_list.append(
+                RecoveryConstraint(
+                    constraint_type="WORK_ORDER_BLOCKED",
+                    resource_id=rec_exposure.active_work_order_id,
+                    description=f"Work order {rec_exposure.active_work_order_id} is in {rec_exposure.work_order_status or 'BLOCKED_PARTS'} status awaiting spare delivery.",
+                    impact_level="HIGH",
+                )
+            )
+        if rec_exposure.resupply_vessel_name:
+            recovery_constraints_list.append(
+                RecoveryConstraint(
+                    constraint_type="LOGISTICS_WINDOW",
+                    resource_id=rec_exposure.resupply_vessel_name,
+                    description=(
+                        f"Expedition resupply vessel ({rec_exposure.resupply_vessel_name}) ETA is in "
+                        f"≈ {rec_exposure.resupply_eta_days or 11.0} days. Blizzard window blocks emergency air-drops."
+                    ),
+                    impact_level="HIGH",
+                )
+            )
+
     scenario_id = f"SCENARIO-{uuid.uuid4().hex[:8].upper()}"
     baseline_summary = (
         f"Station operating under nominal baseline: {baseline_energy.online_generators_count} generators online "
@@ -215,6 +275,42 @@ def simulate_operational_scenario(
         "Decision-support options are advisory prototype suggestions and require human operator confirmation.",
     ]
 
+    # 9. Record Scenario Evaluated Event into Canonical Stream
+    try:
+        record_operational_event(
+            db,
+            station_id=request.station_id,
+            event_type=OperationalEventType.SCENARIO_EVALUATED,
+            severity="INFO",
+            title=f"What-If Scenario Evaluated: {asset.name} ({request.duration_hours:.0f}h)",
+            summary=(
+                f"Hypothetical {request.duration_hours:.0f}h outage simulated at {ambient_temp:.1f}°C ambient: "
+                f"available capacity drops to {available_capacity_kw:.0f} kW, reserve margin is {reserve_margin_kw:.1f} kW "
+                f"({reserve_margin_percent:.1f}% spare margin), {len(affected_services_list)} services exposed. Modeled risk: {scenario_risk_score}/100."
+            ),
+            message=(
+                f"Scenario ID: {scenario_id}. Asset {asset.name} simulated offline for {request.duration_hours:.0f}h at {ambient_temp:.1f}°C. "
+                f"Generation: {available_capacity_kw:.0f} kW, Load: {projected_load_kw:.1f} kW, Reserve Margin: {reserve_margin_kw:.1f} kW."
+            ),
+            entity_type="SCENARIO",
+            entity_id=scenario_id,
+            source="scenario_service",
+            truth_type=TruthType.SCENARIO,
+            metadata={
+                "scenario_id": scenario_id,
+                "target_asset_id": asset.code,
+                "duration_hours": request.duration_hours,
+                "ambient_temp_celsius": ambient_temp,
+                "available_capacity_kw": available_capacity_kw,
+                "projected_load_kw": projected_load_kw,
+                "reserve_margin_kw": reserve_margin_kw,
+                "scenario_risk_score": scenario_risk_score,
+                "risk_delta": risk_delta,
+            },
+        )
+    except Exception:
+        pass
+
     return ScenarioSimulateResponse(
         scenario_id=scenario_id,
         station_id=request.station_id,
@@ -234,7 +330,15 @@ def simulate_operational_scenario(
         baseline_risk_level=baseline_risk_level,
         scenario_risk_level="CRITICAL",
         decision_options=decision_options,
+        thermal_demand_kw=thermal_demand_kw,
+        projected_load_kw=projected_load_kw,
+        available_capacity_kw=available_capacity_kw,
+        reserve_margin_kw=reserve_margin_kw,
+        reserve_margin_percent=reserve_margin_percent,
+        recovery_constraints=recovery_constraints_list,
         assumptions=assumptions,
         computed_at=datetime.now(timezone.utc),
         truth_type="SCENARIO",
+        source_context=["scenario_service", "energy_service", "dependency_service", "risk_service", "resource_service"],
     )
+

@@ -35,6 +35,7 @@ from app.models.enums import (
     IncidentStatus,
     MaintenancePriority,
     MaintenanceStatus,
+    OperationalEventType,
     Quality,
     ResupplyStatus,
     StationStatus,

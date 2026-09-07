@@ -1,28 +1,186 @@
 @import "tailwindcss";
 
-/* ── PolarOps Design Tokens ────────────────────────────── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── PolarOps Semantic Design Tokens ─────────────────────── */
+
+/* Light Theme (default) */
+:root {
+  color-scheme: light;
+
+  /* Backgrounds */
+  --bg-primary: #f8f9fb;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f0f2f5;
+  --bg-elevated: #ffffff;
+
+  /* Foregrounds */
+  --fg-primary: #1a1d23;
+  --fg-secondary: #4a5060;
+  --fg-muted: #7a8194;
+  --fg-inverse: #ffffff;
+
+  /* Borders */
+  --border-default: #d8dce6;
+  --border-subtle: #e8ecf2;
+  --border-strong: #b0b8c8;
+
+  /* Accent */
+  --accent: #2563a8;
+  --accent-fg: #ffffff;
+  --accent-hover: #1d4e8a;
+  --accent-muted: #dbeafe;
+
+  /* Status */
+  --status-nominal: #16804a;
+  --status-nominal-bg: #ecfdf5;
+  --status-nominal-muted: #bbf7d0;
+  --status-warning: #b45309;
+  --status-warning-bg: #fffbeb;
+  --status-warning-muted: #fde68a;
+  --status-critical: #c4342d;
+  --status-critical-bg: #fef2f2;
+  --status-critical-muted: #fecaca;
+  --status-info: #2563a8;
+  --status-info-bg: #eff6ff;
+  --status-info-muted: #bfdbfe;
+
+  /* Interactive */
+  --interactive-hover: #f0f2f5;
+  --interactive-active: #e4e8ee;
+  --focus-ring: #2563a8;
+
+  /* Scenario (distinct from other status) */
+  --status-scenario: #7c3aed;
+  --status-scenario-bg: #f5f3ff;
+}
+
+/* Dark Theme */
+.dark {
+  color-scheme: dark;
+
+  --bg-primary: #0f1117;
+  --bg-secondary: #181b24;
+  --bg-tertiary: #1e2230;
+  --bg-elevated: #242838;
+
+  --fg-primary: #e4e8f0;
+  --fg-secondary: #9ca3b4;
+  --fg-muted: #6b7280;
+  --fg-inverse: #0f1117;
+
+  --border-default: #2a2f3e;
+  --border-subtle: #1f2433;
+  --border-strong: #3d4556;
+
+  --accent: #5b9cf5;
+  --accent-fg: #0f1117;
+  --accent-hover: #7ab4ff;
+  --accent-muted: #1e3a5f;
+
+  --status-nominal: #34d399;
+  --status-nominal-bg: #0a2e1f;
+  --status-nominal-muted: #065f46;
+  --status-warning: #fbbf24;
+  --status-warning-bg: #2a2008;
+  --status-warning-muted: #78350f;
+  --status-critical: #f87171;
+  --status-critical-bg: #2a0f0f;
+  --status-critical-muted: #7f1d1d;
+  --status-info: #5b9cf5;
+  --status-info-bg: #0f1a2e;
+  --status-info-muted: #1e3a5f;
+
+  --interactive-hover: #1e2230;
+  --interactive-active: #242838;
+  --focus-ring: #5b9cf5;
+
+  --status-scenario: #a78bfa;
+  --status-scenario-bg: #1a1033;
+}
+
+/* Auto dark-mode from OS preference when no explicit .dark class */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+
+    --bg-primary: #0f1117;
+    --bg-secondary: #181b24;
+    --bg-tertiary: #1e2230;
+    --bg-elevated: #242838;
+
+    --fg-primary: #e4e8f0;
+    --fg-secondary: #9ca3b4;
+    --fg-muted: #6b7280;
+    --fg-inverse: #0f1117;
+
+    --border-default: #2a2f3e;
+    --border-subtle: #1f2433;
+    --border-strong: #3d4556;
+
+    --accent: #5b9cf5;
+    --accent-fg: #0f1117;
+    --accent-hover: #7ab4ff;
+    --accent-muted: #1e3a5f;
+
+    --status-nominal: #34d399;
+    --status-nominal-bg: #0a2e1f;
+    --status-nominal-muted: #065f46;
+    --status-warning: #fbbf24;
+    --status-warning-bg: #2a2008;
+    --status-warning-muted: #78350f;
+    --status-critical: #f87171;
+    --status-critical-bg: #2a0f0f;
+    --status-critical-muted: #7f1d1d;
+    --status-info: #5b9cf5;
+    --status-info-bg: #0f1a2e;
+    --status-info-muted: #1e3a5f;
+
+    --interactive-hover: #1e2230;
+    --interactive-active: #242838;
+    --focus-ring: #5b9cf5;
+
+    --status-scenario: #a78bfa;
+    --status-scenario-bg: #1a1033;
+  }
+}
+
+/* ── Tailwind Theme Extension (maps tokens to utility classes) ── */
 @theme {
-  --color-polar-900: #0a0e1a;
-  --color-polar-800: #111827;
-  --color-polar-700: #1e293b;
-  --color-polar-600: #334155;
-  --color-polar-500: #475569;
-  --color-polar-400: #94a3b8;
-  --color-polar-300: #cbd5e1;
-  --color-polar-200: #e2e8f0;
-  --color-polar-100: #f1f5f9;
+  /* Legacy polar-* aliases for migration compatibility */
+  --color-polar-900: var(--bg-primary);
+  --color-polar-800: var(--bg-secondary);
+  --color-polar-700: var(--border-default);
+  --color-polar-600: var(--border-strong);
+  --color-polar-500: var(--fg-muted);
+  --color-polar-400: var(--fg-secondary);
+  --color-polar-300: var(--fg-secondary);
+  --color-polar-200: var(--fg-primary);
+  --color-polar-100: var(--fg-primary);
+  --color-polar-950: var(--bg-tertiary);
 
-  --color-accent-cyan: #22d3ee;
-  --color-accent-green: #34d399;
-  --color-accent-amber: #fbbf24;
-  --color-accent-red: #f87171;
+  /* Legacy accent aliases */
+  --color-accent-cyan: var(--accent);
+  --color-accent-green: var(--status-nominal);
+  --color-accent-amber: var(--status-warning);
+  --color-accent-red: var(--status-critical);
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* New semantic utilities */
+  --color-surface: var(--bg-secondary);
+  --color-surface-muted: var(--bg-tertiary);
+
+  /* Fonts */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 }
 
 /* ── Global Baseline ───────────────────────────────────── */
 body {
-  @apply bg-polar-900 text-polar-100 font-sans antialiased;
+  background-color: var(--bg-primary);
+  color: var(--fg-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   min-height: 100dvh;
 }
 
@@ -30,4 +188,50 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+}
+
+/* ── Focus States ──────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Selection ─────────────────────────────────────────── */
+::selection {
+  background-color: var(--accent-muted);
+  color: var(--fg-primary);
+}
+
+/* ── Reduced Motion ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Scrollbar Styling (subtle) ────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-muted);
+}
+
+/* ── Select dropdown fix for themes ────────────────────── */
+select option {
+  background-color: var(--bg-elevated);
+  color: var(--fg-primary);
 }

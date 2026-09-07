@@ -17,6 +17,21 @@ from app.schemas.station import (
     SubsystemSummaryItem,
 )
 
+from app.schemas.events import (
+    EventListResponse,
+    OperationalEventSchema,
+    ResetEventsResponse,
+    SimulateEventRequest,
+)
+from app.schemas.explainability import (
+    ExplanationConsequence,
+    ExplanationEvidence,
+    ExplanationQueryRequest,
+    ExplanationResponse,
+    RecommendedNextStep,
+    RecoveryConstraint,
+)
+
 __all__ = [
     "ProvenanceSchema",
     "ErrorDetail",
@@ -32,4 +47,14 @@ __all__ = [
     "DownstreamServiceImpact",
     "DownstreamImpact",
     "AssetDependenciesResponse",
+    "OperationalEventSchema",
+    "EventListResponse",
+    "SimulateEventRequest",
+    "ResetEventsResponse",
+    "ExplanationResponse",
+    "ExplanationEvidence",
+    "ExplanationConsequence",
+    "RecoveryConstraint",
+    "RecommendedNextStep",
+    "ExplanationQueryRequest",
 ]

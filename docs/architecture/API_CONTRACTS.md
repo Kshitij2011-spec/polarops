@@ -451,3 +451,119 @@ Records operator approval of a recommended scenario action into persistent opera
   "notes": "Auxiliary Boiler B-01 activated to maintain Zone 2 habitat temperature during G-02 vibration investigation."
 }
 ```
+
+---
+
+## 8. Operational Events Stream
+
+### `GET /events` & `GET /api/v1/events`
+Returns reverse-chronologically sorted operational events for the selected station, ordered by `timestamp DESC, id DESC`.
+
+**Query Parameters**:
+- `station_id` (str, optional): Station code (e.g. `STATION-BHARATI`, `STATION-MAITRI`).
+- `severity` (str, optional): Filter by `CRITICAL`, `WARNING`, `INFO`, `NOMINAL`.
+- `limit` (int, default=50): Page size (max 200).
+- `offset` (int, default=0): Pagination offset.
+
+**Response (200 OK)**:
+```json
+{
+  "total": 12,
+  "station_id": "STATION-BHARATI",
+  "items": [
+    {
+      "id": "EVT-BHARATI-012",
+      "timestamp": "2026-09-07T07:02:03Z",
+      "station_id": "STATION-BHARATI",
+      "event_type": "COMMUNICATION_STATE",
+      "entity_type": "COMMS_LINK",
+      "entity_id": "VSAT_UPLINK",
+      "severity": "CRITICAL",
+      "title": "Satellite carrier link severed (Simulated Outage)",
+      "summary": "Communication link transitioned to OFFLINE. Autonomous local operations active; local priority events accumulating.",
+      "truth_type": "MEASURED",
+      "metadata": { "link_id": "GSAT-7-KU", "previous_state": "ONLINE" }
+    }
+  ]
+}
+```
+
+### `POST /events/simulate` & `POST /api/v1/events/simulate`
+Advances the deterministic 9-step demonstration state machine to append the next causal transition:
+`BASELINE → TELEMETRY_CHANGE → THRESHOLD_BREACH → RISK_CHANGE → DEPENDENCY_EXPOSURE → SPARES_CONSTRAINT → RESUPPLY_ALERT → RECOVERY_SCENARIO → RECONCILIATION`.
+
+**Response (200 OK)**:
+```json
+{
+  "step": 2,
+  "total_steps": 9,
+  "stage": "THRESHOLD_BREACH",
+  "event": {
+    "id": "EVT-SIM-002",
+    "event_type": "THRESHOLD_BREACH",
+    "entity_id": "G-02",
+    "severity": "WARNING",
+    "title": "Vibration warning threshold exceeded on Generator G-02",
+    "summary": "Bearing vibration reached 4.8 mm/s, exceeding warning threshold of 4.0 mm/s. Coolant temp elevated at 94.2°C.",
+    "truth_type": "SYNTHETIC_SIMULATION"
+  }
+}
+```
+
+### `POST /events/reset` & `POST /api/v1/events/reset`
+Resets the event stream to the canonical seeded baseline timeline for Bharati and Maitri.
+
+---
+
+## 9. Deterministic Explainability Layer
+
+### `GET /explain/{domain}/{entity_id}` & `GET /api/v1/explain/{domain}/{entity_id}`
+Derives a complete, deterministic, machine-readable causal explanation from trusted station state across multiple domains (`assets`, `resources`, `comms`, `science`, `incidents`).
+
+**Supported Domains**:
+- `assets`: Synthesizes 24h telemetry, warning thresholds, multi-hop BFS blast radius, 6-factor risk breakdown, maintenance blocker status, local spare stock (SK-402), and logistics resupply timing (MV Vasiliy Golovnin).
+- `resources`: Synthesizes daily consumption rates, fuel reserve runways, winter targets, stockout risks, and vessel logistics.
+- `comms`: Synthesizes carrier uplink telemetry, local priority queue depth (P0..P3), circular buffer integrity, and reconnection synchronization state.
+- `science`: Synthesizes instrument science telemetry, payload criticality, RAM circular buffer retention, and data preservation priorities.
+- `incidents`: Synthesizes severity, affected subsystems, operational memory matches, and recorded mitigation actions.
+
+**Response (200 OK)**:
+```json
+{
+  "subject": "Diesel Generator G-02 (G-02) — Operational Anomaly & Risk Explanation",
+  "domain": "assets",
+  "entity_id": "G-02",
+  "severity": "WARNING",
+  "summary": "Bearing vibration reached 4.8 mm/s exceeding warning threshold (4.0 mm/s) with coolant temp at 94.2°C. Downstream blast radius exposes Habitat Zone 2 Heating (LIFE_SUPPORT) and Station Main Electrical Grid. Recovery is constrained by Rotary Seal Kit SK-402 local stockout (0 units).",
+  "why_it_matters": "Diesel Generator G-02 provides critical powerhouse baseload and cogenerated thermal heat to Habitat Zone 2. Degradation threatens winter life-support margins.",
+  "evidence": [
+    { "factor": "G-02 Bearing Vibration", "metric": "bearing_vibration_mm_s", "value": 4.8, "threshold": 4.0, "status": "WARNING", "detail": "G-02 Bearing Vibration measured at 4.8 mm/s (warning threshold: 4.0 mm/s)." },
+    { "factor": "G-02 Coolant Temperature", "metric": "coolant_temp_celsius", "value": 94.2, "threshold": 90.0, "status": "WARNING", "detail": "G-02 Coolant Temperature measured at 94.2 °C (warning threshold: 90.0 °C)." },
+    { "factor": "Station Tier Criticality", "metric": "criticality", "value": 18.0, "threshold": 20.0, "status": "CRITICAL", "detail": "Asset is designated CRITICAL equipment in station operations taxonomy." },
+    { "factor": "Multi-Hop Dependency Blast Radius", "metric": "blast_radius", "value": 20.0, "threshold": 20.0, "status": "CRITICAL", "detail": "Direct downstream impact on Life Support services: Habitat Zone 2 Heating; Zones exposed: ZONE-HABITAT-2, ZONE-RADAR-LAB" },
+    { "factor": "Local Spare Parts Availability", "metric": "spare_stock", "value": 10.0, "threshold": 10.0, "status": "CRITICAL", "detail": "Critical spare 'Generator G-02 Gasket & Fuel Pump Seal Kit' has 0 available units in station stock." },
+    { "factor": "Logistics & Resupply Window Exposure", "metric": "resupply_eta_days", "value": 8.0, "threshold": 10.0, "status": "HIGH", "detail": "Next scheduled resupply vessel (MV Vasiliy Golovnin) ETA is in ≈ 10.1 days. Blizzard window blocks emergency flights." }
+  ],
+  "consequences": [
+    { "domain": "LIFE_SUPPORT", "impact": "CRITICAL", "blast_radius_depth": 1, "description": "Downstream service 'Habitat Zone 2 Heating' (HABITAT_HEATING_Z2) degraded via dependency link." },
+    { "domain": "CRITICAL", "impact": "HIGH", "blast_radius_depth": 1, "description": "Downstream service 'Station Main Electrical Grid' (STATION_MAIN_GRID) degraded via dependency link." }
+  ],
+  "recovery_constraints": [
+    { "constraint_type": "INVENTORY_STOCKOUT", "entity": "SK-402", "impact_severity": "BLOCKING", "description": "Rotary Seal Kit SK-402 has 0 units in local stock at Central Spares. Preventive overhaul cannot proceed locally. Vessel MV Vasiliy Golovnin ETA in ~11 days." },
+    { "constraint_type": "WORK_ORDER_BLOCKED", "entity": "MWO-2026-089", "impact_severity": "HIGH", "description": "Work order WO-2026-088 is in BLOCKED_PARTS status awaiting seal kit arrival." }
+  ],
+  "recommended_next_steps": [
+    { "action_code": "INSPECT_ASSET_G02", "title": "Inspect Asset G-02 Telemetry", "description": "Examine 24h vibration sparklines and bearing temperature trends in Asset Intelligence.", "target_route": "/assets/G-02", "action_type": "INSPECT" },
+    { "action_code": "EVALUATE_SCENARIO_G02", "title": "Evaluate Generator G-02 Failure Scenario", "description": "Run 72h what-if failure simulation to assess thermal loop impact and mitigation countermeasures.", "target_route": "/scenarios", "action_type": "SIMULATE" },
+    { "action_code": "REVIEW_SPARES_CHAIN", "title": "Review Central Spares & Logistics Recovery Chain", "description": "Audit SK-402 stockout timeline and expedition resupply vessel ETA in Resources.", "target_route": "/resources", "action_type": "REVIEW" }
+  ],
+  "confidence": 0.96,
+  "truth_type": "DERIVED",
+  "source_context": "assets, measurements, risk_service.calculate_asset_risk",
+  "timestamp": "2026-09-07T12:00:00Z"
+}
+```
+
+### `POST /explain` & `POST /api/v1/explain`
+Allows ad-hoc explanation queries with optional client context.
+

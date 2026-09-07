@@ -7,7 +7,7 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
 
-from app.models.entities import CommunicationLink, Incident, SyncQueueItem
+from app.models.entities import CommunicationLink, EventLog, Incident, SyncQueueItem
 from app.models.enums import CommsLinkStatus, IncidentStatus, Quality, SyncStatus, TruthType
 from app.schemas.common import ProvenanceSchema
 from app.schemas.resilience import (
@@ -103,9 +103,27 @@ def get_comms_status(db: Session, station_id: str = "STATION-BHARATI") -> CommsL
 
 
 def simulate_link_failure(db: Session, station_id: str = "STATION-BHARATI") -> CommsLinkStatusResponse:
-    """Transition communication link from ONLINE to OFFLINE."""
+    """Transition communication link from ONLINE to OFFLINE and accumulate local events."""
     link = get_or_create_link(db, station_id)
     link.status = CommsLinkStatus.OFFLINE
+    
+    # Record communication outage event
+    ev = EventLog(
+        station_id=station_id,
+        event_type="COMMUNICATION_STATE",
+        category="COMMS",
+        severity="CRITICAL",
+        entity_type="COMMS",
+        entity_id="VSAT_UPLINK",
+        title="Satellite carrier link severed (Simulated Outage)",
+        summary="Communication link transitioned to OFFLINE. Autonomous local operations active; local priority events accumulating.",
+        message="Satellite carrier severed. Local edge autonomy active with P0-P3 priority queue buffering.",
+        timestamp=datetime.now(timezone.utc),
+        source="SYNTHETIC_SIMULATION",
+        truth_type="MEASURED",
+        metadata_json='{"status":"OFFLINE","autonomous_mode":true}',
+    )
+    db.add(ev)
     db.commit()
     db.refresh(link)
     return get_comms_status(db, station_id)
@@ -299,6 +317,24 @@ def restore_and_sync_all(db: Session, station_id: str = "STATION-BHARATI") -> Re
     # 4. Link successfully reconciles all operations and returns to ONLINE
     link.status = CommsLinkStatus.ONLINE
     link.last_sync_at = datetime.now(timezone.utc)
+    
+    # Record priority synchronization event
+    ev_sync = EventLog(
+        station_id=station_id,
+        event_type="SYNC_QUEUE_EVENT",
+        category="COMMS",
+        severity="INFO",
+        entity_type="COMMS",
+        entity_id="VSAT_UPLINK",
+        title="Priority queue synchronized and reconciled",
+        summary=f"Processed {len(pending_items)} buffered queue items via canonical SHA-256 verification. Link restored to ONLINE.",
+        message=f"Sync complete: {reconciled_count} items reconciled, {failed_count} failed. Link restored to ONLINE.",
+        timestamp=datetime.now(timezone.utc),
+        source="SYNTHETIC_SIMULATION",
+        truth_type="DERIVED",
+        metadata_json=f'{{"items_processed":{len(pending_items)},"reconciled":{reconciled_count},"failed":{failed_count}}}',
+    )
+    db.add(ev_sync)
     db.commit()
 
     return RestoreLinkResponse(

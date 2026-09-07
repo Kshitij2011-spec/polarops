@@ -621,10 +621,17 @@ class EventLog(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     station_id: Mapped[str] = mapped_column(ForeignKey("stations.id"), index=True)
-    category: Mapped[str] = mapped_column(String(64), index=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True, default="TELEMETRY_CHANGE")
+    category: Mapped[str] = mapped_column(String(64), index=True, default="OPERATIONAL")
     severity: Mapped[str] = mapped_column(String(16), default="INFO")
+    entity_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    entity_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    title: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    summary: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     message: Mapped[str] = mapped_column(String(512))
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), index=True, default=utc_now
     )
     source: Mapped[str] = mapped_column(String(128), default="SYNTHETIC_SIMULATION")
+    truth_type: Mapped[str] = mapped_column(String(32), default="MEASURED")
+    metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

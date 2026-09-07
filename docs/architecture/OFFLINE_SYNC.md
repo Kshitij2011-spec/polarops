@@ -115,3 +115,19 @@ Scientific observations follow the same resilience abstraction:
 - **Resets**: Communication link back to `ONLINE` and demo queue items to `PENDING`.
 - **Restores**: Baseline hero incident `INC-2026-04` back to `ACTIVE` if it was resolved during tests.
 - **Preserves**: Does **NOT** delete canonical seed data, mutate Day 1–3 baseline resources (fuel, water, warehouse spares), or create duplicate entities.
+
+---
+
+## 7. Stepped Priority Reconnection Experience (Day 2)
+
+During operator-triggered network restoration, the UI visibly steps through discrete reconciliation phases reflecting the backend queue state:
+1. **Link Restoration Handshake**: Satellite transceiver transitions to `RESTORING`.
+2. **Priority Batch Transfers**:
+   - `P0 Critical` telemetry events (e.g. generator trips, life support overrides) transferred first.
+   - `P1 High` maintenance work orders and pump diagnostics transferred.
+   - `P2 Important` buffered science observations and experiment logs transferred.
+   - `P3 Routine` ambient meteorological pings transferred.
+3. **Cryptographic Checksum Verification**: Incoming UTF-8 canonical SHA-256 hashes are recalculated against stored payload signatures to verify data integrity without corruption.
+4. **Server ACK & Reconciled State**: Individual items advance to `RECONCILED` with persistent database commit timestamps.
+5. **Operational Normalization**: Station link returns to `ONLINE` with 0 unsynced items.
+

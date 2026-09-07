@@ -13,6 +13,8 @@ import { ScenariosView } from "./components/Scenarios/ScenariosView";
 import { ResilienceView } from "./components/Resilience/ResilienceView";
 import { PrivacyPolicy } from "./components/PrivacyPolicy";
 import { TermsAndConditions } from "./components/TermsAndConditions";
+import { ActivityStream } from "./components/ActivityStream";
+import { ExplanationDrawer } from "./components/ExplanationDrawer";
 
 function getViewFromPath(): ViewMode {
   if (typeof window === "undefined") return "COMMAND_CENTER";
@@ -29,13 +31,38 @@ function getViewFromPath(): ViewMode {
 function getAssetIdFromPath(): string {
   if (typeof window === "undefined") return "G-02";
   const match = window.location.pathname.match(/\/assets\/([^/]+)/);
-  return match ? (match[1] === "ASSET-GEN-02" ? "G-02" : match[1]) : "G-02";
+  if (!match || !match[1]) return "G-02";
+  return match[1] === "ASSET-GEN-02" ? "G-02" : match[1];
 }
 
 export default function App() {
   const [selectedStationId, setSelectedStationId] = useState<string>("STATION-BHARATI");
   const [activeView, setActiveView] = useState<ViewMode>(getViewFromPath);
   const [inspectedAssetId, setInspectedAssetId] = useState<string>(getAssetIdFromPath);
+  const [isExplanationOpen, setIsExplanationOpen] = useState<boolean>(false);
+  const [explanationDomain, setExplanationDomain] = useState<string>("ASSET");
+  const [explanationEntityId, setExplanationEntityId] = useState<string>("G-02");
+
+  const handleOpenExplanation = (domain: string, entityId: string) => {
+    setExplanationDomain(domain);
+    setExplanationEntityId(entityId);
+    setIsExplanationOpen(true);
+  };
+
+  const handleRouteNavigation = (route: string) => {
+    if (route.startsWith("/assets/")) {
+      const id = route.replace("/assets/", "");
+      handleInspectAsset(id);
+    } else if (route.startsWith("/scenarios")) {
+      navigateToView("SCENARIOS");
+    } else if (route.startsWith("/resources")) {
+      navigateToView("RESOURCES");
+    } else if (route.startsWith("/resilience")) {
+      navigateToView("RESILIENCE");
+    } else if (route === "/") {
+      navigateToView("COMMAND_CENTER");
+    }
+  };
 
   useEffect(() => {
     const handlePopState = () => {
@@ -85,7 +112,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-polar-900 text-polar-100 flex flex-col font-sans selection:bg-accent-cyan/20 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0f1117] text-slate-900 dark:text-[#e4e8f0] flex flex-col font-sans selection:bg-blue-100 dark:selection:bg-blue-900/40 transition-colors">
       {/* ── Top Command Bar ─────────────────────────────── */}
       <Header
         selectedStationId={selectedStationId}
@@ -108,14 +135,14 @@ export default function App() {
         {isLoading && (
           <div
             data-testid="loading-indicator"
-            className="flex flex-col items-center justify-center min-h-[420px] gap-4 rounded border border-polar-700 bg-polar-800/40 p-12 backdrop-blur-sm"
+            className="flex flex-col items-center justify-center min-h-[420px] gap-4 rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white/70 dark:bg-[#181b24]/40 p-12 backdrop-blur-sm"
           >
-            <Loader2 className="h-8 w-8 animate-spin text-accent-cyan" />
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-[#5b9cf5]" />
             <div className="text-center">
-              <div className="text-sm font-mono font-bold text-polar-200 uppercase tracking-wider">
+              <div className="text-sm font-mono font-bold text-slate-800 dark:text-[#e4e8f0] uppercase tracking-wider">
                 CONNECTING TO STATION TELEMETRY BUS…
               </div>
-              <p className="text-xs text-polar-400 mt-1 font-mono">
+              <p className="text-xs text-slate-500 dark:text-[#7a8194] mt-1 font-mono">
                 Synchronizing real-time sensor metrics and topological state from {selectedStationId}
               </p>
             </div>
@@ -162,6 +189,7 @@ export default function App() {
               <AssetIntelligenceView
                 assetId={inspectedAssetId}
                 onBack={handleBackToCommandCenter}
+                onOpenExplanation={handleOpenExplanation}
               />
             ) : activeView === "RESOURCES" ? (
               <ResourcesView
@@ -174,6 +202,7 @@ export default function App() {
                 stationId={selectedStationId}
                 onBack={handleBackToCommandCenter}
                 onInspectAsset={handleInspectAsset}
+                onOpenExplanation={handleOpenExplanation}
               />
             ) : activeView === "RESILIENCE" ? (
               <ResilienceView
@@ -190,20 +219,38 @@ export default function App() {
                 <CriticalEvents
                   events={overview.critical_events}
                   onInspectAsset={handleInspectAsset}
+                  onOpenExplanation={handleOpenExplanation}
                 />
 
-                {/* 3. Spatial Topology & Schematic */}
+                {/* 3. Live Operational Activity Stream (Day 2) */}
+                <ActivityStream
+                  stationId={selectedStationId}
+                  onOpenExplanation={handleOpenExplanation}
+                  onNavigate={handleRouteNavigation}
+                />
+
+                {/* 4. Spatial Topology & Schematic */}
                 <StationSchematic
                   stationName={overview.name}
                   onInspectAsset={handleInspectAsset}
                 />
 
-                {/* 4. Subsystem Telemetry & Health Grid */}
+                {/* 5. Subsystem Telemetry & Health Grid */}
                 <SubsystemGrid subsystems={overview.subsystem_summary} />
               </div>
             )}
           </>
         ) : null}
+
+        {/* ── Deterministic Operational Explanation Drawer (Day 2) ── */}
+        <ExplanationDrawer
+          isOpen={isExplanationOpen}
+          onClose={() => setIsExplanationOpen(false)}
+          domain={explanationDomain}
+          entityId={explanationEntityId}
+          stationId={selectedStationId}
+          onNavigate={handleRouteNavigation}
+        />
       </main>
 
       {/* ── Operational Status Footer ───────────────────── */}

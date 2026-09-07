@@ -406,9 +406,16 @@ export interface ScenarioSimulateResponse {
   baseline_risk_level: string;
   scenario_risk_level: string;
   decision_options: ScenarioDecisionOption[];
+  thermal_demand_kw: number;
+  projected_load_kw: number;
+  available_capacity_kw: number;
+  reserve_margin_kw: number;
+  reserve_margin_percent: number;
+  recovery_constraints: RecoveryConstraint[];
   assumptions: string[];
   computed_at: string;
   truth_type: string;
+  source_context: string[];
 }
 
 // ── DAY 3 FETCHERS ────────────────────────────────────────────────────────
@@ -819,4 +826,145 @@ export async function recordOperationalMemory(data: {
   if (!res.ok) throw new Error(`Failed to record operational memory (${res.status})`);
   return res.json() as Promise<OperationalMemory>;
 }
+
+// ── OPERATIONAL EVENT STREAM & EXPLAINABILITY (DAY 2) ─────────────────────────
+
+export interface OperationalEvent {
+  id: string;
+  timestamp: string;
+  station_id: string;
+  event_type: string;
+  entity_type: string;
+  entity_id: string;
+  title: string;
+  summary: string;
+  severity: "INFO" | "WARNING" | "CRITICAL" | "SYSTEM";
+  truth_type: string;
+  metadata?: Record<string, unknown> | null;
+  is_synthetic: boolean;
+}
+
+export interface EventListResponse {
+  events: OperationalEvent[];
+  total_count: number;
+  station_id: string;
+  simulation_active: boolean;
+  last_updated: string;
+}
+
+export interface ExplanationEvidence {
+  factor: string;
+  metric: string;
+  value: string | number | boolean;
+  threshold?: string | number | null;
+  status: "NOMINAL" | "WARNING" | "CRITICAL" | "LOW" | "MEDIUM" | "HIGH";
+  detail: string;
+}
+
+export interface ExplanationConsequence {
+  domain: string;
+  impact: string;
+  blast_radius_depth: number;
+  description: string;
+}
+
+export interface RecoveryConstraint {
+  constraint_type: string;
+  resource_id?: string | null;
+  description: string;
+  impact_level: "LOW" | "MEDIUM" | "HIGH" | "BLOCKING";
+}
+
+export interface RecommendedNextStep {
+  action_code: string;
+  title: string;
+  description: string;
+  target_route: string;
+  action_type: "INSPECT" | "SIMULATE" | "REVIEW" | "MITIGATE";
+}
+
+export interface ExplanationResponse {
+  subject: string;
+  domain: string;
+  entity_id: string;
+  station_id: string;
+  severity: "INFO" | "WARNING" | "CRITICAL";
+  summary: string;
+  why_it_matters: string;
+  evidence: ExplanationEvidence[];
+  consequences: ExplanationConsequence[];
+  recovery_constraints: RecoveryConstraint[];
+  recommended_next_steps: RecommendedNextStep[];
+  confidence: number;
+  truth_type: string;
+  source_context: string[];
+  timestamp: string;
+}
+
+export async function fetchOperationalEvents(params?: {
+  station_id?: string;
+  severity?: string;
+  event_type?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<EventListResponse> {
+  const station = params?.station_id ?? "STATION-BHARATI";
+  let url = `${API_BASE}/events?station_id=${encodeURIComponent(station)}`;
+  if (params?.severity) {
+    url += `&severity=${encodeURIComponent(params.severity)}`;
+  }
+  if (params?.event_type) {
+    url += `&event_type=${encodeURIComponent(params.event_type)}`;
+  }
+  if (params?.limit) {
+    url += `&limit=${params.limit}`;
+  }
+  if (params?.offset) {
+    url += `&offset=${params.offset}`;
+  }
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch operational events (${res.status})`);
+  return res.json() as Promise<EventListResponse>;
+}
+
+export async function fetchExplanation(
+  domain: string,
+  entityId: string,
+  stationId: string = "STATION-BHARATI"
+): Promise<ExplanationResponse> {
+  const url = `${API_BASE}/explain/${encodeURIComponent(domain)}/${encodeURIComponent(entityId)}?station_id=${encodeURIComponent(stationId)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ detail: "Unknown error" }));
+    throw new Error(errorBody.detail || `Failed to fetch operational explanation (${res.status})`);
+  }
+  return res.json() as Promise<ExplanationResponse>;
+}
+
+export async function simulateDemoEvent(
+  stepIndex?: number,
+  stationId: string = "STATION-BHARATI"
+): Promise<OperationalEvent> {
+  const res = await fetch(`${API_BASE}/events/simulate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      step_index: stepIndex,
+      station_id: stationId,
+    }),
+  });
+  if (!res.ok) throw new Error(`Failed to simulate demo event (${res.status})`);
+  return res.json() as Promise<OperationalEvent>;
+}
+
+export async function resetDemoEvents(
+  stationId: string = "STATION-BHARATI"
+): Promise<{ status: string; message: string; events_reset_count: number }> {
+  const res = await fetch(`${API_BASE}/events/reset?station_id=${encodeURIComponent(stationId)}`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(`Failed to reset events (${res.status})`);
+  return res.json() as Promise<{ status: string; message: string; events_reset_count: number }>;
+}
+
 

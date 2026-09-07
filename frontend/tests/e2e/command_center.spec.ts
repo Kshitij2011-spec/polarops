@@ -40,8 +40,8 @@ test.describe("PolarOps Station Command Center (Day 1 MVP)", () => {
 
     // 3. Verify Ambient Weather from backend
     await expect(page.getByText(/ENVIRONMENT/i)).toBeVisible();
-    await expect(page.getByText(/-28\.5°C/i)).toBeVisible();
-    await expect(page.getByText(/42 kt/i)).toBeVisible();
+    await expect(page.getByText(/-28\.5°C/i).first()).toBeVisible();
+    await expect(page.getByText(/42 kt/i).first()).toBeVisible();
 
     // 4. Verify G-02 Hero Anomaly in Critical Events
     await expect(page.getByText(/CRITICAL OPERATIONAL EVENT/i)).toBeVisible();

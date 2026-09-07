@@ -12,9 +12,10 @@ import { TelemetryTrends } from "./TelemetryTrends";
 export interface AssetIntelligenceViewProps {
   assetId: string;
   onBack: () => void;
+  onOpenExplanation?: (domain: string, entityId: string) => void;
 }
 
-export function AssetIntelligenceView({ assetId, onBack }: AssetIntelligenceViewProps) {
+export function AssetIntelligenceView({ assetId, onBack, onOpenExplanation }: AssetIntelligenceViewProps) {
   const {
     data: asset,
     isLoading: isAssetLoading,
@@ -126,7 +127,7 @@ export function AssetIntelligenceView({ assetId, onBack }: AssetIntelligenceView
           Risk scoring calculation unavailable.
         </div>
       ) : (
-        <RiskEngineCard risk={risk} />
+        <RiskEngineCard risk={risk} onOpenExplanation={onOpenExplanation} />
       )}
 
       {/* ── 4. Multi-Hop Relational Dependency Blast Radius ── */}
