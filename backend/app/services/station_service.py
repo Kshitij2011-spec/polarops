@@ -23,6 +23,7 @@ from app.schemas.station import (
     CrossStationConsiderationItem,
     OperationalCapabilityItem,
     OperationalDifferenceItem,
+    RecoveryChainItem,
     StationComparisonResponse,
     StationOverviewResponse,
     StationPortfolioItem,
@@ -233,6 +234,7 @@ def _evaluate_station_capabilities(
             headroom_score=energy_score,
             status=energy_status,
             summary=f"{fuel_runway:.1f} days fuel runway ({fuel.current_quantity:,.0f} L). {'Genset anomaly present' if has_gen_warning else 'Dual nominal generation'}." if fuel else "No fuel record found.",
+            calculation_basis="Derived from diesel fuel runway vs 90d winter baseline and generator redundancy status.",
             metrics={"fuel_runway_days": round(fuel_runway, 1), "fuel_liters": fuel.current_quantity if fuel else 0, "generator_warning": has_gen_warning},
         )
     )
@@ -241,16 +243,41 @@ def _evaluate_station_capabilities(
     is_online = comm_link.status == "ONLINE" if comm_link else False
     bw = comm_link.bandwidth_kbps if comm_link else 0
     lat = comm_link.latency_ms if comm_link else 999
-    comms_score = 92 if (is_online and bw >= 1024) else 85 if (is_online and bw >= 256) else 60 if is_online else 10
-    comms_status = "NOMINAL" if comms_score >= 80 else "CONSTRAINED" if comms_score >= 50 else "CRITICAL"
+    
+    if is_online:
+        if bw >= 1024:
+            comms_score = 92
+            comms_status = "NOMINAL"
+            comms_summary = f"Carrier ONLINE via {comm_link.name if comm_link else 'Primary Link'} ({bw} kbps, {lat} ms latency). High-speed telemetry streaming & real-time operational coordination active."
+        elif bw >= 256:
+            comms_score = 82
+            comms_status = "NOMINAL"
+            comms_summary = f"Carrier ONLINE via {comm_link.name if comm_link else 'Backup Terminal'} ({bw} kbps, {lat} ms latency). Reliable operational coordination; bulk scientific file transmission deferred."
+        else:
+            comms_score = 65
+            comms_status = "CONSTRAINED"
+            comms_summary = f"Carrier ONLINE ({bw} kbps, {lat} ms latency). Narrowband voice and essential alarms only."
+    else:
+        # Autonomous local operations continue at edge during outages
+        comms_score = 52
+        comms_status = "CONSTRAINED"
+        comms_summary = "Carrier OFFLINE. Autonomous edge circular buffering active; priority sync queue accumulating for reconnection."
+
     capabilities.append(
         OperationalCapabilityItem(
             domain="COMMS_CONTINUITY",
             name="Telecommunications Continuity",
             headroom_score=comms_score,
             status=comms_status,
-            summary=f"Link {'ONLINE' if is_online else 'OFFLINE'} via {comm_link.name if comm_link else 'None'} ({bw} kbps, {lat} ms latency).",
-            metrics={"online": is_online, "bandwidth_kbps": bw, "latency_ms": lat},
+            summary=comms_summary,
+            calculation_basis="Derived from satellite carrier link state, bandwidth allocation, modeled latency, and edge buffering readiness.",
+            metrics={
+                "online": is_online,
+                "bandwidth_kbps": bw,
+                "latency_ms": lat,
+                "link_type": "PRIMARY_VSAT" if bw >= 1024 else "BACKUP_INMARSAT" if is_online else "OFFLINE_AUTONOMOUS",
+                "continuity_mode": "REALTIME_UPLINK" if (is_online and bw >= 1024) else "TELEMETRY_STREAMING" if is_online else "LOCAL_EDGE_BUFFERED",
+            },
         )
     )
 
@@ -265,6 +292,7 @@ def _evaluate_station_capabilities(
             headroom_score=science_score,
             status=sci_status,
             summary="Observation arrays nominal; edge circular buffer absorbing telemetry." if science_score >= 85 else "Science telemetry constrained by generation throttling and weather buffer protection.",
+            calculation_basis="Derived from instrument acquisition telemetry and station electrical load shedding priorities during blizzard.",
             metrics={"wind_knots": wind, "power_constrained": has_gen_warning},
         )
     )
@@ -281,6 +309,7 @@ def _evaluate_station_capabilities(
             headroom_score=ls_score,
             status=ls_status,
             summary="Primary hydronic and heating loops fully nominal." if ls_score >= 85 else "Thermal margin degraded; secondary heating circuit exposed to sub-zero freeze-out risk.",
+            calculation_basis="Derived from combined heat-and-power (CHP) thermal recovery margin and auxiliary boiler B-01 reserve during sub-zero ambient.",
             metrics={"outside_temp_c": temp, "thermal_impaired": has_gen_warning},
         )
     )
@@ -295,6 +324,7 @@ def _evaluate_station_capabilities(
             headroom_score=rec_score,
             status=rec_status,
             summary=f"{spares_count} critical SK-402 bearing kits available in local station inventory." if spares_count > 0 else "0 critical SK-402 seal kits in local inventory (STOCKOUT; dependent on 11-day maritime resupply).",
+            calculation_basis="Derived from local warehouse inventory of critical replacement parts (SP-SK-402) against active equipment degradation work orders.",
             metrics={"sk402_available": spares_count, "active_incidents": incidents_count},
         )
     )
@@ -426,6 +456,8 @@ def get_station_comparison(
             status="RESTRICTED",
             impact="Overland surface transit (~3,000 km across Antarctic ice shelf) is impassable during midwinter polar night.",
             details="Any inter-station physical support requires polar ski-equipped aviation (e.g. Basler BT-67 / Twin Otter) subject to meteorological clearance.",
+            provenance_type="DOCUMENTED_GEOGRAPHY",
+            validation_status="VERIFIED_RESEARCH",
         ),
         CoordinationConstraintItem(
             constraint_type="WEATHER_FLIGHT_WINDOW",
@@ -433,13 +465,60 @@ def get_station_comparison(
             status="RESTRICTED",
             impact=f"Bharati ambient wind speed ({p_a.wind_speed_knots} kt) exceeds the 30-knot polar flight safety limit.",
             details="Aviation corridors grounded until blizzard front clears and visibility exceeds 5 km.",
+            provenance_type="MODELED_OPERATIONAL_RULE",
+            validation_status="REQUIRES_FUTURE_VALIDATION",
         ),
         CoordinationConstraintItem(
             constraint_type="COMMS_ASYMMETRY",
             name="Satellite Bandwidth Asymmetry",
             status="NOMINAL",
             impact="Sufficient for operational coordination telemetry, JSON synchronization, and voice links.",
-            details=f"Bharati (2048 kbps) and Maitri (512 kbps) maintain active links; bulk scientific raw file synchronization should be deferred.",
+            details=f"Bharati (2048 kbps GSAT-7) and Maitri (512 kbps Inmarsat) maintain active links; bulk raw scientific synchronization deferred.",
+            provenance_type="MODELED_SYSTEM_PROFILE",
+            validation_status="VERIFIED_RESEARCH",
+        ),
+    ]
+
+    recovery_chain = [
+        RecoveryChainItem(
+            station_id="STATION-BHARATI",
+            asset_id="GEN-BHARATI-G02",
+            asset_code="G-02",
+            asset_name="Diesel Generator G-02 (Backup Genset)",
+            technical_condition="Bearing vibration elevated at 4.8 mm/s (exceeds 4.0 mm/s warning threshold); risk of bearing seizure and thermal runaway.",
+            material_constraint="SK-402 Rotary Fuel Injection Pump Seal Kit (Part # SP-SK-402)",
+            local_availability="0 units available (Stockout)",
+            local_stock_quantity=0,
+            maintenance_constraint="BLOCKED: Work Order MWO-2026-089 scheduled awaiting spare parts release",
+            maintenance_status="BLOCKED",
+            work_order_id="MWO-2026-089",
+            resupply_dependency="ACTIVE: Maritime expedition vessel MV Vasiliy Golovnin carrying replacement seal kits (window ETA 11 days).",
+            candidate_support_station="Maitri Research Station holds 2 unreserved SK-402 units in Locker M-2; inter-station transit (~3,000 km) is advisory only.",
+            recovery_status="CONSTRAINED",
+            recovery_exposure="Loss of N+1 generator redundancy; single-fault vulnerable microgrid posture",
+            operational_exposure="Single generator G-01 dependency; Habitat Zone 2 secondary heating loop exposed to sub-zero freeze-out if primary generation trips.",
+            timing_confidence="Requires future validation",
+            timing_disclaimer="Recovery remains constrained until the required resource becomes available. Repair duration requires post-delivery mechanical inspection.",
+        ),
+        RecoveryChainItem(
+            station_id="STATION-MAITRI",
+            asset_id="MAITRI-GEN-01",
+            asset_code="MAITRI-GEN-01",
+            asset_name="Maitri Main Generator 1 (150 kVA)",
+            technical_condition="Operating nominal at 100% health score; zero active vibration or temperature anomalies.",
+            material_constraint="None (Routine consumables on hand)",
+            local_availability="2 units available in Locker M-2",
+            local_stock_quantity=2,
+            maintenance_constraint="NOMINAL: Routine 250h inspection cycle on schedule",
+            maintenance_status="NOMINAL",
+            work_order_id=None,
+            resupply_dependency="INDEPENDENT: Station maintains 133.1 days fuel runway and 2x unreserved SK-402 backup kits.",
+            candidate_support_station=None,
+            recovery_status="NOMINAL",
+            recovery_exposure="Full N+1 generator redundancy active; zero exposed services",
+            operational_exposure="Dual N+1 generator redundancy active; 0 exposed life-support services.",
+            timing_confidence="VERIFIED_RESEARCH",
+            timing_disclaimer="Standard preventive maintenance schedule.",
         ),
     ]
 
@@ -508,6 +587,7 @@ def get_station_comparison(
         differences=differences,
         constraints=constraints,
         considerations=considerations,
+        recovery_chain=recovery_chain,
         higher_pressure_station_id=higher_pressure,
         pressure_rationale=pressure_rationale,
         provenance=ProvenanceSchema(

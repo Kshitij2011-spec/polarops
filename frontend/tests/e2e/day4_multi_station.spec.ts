@@ -163,4 +163,36 @@ test.describe('Day 4 Multi-Station Operational Coordination & Approved Frontend 
     await page.goto('/resilience');
     await expect(page.getByRole('heading', { name: /OPERATE THROUGH DISRUPTION/i, level: 1 })).toBeVisible({ timeout: 15000 });
   });
+
+  test('Test 9 — Verify Recovery & Logistics Intelligence Card and "Why is Recovery Constrained?" explanation', async ({ page }) => {
+    await page.goto('/stations');
+    const recoveryCard = page.locator('[data-testid="recovery-logistics-intelligence-card"]');
+    await expect(recoveryCard).toBeVisible({ timeout: 15000 });
+
+    // Verify recovery status and 4-tier chain
+    await expect(recoveryCard.getByText(/RECOVERY STATUS: CONSTRAINED/i)).toBeVisible();
+    await expect(recoveryCard.getByText(/1\. TECHNICAL CONDITION/i)).toBeVisible();
+    await expect(recoveryCard.getByText(/2\. MATERIAL CONSTRAINT/i)).toBeVisible();
+    await expect(recoveryCard.getByText(/3\. LOGISTICS CONSTRAINT/i)).toBeVisible();
+    await expect(recoveryCard.getByText(/4\. OPERATIONAL EXPOSURE/i)).toBeVisible();
+    await expect(recoveryCard.getByText(/MV Vasiliy Golovnin/i).first()).toBeVisible();
+
+    // Verify deterministic timeline progression bar and timing disclaimer
+    await expect(recoveryCard.getByText(/DETERMINISTIC RECOVERY STAGES/i)).toBeVisible();
+    await expect(recoveryCard.getByText(/STAGE 2 OF 5: PART UNAVAILABLE/i)).toBeVisible();
+    await expect(recoveryCard.getByText(/Repair duration requires post-delivery mechanical inspection/i)).toBeVisible();
+    await expect(recoveryCard.getByText(/Requires future validation/i).first()).toBeVisible();
+
+    // Verify "Why is Recovery Constrained?" explanation drawer trigger
+    const whyBtn = page.locator('[data-testid="why-recovery-constrained-btn"]');
+    await expect(whyBtn).toBeVisible();
+    await whyBtn.click();
+
+    // Verify Explanation Drawer opens with structured recovery reasoning
+    const drawer = page.locator('[data-testid="explanation-drawer"]');
+    await expect(drawer).toBeVisible({ timeout: 10000 });
+    await expect(drawer.getByText(/Generator G-02 Recovery Constraint/i)).toBeVisible({ timeout: 10000 });
+    await expect(drawer.getByText(/TECHNICAL_CONDITION|MATERIAL_CONSTRAINT|MAINTENANCE_STATUS/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(drawer.getByText(/MV Vasiliy Golovnin/i).first()).toBeVisible();
+  });
 });

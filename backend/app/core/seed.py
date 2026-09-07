@@ -153,6 +153,11 @@ def ensure_maitri_canonical_state(db: Session) -> None:
             updated_at=base_time,
         )
         db.add(comm_maitri)
+    else:
+        comm_maitri.status = "ONLINE"
+        comm_maitri.bandwidth_kbps = 512
+        comm_maitri.latency_ms = 640
+        comm_maitri.name = "Maitri Inmarsat/Iridium Primary Terminal"
 
     # 6. Assets (Generators, Boiler, Pump)
     maitri_assets = [

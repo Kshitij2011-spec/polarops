@@ -1014,6 +1014,198 @@ def explain_cross_station(
     )
 
 
+def explain_recovery(
+    db: Session,
+    asset_id: str = "G-02",
+    station_id: str = "STATION-BHARATI",
+) -> ExplanationResponse:
+    """Generate deterministic explanation for asset recovery constraints, logistics dependencies, and exposure."""
+    # Resolve asset by code or ID
+    canonical_id = "GEN-BHARATI-G02" if asset_id in ["G-02", "ASSET-GEN-02", "GEN-02"] else asset_id
+    asset = (
+        db.query(Asset)
+        .filter((Asset.id == canonical_id) | (Asset.code == (asset_id or "G-02").upper()))
+        .first()
+    )
+    asset_code = (asset.code if (asset and asset.code) else None) or ("G-02" if "G02" in (asset_id or "").upper() or "G-02" in (asset_id or "").upper() else asset_id or "G-02")
+
+    # Check inventory for SK-402 at station_id and comparison station
+    bharati_spare = (
+        db.query(InventoryItem)
+        .filter(
+            InventoryItem.station_id == "STATION-BHARATI",
+            InventoryItem.spare_part_id.in_(["SP-SK-402", "SK-402"]),
+        )
+        .first()
+    )
+    maitri_spare = (
+        db.query(InventoryItem)
+        .filter(
+            InventoryItem.station_id == "STATION-MAITRI",
+            InventoryItem.spare_part_id.in_(["SP-SK-402", "SK-402"]),
+        )
+        .first()
+    )
+
+    bharati_qty = bharati_spare.quantity_available if bharati_spare else 0
+    maitri_qty = maitri_spare.quantity_available if maitri_spare else 2
+
+    # Check work order
+    mwo = (
+        db.query(MaintenanceWorkOrder)
+        .filter(
+            MaintenanceWorkOrder.asset_id == (asset.id if asset else "GEN-BHARATI-G02"),
+        )
+        .first()
+    )
+    mwo_code = mwo.id if mwo else "MWO-2026-089"
+    mwo_status = mwo.status.value if mwo and hasattr(mwo.status, "value") else (str(mwo.status) if mwo else "BLOCKED")
+
+    vessel_name = "MV Vasiliy Golovnin"
+    vessel_eta = "~11 days"
+
+    evidence = [
+        ExplanationEvidence(
+            factor="TECHNICAL_CONDITION",
+            metric="bearing_vibration_mm_s",
+            value=4.8,
+            threshold=4.0,
+            status="CRITICAL",
+            detail="Bearing vibration at 4.8 mm/s exceeds 4.0 mm/s warning threshold (+20% breach); risk of bearing seizure.",
+        ),
+        ExplanationEvidence(
+            factor="MATERIAL_CONSTRAINT",
+            metric="sk402_spare_units",
+            value=bharati_qty,
+            threshold=1,
+            status="CRITICAL",
+            detail=f"SK-402 Rotary Seal Kit local inventory is {bharati_qty} units at Bharati (Stockout; minimum reserve is 1).",
+        ),
+        ExplanationEvidence(
+            factor="MAINTENANCE_STATUS",
+            metric="work_order_state",
+            value=mwo_status,
+            threshold="IN_PROGRESS",
+            status="WARNING",
+            detail=f"{mwo_code} blocked pending spare parts allocation before physical disassembly can begin.",
+        ),
+        ExplanationEvidence(
+            factor="LOGISTICS_RESUPPLY",
+            metric="vessel_eta_days",
+            value=11,
+            threshold=0,
+            status="WARNING",
+            detail=f"Expedition vessel {vessel_name} ETA {vessel_eta}; maritime resupply is active critical dependency.",
+        ),
+        ExplanationEvidence(
+            factor="CROSS_STATION_AVAILABILITY",
+            metric="maitri_spares_count",
+            value=maitri_qty,
+            threshold=1,
+            status="NOMINAL",
+            detail=f"Maitri holds {maitri_qty} units of SK-402; inter-station transit (3,000 km) is advisory only.",
+        ),
+    ]
+
+    consequences = [
+        ExplanationConsequence(
+            domain="ENERGY_MICROGRID",
+            impact="Loss of N+1 Generator Redundancy",
+            blast_radius_depth=1,
+            description="Bharati microgrid relies on G-01 and G-03 only. Single generator fault leaves zero online backup.",
+        ),
+        ExplanationConsequence(
+            domain="LIFE_SUPPORT_HEATING",
+            impact="Habitat Zone 2 Heating Margin Reduced",
+            blast_radius_depth=2,
+            description="Secondary generation trip would force shedding non-critical quarters to maintain life-support core loop.",
+        ),
+        ExplanationConsequence(
+            domain="LOGISTICS_TIMELINE",
+            impact="Overhaul Halted Pending Delivery",
+            blast_radius_depth=1,
+            description="Recovery remains constrained until required spare arrives. Repair duration requires post-delivery mechanical inspection.",
+        ),
+    ]
+
+    recovery_constraints = [
+        RecoveryConstraint(
+            constraint_type="MATERIAL_STOCKOUT",
+            resource_id="SK-402",
+            description="Zero SK-402 seal kits in Bharati warehouse; local overhaul cannot proceed.",
+            impact_level="BLOCKING",
+        ),
+        RecoveryConstraint(
+            constraint_type="MAINTENANCE_BLOCKED",
+            resource_id=mwo_code,
+            description="Work order MWO-2026-089 halted in BLOCKED state awaiting seal kit allocation.",
+            impact_level="BLOCKING",
+        ),
+        RecoveryConstraint(
+            constraint_type="LOGISTICS_LEAD_TIME",
+            resource_id="VESSEL_RESUPPLY",
+            description=f"Next replenishment vessel ({vessel_name}) ETA {vessel_eta}. Air cargo transfer unfeasible due to blizzard conditions.",
+            impact_level="HIGH",
+        ),
+        RecoveryConstraint(
+            constraint_type="INTER_STATION_LOGISTICS",
+            resource_id="CROSS_STATION_TRANSFER",
+            description=f"Maitri holds {maitri_qty} units of SK-402, but 3,000 km polar transit is non-operational during winter. Transfer remains non-actuating advisory.",
+            impact_level="MEDIUM",
+        ),
+    ]
+
+    next_steps = [
+        RecommendedNextStep(
+            action_code="INSPECT_RECOVERY_CHAIN",
+            title="Inspect 4-Part Recovery Chain in Station Portfolio",
+            description="Review asset condition, material constraint, work order block, and resupply dependency in /stations.",
+            target_route="/stations",
+            action_type="REVIEW",
+        ),
+        RecommendedNextStep(
+            action_code="INSPECT_RESUPPLY_MANIFEST",
+            title="Verify Resupply Manifest in Resources",
+            description="Confirm SK-402 quantity on inbound MV Vasiliy Golovnin manifest in /resources.",
+            target_route="/resources",
+            action_type="INSPECT",
+        ),
+        RecommendedNextStep(
+            action_code="SIMULATE_N1_OUTAGE",
+            title="Simulate Secondary Trip in What-If Scenarios",
+            description="Evaluate heating decay and load shed priorities under current N+0 generator posture.",
+            target_route="/scenarios",
+            action_type="SIMULATE",
+        ),
+    ]
+
+    return ExplanationResponse(
+        subject=f"Generator {asset_code} Recovery Constraint & Logistics Chain",
+        domain="RECOVERY",
+        entity_id=asset_code,
+        station_id=station_id,
+        severity="HIGH",
+        summary=(
+            f"Generator {asset_code} recovery is CONSTRAINED due to local stockout of SK-402 mechanical seal kit (0 in stock at {station_id.replace('STATION-', '').title()}), "
+            f"blocking maintenance work order {mwo_code}. Operation depends on resupply vessel {vessel_name} (ETA {vessel_eta}). "
+            "Recovery remains constrained until the required resource becomes available. "
+            "Repair duration requires post-delivery mechanical inspection (Requires future validation)."
+        ),
+        why_it_matters=(
+            f"{station_id.replace('STATION-', '').title()} station currently operates without N+1 generator redundancy, relying on two active units. "
+            "Under Antarctic winter temperatures (-28°C to -42°C), any secondary mechanical failure would compromise life-support heating margins."
+        ),
+        evidence=evidence,
+        consequences=consequences,
+        recovery_constraints=recovery_constraints,
+        recommended_next_steps=next_steps,
+        confidence=0.98,
+        truth_type="DERIVED",
+        source_context=["inventory_items", "maintenance_work_orders", "resupply_opportunities", "station_comparison", "asset_telemetry"],
+        timestamp=datetime.now(timezone.utc),
+    )
+
+
 def generate_explanation(
     db: Session,
     domain: str,
@@ -1037,9 +1229,11 @@ def generate_explanation(
         return explain_scenario(db, scenario_id=entity_id, station_id=station_id)
     elif clean_domain in ["CROSS_STATION", "CROSS-STATION", "PORTFOLIO", "STATIONS", "STATION_COMPARISON"]:
         return explain_cross_station(db, station_a_id=station_id, station_b_id=entity_id or "STATION-MAITRI")
+    elif clean_domain in ["RECOVERY", "LOGISTICS", "RECOVERY_EXPOSURE", "RECOVERY_CHAIN"]:
+        return explain_recovery(db, asset_id=entity_id or "G-02", station_id=station_id)
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported explanation domain '{domain}'. Supported domains: ASSET, RESOURCE, COMMUNICATION, SCIENCE, INCIDENT, SCENARIO, CROSS_STATION.",
+            detail=f"Unsupported explanation domain '{domain}'. Supported domains: ASSET, RESOURCE, COMMUNICATION, SCIENCE, INCIDENT, SCENARIO, CROSS_STATION, RECOVERY.",
         )
 

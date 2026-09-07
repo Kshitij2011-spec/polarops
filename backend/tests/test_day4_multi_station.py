@@ -191,3 +191,75 @@ def test_cross_station_determinism_reproducibility(db_session):
     assert comp1.station_b.overall_health == comp2.station_b.overall_health
     assert len(comp1.differences) == len(comp2.differences)
     assert len(comp1.constraints) == len(comp2.constraints)
+
+
+def test_recovery_chain_and_logistics_intelligence(client):
+    """GET /station/comparison exposes structured 4-part recovery chain for G-02 with verified timing disclaimer."""
+    response = client.get("/station/comparison?station_a_id=STATION-BHARATI&station_b_id=STATION-MAITRI")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "recovery_chain" in data
+    assert len(data["recovery_chain"]) >= 1
+
+    g02 = next((r for r in data["recovery_chain"] if r["asset_code"] == "G-02"), None)
+    assert g02 is not None
+    assert g02["recovery_status"] == "CONSTRAINED"
+    assert "4.8 mm/s" in g02["technical_condition"]
+    assert "SK-402" in g02["material_constraint"]
+    assert "0" in g02["local_availability"]
+    assert "BLOCKED" in g02["maintenance_constraint"]
+    assert "MV Vasiliy Golovnin" in g02["resupply_dependency"]
+    assert "N+1" in g02["recovery_exposure"]
+    assert g02["timing_confidence"] == "Requires future validation"
+    assert "post-delivery mechanical inspection" in g02["timing_disclaimer"]
+
+
+def test_recovery_explainability_deterministic(client):
+    """GET /explain/RECOVERY/G-02 returns deterministic causal explanation for recovery constraints."""
+    response = client.get("/explain/RECOVERY/G-02?station_id=STATION-BHARATI")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["domain"] == "RECOVERY"
+    assert data["entity_id"] == "G-02"
+    assert data["severity"] == "HIGH"
+    assert "CONSTRAINED" in data["summary"]
+    assert "SK-402" in data["summary"]
+    assert len(data["evidence"]) >= 4
+    assert len(data["consequences"]) >= 2
+    assert len(data["recovery_constraints"]) >= 3
+    assert len(data["recommended_next_steps"]) >= 3
+
+    # Check specific recovery evidence metrics
+    metric_names = [e["factor"] for e in data["evidence"]]
+    assert "TECHNICAL_CONDITION" in metric_names
+    assert "MATERIAL_CONSTRAINT" in metric_names
+    assert "MAINTENANCE_STATUS" in metric_names
+    assert "LOGISTICS_RESUPPLY" in metric_names
+
+
+def test_headroom_defensible_comms_and_provenance(client):
+    """Headroom scores have calculation_basis, comms logic is defensible (no arbitrary 10/100), and constraints are categorized."""
+    response = client.get("/station/comparison?station_a_id=STATION-BHARATI&station_b_id=STATION-MAITRI")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Capabilities have calculation basis
+    for cap in data["station_a"]["capabilities"]:
+        assert "calculation_basis" in cap
+        assert cap["calculation_basis"] is not None
+        assert len(cap["calculation_basis"]) > 0
+
+    # Comms headroom audit: Maitri's 512 kbps BGAN is an operational link with autonomous edge buffering, NOT 10/100
+    maitri_comms = next((c for c in data["station_b"]["capabilities"] if c["domain"] == "COMMS_CONTINUITY"), None)
+    assert maitri_comms is not None
+    assert maitri_comms["headroom_score"] >= 80, f"Maitri comms headroom should be defensible, got {maitri_comms['headroom_score']}"
+
+    # Constraints have provenance and validation status
+    for c in data["constraints"]:
+        assert "provenance_type" in c
+        assert "validation_status" in c
+        assert c["provenance_type"] in ["DOCUMENTED_GEOGRAPHY", "MODELED_OPERATIONAL_RULE", "MODELED_SYSTEM_PROFILE"]
+        assert c["validation_status"] in ["VERIFIED_RESEARCH", "REQUIRES_FUTURE_VALIDATION"]
+

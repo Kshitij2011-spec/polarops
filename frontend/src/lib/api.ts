@@ -977,6 +977,7 @@ export interface OperationalCapabilityItem {
   headroom_score: number;
   status: "NOMINAL" | "CONSTRAINED" | "CRITICAL" | string;
   summary: string;
+  calculation_basis?: string;
   metrics: Record<string, string | number | boolean>;
 }
 
@@ -996,6 +997,8 @@ export interface CoordinationConstraintItem {
   status: "RESTRICTED" | "IMPASSABLE" | "NOMINAL" | "DEGRADED" | string;
   impact: string;
   details: string;
+  provenance_type?: string;
+  validation_status?: string;
 }
 
 export interface CrossStationConsiderationItem {
@@ -1006,6 +1009,21 @@ export interface CrossStationConsiderationItem {
   rationale: string;
   prerequisites: string[];
   feasibility_status: "FEASIBLE_WITH_CONSTRAINTS" | "RESTRICTED" | "ADVISORY_ONLY" | string;
+}
+
+export interface RecoveryChainItem {
+  station_id: string;
+  asset_id: string;
+  asset_code: string;
+  technical_condition: string;
+  material_constraint: string;
+  local_availability: string;
+  maintenance_constraint: string;
+  resupply_dependency: string;
+  recovery_exposure: string;
+  recovery_status: "CONSTRAINED" | "NOMINAL" | "BLOCKED" | "WATCH" | string;
+  timing_confidence: string;
+  timing_disclaimer: string;
 }
 
 export interface StationPortfolioItem {
@@ -1032,6 +1050,7 @@ export interface StationComparisonResponse {
   differences: OperationalDifferenceItem[];
   constraints: CoordinationConstraintItem[];
   considerations: CrossStationConsiderationItem[];
+  recovery_chain?: RecoveryChainItem[];
   higher_pressure_station_id: string;
   pressure_rationale: string;
   provenance: Provenance;

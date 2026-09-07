@@ -263,6 +263,133 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
         </div>
       </div>
 
+      {/* ── Recovery & Logistics Intelligence Card ───────── */}
+      {(() => {
+        const g02Recovery = data.recovery_chain?.find(
+          (r) => r.asset_code === "G-02" || r.station_id === "STATION-BHARATI"
+        );
+        return (
+          <div
+            data-testid="recovery-logistics-intelligence-card"
+            className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-5 shadow-2xs transition-colors space-y-4"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-[#2a2f3e]/60 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 px-2 rounded bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/80 font-mono font-bold text-xs">
+                  RECOVERY STATUS: {g02Recovery?.recovery_status ?? "CONSTRAINED"}
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider font-mono text-slate-900 dark:text-[#e4e8f0]">
+                    Generator G-02 Recovery &amp; Logistics Chain
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-[#7a8194]">
+                    Deterministic multi-tier recovery constraint tracking (Condition → Missing Spare → Maintenance → Resupply → Exposure)
+                  </p>
+                </div>
+              </div>
+              {onOpenExplanation && (
+                <button
+                  onClick={() => onOpenExplanation("RECOVERY", "G-02")}
+                  data-testid="why-recovery-constrained-btn"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+                >
+                  <HelpCircle className="h-3.5 w-3.5" />
+                  <span>Why is Recovery Constrained?</span>
+                </button>
+              )}
+            </div>
+
+            {/* Structured 4-Tier Recovery Breakdown */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded border border-slate-200 dark:border-[#2a2f3e] bg-slate-50/60 dark:bg-[#141721] space-y-1">
+                <div className="text-[10px] font-mono text-slate-500 dark:text-[#7a8194] uppercase font-bold">
+                  1. TECHNICAL CONDITION
+                </div>
+                <div className="text-xs font-mono font-bold text-slate-800 dark:text-[#e4e8f0]">
+                  {g02Recovery?.technical_condition ?? "G-02 Bearing Vibration 4.8 mm/s"}
+                </div>
+                <p className="text-[11px] font-mono text-slate-600 dark:text-[#9ca3b4]">
+                  Exceeds 4.0 mm/s ceiling; mechanical fatigue risking stator binding under continuous load.
+                </p>
+              </div>
+
+              <div className="p-3 rounded border border-rose-200 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20 space-y-1">
+                <div className="text-[10px] font-mono text-rose-700 dark:text-rose-400 uppercase font-bold">
+                  2. MATERIAL CONSTRAINT
+                </div>
+                <div className="text-xs font-mono font-bold text-rose-800 dark:text-rose-300">
+                  {g02Recovery?.material_constraint ?? "SK-402 Local Stock: 0 (Stockout)"}
+                </div>
+                <p className="text-[11px] font-mono text-slate-600 dark:text-[#9ca3b4]">
+                  {g02Recovery?.local_availability ?? "0 units available at Bharati; 2 units stored at Maitri (3,000 km)"}
+                </p>
+              </div>
+
+              <div className="p-3 rounded border border-slate-200 dark:border-[#2a2f3e] bg-slate-50/60 dark:bg-[#141721] space-y-1">
+                <div className="text-[10px] font-mono text-slate-500 dark:text-[#7a8194] uppercase font-bold">
+                  3. LOGISTICS CONSTRAINT
+                </div>
+                <div className="text-xs font-mono font-bold text-blue-700 dark:text-[#5b9cf5]">
+                  {g02Recovery?.resupply_dependency ?? "MV Vasiliy Golovnin ETA ~11d"}
+                </div>
+                <p className="text-[11px] font-mono text-slate-600 dark:text-[#9ca3b4]">
+                  Maritime replenishment sole delivery vector. Cross-station transfer from Maitri is advisory only.
+                </p>
+              </div>
+
+              <div className="p-3 rounded border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/20 space-y-1">
+                <div className="text-[10px] font-mono text-amber-700 dark:text-amber-400 uppercase font-bold">
+                  4. OPERATIONAL EXPOSURE
+                </div>
+                <div className="text-xs font-mono font-bold text-amber-800 dark:text-amber-300">
+                  {g02Recovery?.recovery_exposure ?? "Loss of N+1 Redundancy"}
+                </div>
+                <p className="text-[11px] font-mono text-slate-600 dark:text-[#9ca3b4]">
+                  {g02Recovery?.maintenance_constraint ?? "Work order MWO-2026-089 blocked until replacement seals arrive."}
+                </p>
+              </div>
+            </div>
+
+            {/* Deterministic Timeline Progression Bar */}
+            <div className="p-3 rounded border border-slate-200 dark:border-[#2a2f3e] bg-slate-50/40 dark:bg-[#141721] space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-mono">
+                <span className="font-bold text-slate-700 dark:text-[#c4cbd8]">
+                  DETERMINISTIC RECOVERY STAGES:
+                </span>
+                <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                  STAGE 2 OF 5: PART UNAVAILABLE (WAITING FOR RESUPPLY)
+                </span>
+              </div>
+              <div className="grid grid-cols-5 gap-1 text-center text-[10px] font-mono font-bold">
+                <div className="py-1 px-1.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+                  1. DEFECT IDENTIFIED
+                </div>
+                <div className="py-1 px-1.5 rounded bg-rose-500 text-white animate-pulse">
+                  2. PART UNAVAILABLE
+                </div>
+                <div className="py-1 px-1.5 rounded bg-slate-200/60 dark:bg-[#202534] text-slate-400">
+                  3. RESUPPLY WINDOW (~11d)
+                </div>
+                <div className="py-1 px-1.5 rounded bg-slate-200/60 dark:bg-[#202534] text-slate-400">
+                  4. PART ON SITE
+                </div>
+                <div className="py-1 px-1.5 rounded bg-slate-200/60 dark:bg-[#202534] text-slate-400">
+                  5. OVERHAUL COMMENCES
+                </div>
+              </div>
+              <div className="text-[10px] font-mono text-slate-500 dark:text-[#7a8194] flex flex-wrap items-center justify-between gap-1 pt-1">
+                <span>
+                  TIMING NOTE: {g02Recovery?.timing_disclaimer ?? "Recovery remains constrained until the required resource becomes available. Repair duration requires post-delivery mechanical inspection."}
+                </span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">
+                  Confidence: {g02Recovery?.timing_confidence ?? "Requires future validation"}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Operational Capabilities Headroom (0-100) ────── */}
       <div
         data-testid="operational-capabilities-section"
@@ -342,7 +469,7 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-200/60 dark:border-[#2a2f3e]/40 text-[10px] font-mono">
+                <div className="pt-2 border-t border-slate-200/60 dark:border-[#2a2f3e]/40 text-[10px] font-mono space-y-1">
                   <span
                     className={
                       delta > 0
@@ -358,6 +485,12 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
                       ? `Bharati +${Math.abs(delta)}% headroom`
                       : "Parity"}
                   </span>
+                  {capA.calculation_basis && (
+                    <div className="text-[9px] text-slate-500 dark:text-[#7a8194] leading-tight">
+                      <span className="font-semibold text-slate-600 dark:text-[#9ca3b4]">Basis: </span>
+                      {capA.calculation_basis}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -468,15 +601,33 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
                   <span className="text-xs font-mono font-bold text-slate-900 dark:text-[#e4e8f0]">
                     {c.name}
                   </span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
-                      c.status === "RESTRICTED" || c.status === "IMPASSABLE"
-                        ? "bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300"
-                        : "bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300"
-                    }`}
-                  >
-                    {c.status}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {c.provenance_type && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-slate-100 dark:bg-[#1e2230] text-slate-600 dark:text-[#9ca3b4] border border-slate-200 dark:border-[#3d4556]">
+                        {c.provenance_type.replace(/_/g, " ")}
+                      </span>
+                    )}
+                    {c.validation_status && (
+                      <span
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-mono ${
+                          c.validation_status === "VERIFIED_RESEARCH"
+                            ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                            : "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                        }`}
+                      >
+                        {c.validation_status.replace(/_/g, " ")}
+                      </span>
+                    )}
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                        c.status === "RESTRICTED" || c.status === "IMPASSABLE"
+                          ? "bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300"
+                          : "bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300"
+                      }`}
+                    >
+                      {c.status}
+                    </span>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-[#9ca3b4] font-mono">{c.details}</p>
                 <div className="text-[11px] text-amber-700 dark:text-amber-400 font-mono font-semibold pt-0.5">

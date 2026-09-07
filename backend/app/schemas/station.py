@@ -63,6 +63,7 @@ class OperationalCapabilityItem(BaseModel):
     headroom_score: int = Field(ge=0, le=100)
     status: str  # "NOMINAL", "CONSTRAINED", "CRITICAL"
     summary: str
+    calculation_basis: Optional[str] = None
     metrics: dict[str, str | int | float | bool] = Field(default_factory=dict)
 
 
@@ -86,6 +87,8 @@ class CoordinationConstraintItem(BaseModel):
     status: str  # "RESTRICTED", "IMPASSABLE", "NOMINAL", "DEGRADED"
     impact: str
     details: str
+    provenance_type: str = "DOCUMENTED_GEOGRAPHY"  # "DOCUMENTED_GEOGRAPHY", "MODELED_OPERATIONAL_RULE", "MODELED_SYSTEM_PROFILE"
+    validation_status: str = "VERIFIED_RESEARCH"  # "VERIFIED_RESEARCH", "REQUIRES_FUTURE_VALIDATION"
 
 
 class CrossStationConsiderationItem(BaseModel):
@@ -98,6 +101,29 @@ class CrossStationConsiderationItem(BaseModel):
     rationale: str
     prerequisites: list[str] = Field(default_factory=list)
     feasibility_status: str  # "FEASIBLE_WITH_CONSTRAINTS", "RESTRICTED", "ADVISORY_ONLY"
+
+
+class RecoveryChainItem(BaseModel):
+    """Structured end-to-end recovery chain distinguishing technical, material, and logistics constraints."""
+
+    station_id: str
+    asset_id: str
+    asset_code: str = "G-02"
+    asset_name: str
+    technical_condition: str
+    material_constraint: str
+    local_availability: str = "0 units available (Stockout)"
+    local_stock_quantity: int = 0
+    maintenance_constraint: str = "BLOCKED (MWO-2026-089 awaiting parts)"
+    maintenance_status: str = "BLOCKED"
+    work_order_id: Optional[str] = None
+    resupply_dependency: str
+    candidate_support_station: Optional[str] = None
+    recovery_status: str = "CONSTRAINED"  # "CONSTRAINED", "NOMINAL", "MONITORING"
+    recovery_exposure: str = "Loss of N+1 redundancy; single-fault vulnerability"
+    operational_exposure: str = "Single generator G-01 dependency; secondary heating loop exposed to freeze-out"
+    timing_confidence: str = "Requires future validation"
+    timing_disclaimer: str = "Recovery remains constrained until the required resource becomes available. Repair duration requires post-delivery mechanical inspection."
 
 
 class StationPortfolioItem(BaseModel):
@@ -128,6 +154,7 @@ class StationComparisonResponse(BaseModel):
     differences: list[OperationalDifferenceItem] = Field(default_factory=list)
     constraints: list[CoordinationConstraintItem] = Field(default_factory=list)
     considerations: list[CrossStationConsiderationItem] = Field(default_factory=list)
+    recovery_chain: list[RecoveryChainItem] = Field(default_factory=list)
     higher_pressure_station_id: str
     pressure_rationale: str
     provenance: ProvenanceSchema
