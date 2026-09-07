@@ -262,64 +262,103 @@ def reset_operational_events(db: Session, station_id: str = "STATION-BHARATI") -
 
     # Re-seed canonical baseline events with realistic staggered timestamps
     now = datetime.now(timezone.utc)
-    base_events = [
-        (
-            "COMMUNICATION_STATE", "SYSTEM", "COMMS", "VSAT_UPLINK",
-            "VSAT Ku-Band satellite carrier online",
-            "Carrier established at 680 ms latency with 99.8% nominal packet delivery.",
-            "MEASURED", now - timedelta(minutes=45),
-            {"carrier": "VSAT Ku-Band", "latency_ms": 680}
-        ),
-        (
-            "SCIENCE_BUFFER_EVENT", "INFO", "SCIENCE", "INST-S17-RADAR",
-            "S-17 Auroral Radar sampling nominal",
-            "Instrument active sampling 146.2 TECU ionospheric sweeps; edge buffer nominal.",
-            "MEASURED", now - timedelta(minutes=30),
-            {"tecu": 146.2, "buffer_percent": 42.0}
-        ),
-        (
-            "WEATHER_CHANGE", "INFO", "ENVIRONMENT", "WEATHER",
-            "Ambient temperature decreased to -28.5°C",
-            "Winter blizzard conditions approaching; wind speed 42 kt, wind chill -41.2°C.",
-            "MEASURED", now - timedelta(minutes=22),
-            {"temperature_c": -28.5, "wind_chill_c": -41.2}
-        ),
-        (
-            "TELEMETRY_CHANGE", "INFO", "RESOURCE", "DIESEL_LFO",
-            "Fuel runway projected at 70.3 days",
-            "Winter target requires 90 days; resupply window ETA 11 days provides buffer.",
-            "DERIVED", now - timedelta(minutes=15),
-            {"runway_days": 70.3, "target_days": 90.0, "resupply_days": 11.0}
-        ),
-        (
-            "INVENTORY_SHORTAGE", "WARNING", "RESOURCE", "SK-402",
-            "SK-402 Rotary Seal Kit zero local stock",
-            "Central spares bin SK-402 depleted; recovery chain dependent on maritime resupply.",
-            "MEASURED", now - timedelta(minutes=10),
-            {"part_id": "SK-402", "stock": 0, "resupply_eta_days": 11}
-        ),
-        (
-            "DEPENDENCY_EXPOSURE", "WARNING", "SERVICE", "ZONE_2_HEATING",
-            "Habitat Zone 2 heating dependency exposed",
-            "Generator G-02 thermal loop heat margin degraded; secondary heating circuit exposed.",
-            "DERIVED", now - timedelta(minutes=6),
-            {"affected_zone": "Habitat Zone 2", "loop": "Thermal Loop B"}
-        ),
-        (
-            "RISK_CHANGE", "WARNING", "ASSET", "G-02",
-            "G-02 condition risk increased to 78/100",
-            "Composite risk elevated due to persistent bearing vibration and high coolant temp.",
-            "DERIVED", now - timedelta(minutes=3),
-            {"risk_score": 78, "health_score": 62}
-        ),
-        (
-            "THRESHOLD_BREACH", "WARNING", "ASSET", "G-02",
-            "G-02 bearing vibration crossed warning limit",
-            "Bearing vibration reached 4.8 mm/s, exceeding warning threshold limit of 4.0 mm/s.",
-            "MEASURED", now - timedelta(minutes=1),
-            {"metric": "bearing_vibration_mm_s", "value": 4.8, "threshold": 4.0}
-        ),
-    ]
+    if station_id in ["STATION-MAITRI", "MAITRI"]:
+        base_events = [
+            (
+                "COMMUNICATION_STATE", "SYSTEM", "COMMS", "LINK-MAITRI-SAT-01",
+                "Maitri Inmarsat / Iridium terminal online",
+                "Carrier online at 640 ms latency, 512 kbps bandwidth with 99.9% packet delivery.",
+                "MEASURED", now - timedelta(minutes=45),
+                {"carrier": "Inmarsat/Iridium", "latency_ms": 640, "bandwidth_kbps": 512}
+            ),
+            (
+                "WEATHER_CHANGE", "INFO", "ENVIRONMENT", "WEATHER",
+                "Maitri ambient weather: -18.2°C, wind 14.5 kt",
+                "Schirmacher Oasis conditions calm; low blizzarding probability; clear visibility 25 km.",
+                "MEASURED", now - timedelta(minutes=30),
+                {"temperature_c": -18.2, "wind_speed_kt": 14.5, "conditions": "CLEAR_OASIS"}
+            ),
+            (
+                "TELEMETRY_CHANGE", "INFO", "RESOURCE", "DIESEL_LFO",
+                "Maitri fuel runway projected at 133.1 days",
+                "Storage stable at 198,000 L (82.5% capacity); +43.1 days headroom over 90d winter baseline.",
+                "DERIVED", now - timedelta(minutes=20),
+                {"runway_days": 133.1, "capacity_liters": 240000.0, "current_liters": 198000.0}
+            ),
+            (
+                "RESOURCE_HEADROOM", "INFO", "RESOURCE", "SK-402",
+                "Maitri central spares holds 2x SK-402 rotary seal kits",
+                "Spares locker M-2 holds 2 unreserved SK-402 kits; available for potential inter-station support.",
+                "MEASURED", now - timedelta(minutes=12),
+                {"part_id": "SK-402", "quantity_available": 2, "station": "MAITRI"}
+            ),
+            (
+                "SYSTEM_HEALTH", "INFO", "ASSET", "MAITRI-GEN-01",
+                "Maitri power generation nominal at 150 kVA",
+                "Generators G-01 and G-02 running balanced load; zero active maintenance blockers.",
+                "MEASURED", now - timedelta(minutes=5),
+                {"health_score": 100, "status": "NOMINAL"}
+            ),
+        ]
+    else:
+        base_events = [
+            (
+                "COMMUNICATION_STATE", "SYSTEM", "COMMS", "VSAT_UPLINK",
+                "VSAT Ku-Band satellite carrier online",
+                "Carrier established at 680 ms latency with 99.8% nominal packet delivery.",
+                "MEASURED", now - timedelta(minutes=45),
+                {"carrier": "VSAT Ku-Band", "latency_ms": 680}
+            ),
+            (
+                "SCIENCE_BUFFER_EVENT", "INFO", "SCIENCE", "INST-S17-RADAR",
+                "S-17 Auroral Radar sampling nominal",
+                "Instrument active sampling 146.2 TECU ionospheric sweeps; edge buffer nominal.",
+                "MEASURED", now - timedelta(minutes=30),
+                {"tecu": 146.2, "buffer_percent": 42.0}
+            ),
+            (
+                "WEATHER_CHANGE", "INFO", "ENVIRONMENT", "WEATHER",
+                "Ambient temperature decreased to -28.5°C",
+                "Winter blizzard conditions approaching; wind speed 42 kt, wind chill -41.2°C.",
+                "MEASURED", now - timedelta(minutes=22),
+                {"temperature_c": -28.5, "wind_chill_c": -41.2}
+            ),
+            (
+                "TELEMETRY_CHANGE", "INFO", "RESOURCE", "DIESEL_LFO",
+                "Fuel runway projected at 70.3 days",
+                "Winter target requires 90 days; resupply window ETA 11 days provides buffer.",
+                "DERIVED", now - timedelta(minutes=15),
+                {"runway_days": 70.3, "target_days": 90.0, "resupply_days": 11.0}
+            ),
+            (
+                "INVENTORY_SHORTAGE", "WARNING", "RESOURCE", "SK-402",
+                "SK-402 Rotary Seal Kit zero local stock",
+                "Central spares bin SK-402 depleted; recovery chain dependent on maritime resupply.",
+                "MEASURED", now - timedelta(minutes=10),
+                {"part_id": "SK-402", "stock": 0, "resupply_eta_days": 11}
+            ),
+            (
+                "DEPENDENCY_EXPOSURE", "WARNING", "SERVICE", "ZONE_2_HEATING",
+                "Habitat Zone 2 heating dependency exposed",
+                "Generator G-02 thermal loop heat margin degraded; secondary heating circuit exposed.",
+                "DERIVED", now - timedelta(minutes=6),
+                {"affected_zone": "Habitat Zone 2", "loop": "Thermal Loop B"}
+            ),
+            (
+                "RISK_CHANGE", "WARNING", "ASSET", "G-02",
+                "G-02 condition risk increased to 78/100",
+                "Composite risk elevated due to persistent bearing vibration and high coolant temp.",
+                "DERIVED", now - timedelta(minutes=3),
+                {"risk_score": 78, "health_score": 62}
+            ),
+            (
+                "THRESHOLD_BREACH", "WARNING", "ASSET", "G-02",
+                "G-02 bearing vibration crossed warning limit",
+                "Bearing vibration reached 4.8 mm/s, exceeding warning threshold limit of 4.0 mm/s.",
+                "MEASURED", now - timedelta(minutes=1),
+                {"metric": "bearing_vibration_mm_s", "value": 4.8, "threshold": 4.0}
+            ),
+        ]
 
     count = 0
     for ev_type, sev, ent_type, ent_id, title, summary, truth, ts, meta in base_events:

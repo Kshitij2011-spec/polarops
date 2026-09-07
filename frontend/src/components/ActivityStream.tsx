@@ -202,7 +202,7 @@ export function ActivityStream({
       {/* Events List */}
       {loading ? (
         <div className="py-12 text-center font-mono text-xs text-slate-500 dark:text-[#7a8194]">
-          Loading operational activity stream...
+          Loading activity stream events...
         </div>
       ) : filteredEvents.length === 0 ? (
         <div className="py-8 text-center font-mono text-xs text-slate-500 dark:text-[#7a8194]">

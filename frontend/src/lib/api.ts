@@ -967,4 +967,141 @@ export async function resetDemoEvents(
   return res.json() as Promise<{ status: string; message: string; events_reset_count: number }>;
 }
 
+// ==========================================
+// DAY 4: MULTI-STATION COORDINATION & COMPARISON
+// ==========================================
+
+export interface OperationalCapabilityItem {
+  domain: string;
+  name: string;
+  headroom_score: number;
+  status: "NOMINAL" | "CONSTRAINED" | "CRITICAL" | string;
+  summary: string;
+  metrics: Record<string, string | number | boolean>;
+}
+
+export interface OperationalDifferenceItem {
+  dimension: string;
+  title: string;
+  station_a_value: string;
+  station_b_value: string;
+  delta_summary: string;
+  pressure_direction: "BHARATI_HIGHER" | "MAITRI_HIGHER" | "BALANCED" | string;
+  significance: "CRITICAL" | "MODERATE" | "INFORMATIONAL" | string;
+}
+
+export interface CoordinationConstraintItem {
+  constraint_type: string;
+  name: string;
+  status: "RESTRICTED" | "IMPASSABLE" | "NOMINAL" | "DEGRADED" | string;
+  impact: string;
+  details: string;
+}
+
+export interface CrossStationConsiderationItem {
+  id: string;
+  category: string;
+  title: string;
+  recommendation: string;
+  rationale: string;
+  prerequisites: string[];
+  feasibility_status: "FEASIBLE_WITH_CONSTRAINTS" | "RESTRICTED" | "ADVISORY_ONLY" | string;
+}
+
+export interface StationPortfolioItem {
+  station_id: string;
+  code: string;
+  name: string;
+  status: StationStatus;
+  overall_health: number;
+  fuel_runway_days?: number | null;
+  fuel_quantity_liters?: number | null;
+  temperature_celsius: number;
+  wind_speed_knots: number;
+  conditions: string;
+  comms_status: string;
+  active_incidents_count: number;
+  critical_spares_available: number;
+  capabilities: OperationalCapabilityItem[];
+}
+
+export interface StationComparisonResponse {
+  station_a: StationPortfolioItem;
+  station_b: StationPortfolioItem;
+  capabilities_summary: Array<Record<string, string | number>>;
+  differences: OperationalDifferenceItem[];
+  constraints: CoordinationConstraintItem[];
+  considerations: CrossStationConsiderationItem[];
+  higher_pressure_station_id: string;
+  pressure_rationale: string;
+  provenance: Provenance;
+}
+
+export interface CrossStationScenarioRequest {
+  disrupted_station_id?: string;
+  support_station_id?: string;
+  scenario_type?: string;
+  target_asset_id?: string;
+  duration_hours?: number;
+  ambient_temp_celsius?: number | null;
+}
+
+export interface CrossStationScenarioResponse {
+  scenario_id: string;
+  scenario_type: string;
+  disrupted_station_id: string;
+  disrupted_station_name: string;
+  support_station_id: string;
+  support_station_name: string;
+  disruption_summary: string;
+  support_capacity_summary: string;
+  differences: OperationalDifferenceItem[];
+  capabilities: OperationalCapabilityItem[];
+  constraints: CoordinationConstraintItem[];
+  considerations: CrossStationConsiderationItem[];
+  decision_options: ScenarioDecisionOption[];
+  affected_services: ScenarioAffectedService[];
+  reserve_margin_disrupted_kw: number;
+  reserve_margin_support_kw: number;
+  truth_type: string;
+  source_context: string[];
+  disclaimer: string;
+  computed_at: string;
+}
+
+export async function fetchStationComparison(
+  stationA: string = "STATION-BHARATI",
+  stationB: string = "STATION-MAITRI"
+): Promise<StationComparisonResponse> {
+  const url = `${API_BASE}/station/comparison?station_a_id=${encodeURIComponent(stationA)}&station_b_id=${encodeURIComponent(stationB)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch station comparison (${res.status})`);
+  return res.json() as Promise<StationComparisonResponse>;
+}
+
+export async function evaluateStationComparison(
+  stationA: string = "STATION-BHARATI",
+  stationB: string = "STATION-MAITRI"
+): Promise<StationComparisonResponse> {
+  const url = `${API_BASE}/station/comparison/evaluate?station_a_id=${encodeURIComponent(stationA)}&station_b_id=${encodeURIComponent(stationB)}`;
+  const res = await fetch(url, { method: "POST" });
+  if (!res.ok) throw new Error(`Failed to evaluate station comparison (${res.status})`);
+  return res.json() as Promise<StationComparisonResponse>;
+}
+
+export async function simulateCrossStationScenario(
+  payload: CrossStationScenarioRequest
+): Promise<CrossStationScenarioResponse> {
+  const res = await fetch(`${API_BASE}/scenarios/cross-station`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({ detail: "Unknown error" }));
+    throw new Error(errorBody.detail || `Failed to simulate cross-station scenario (${res.status})`);
+  }
+  return res.json() as Promise<CrossStationScenarioResponse>;
+}
+
 

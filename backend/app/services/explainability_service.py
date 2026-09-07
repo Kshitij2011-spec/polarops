@@ -852,6 +852,168 @@ def explain_scenario(
     )
 
 
+def explain_cross_station(
+    db: Session,
+    station_a_id: str = "STATION-BHARATI",
+    station_b_id: str = "STATION-MAITRI",
+) -> ExplanationResponse:
+    """Generate a deterministic causal explanation for cross-station operational differences and support readiness.
+
+    Follows the canonical 8-part causal structure:
+    1. WHAT CHANGED
+    2. WHY IT MATTERS
+    3. BHARATI EVIDENCE
+    4. MAITRI EVIDENCE
+    5. CROSS-STATION DIFFERENCE
+    6. COMMUNICATION CONSTRAINT
+    7. LOGISTICS / RESOURCE CONSTRAINT
+    8. WHAT TO CONSIDER
+    """
+    from app.services.station_service import get_station_comparison
+
+    comp = get_station_comparison(db, station_a_id=station_a_id, station_b_id=station_b_id)
+    st_a = comp.station_a
+    st_b = comp.station_b
+
+    evidence = [
+        ExplanationEvidence(
+            factor=f"{st_a.code} Generator G-02 Condition",
+            metric="bearing_vibration_mm_s",
+            value=4.8,
+            threshold=4.0,
+            status="CRITICAL",
+            detail=f"{st_a.name} G-02 bearing vibration (4.8 mm/s) exceeded 4.0 mm/s limit, degrading thermal supply to Habitat Zone 2.",
+        ),
+        ExplanationEvidence(
+            factor=f"{st_a.code} Fuel Runway & Deficit",
+            metric="fuel_runway_days",
+            value=st_a.fuel_runway_days or 70.3,
+            threshold=90.0,
+            status="WARNING",
+            detail=f"{st_a.name} diesel runway is {st_a.fuel_runway_days or 70.3:.1f} days, falling -19.7 days short of the 90-day winter baseline.",
+        ),
+        ExplanationEvidence(
+            factor=f"{st_a.code} SK-402 Local Inventory",
+            metric="sk402_quantity_available",
+            value=st_a.critical_spares_available,
+            threshold=1,
+            status="CRITICAL",
+            detail="Warehouse inventory for SK-402 rotary seal kit is 0 (STOCKOUT); MWO-2026-089 blocked awaiting vessel (ETA 11 days).",
+        ),
+        ExplanationEvidence(
+            factor=f"{st_b.code} Power Generation Redundancy",
+            metric="maitri_generator_status",
+            value="NOMINAL (2x 150 kVA)",
+            threshold="NOMINAL",
+            status="NOMINAL",
+            detail=f"{st_b.name} dual diesel generators operating balanced with 100/100 health score and zero active incidents.",
+        ),
+        ExplanationEvidence(
+            factor=f"{st_b.code} Fuel Runway Buffer",
+            metric="maitri_fuel_runway_days",
+            value=st_b.fuel_runway_days or 133.1,
+            threshold=90.0,
+            status="NOMINAL",
+            detail=f"{st_b.name} holds {st_b.fuel_runway_days or 133.1:.1f} days fuel runway (+43.1 days surplus buffer above winter requirement).",
+        ),
+        ExplanationEvidence(
+            factor=f"{st_b.code} SK-402 Spares Availability",
+            metric="maitri_sk402_quantity",
+            value=st_b.critical_spares_available,
+            threshold=1,
+            status="NOMINAL",
+            detail=f"{st_b.name} central spares locker M-2 holds {st_b.critical_spares_available} unreserved SK-402 kits in stock.",
+        ),
+    ]
+
+    consequences = [
+        ExplanationConsequence(
+            domain="HEATING_AND_POWER",
+            impact=f"{st_a.code} Habitat Thermal Exposure",
+            blast_radius_depth=2,
+            description=f"Persistent G-02 vibration threatens Zone 2 habitat freeze-out during active -28.5°C winter blizzard.",
+        ),
+        ExplanationConsequence(
+            domain="PORTFOLIO_COORDINATION",
+            impact=f"{st_b.code} Operational Headroom Available",
+            blast_radius_depth=1,
+            description=f"{st_b.name} has modeled operational headroom in energy (+43.1d fuel) and spare parts (2x SK-402) to support inter-station contingency planning.",
+        ),
+    ]
+
+    recovery_constraints = [
+        RecoveryConstraint(
+            constraint_type="LOGISTICS_DISTANCE",
+            resource_id="ANTARCTIC_CORRIDOR",
+            description="Overland surface transit (~3,000 km across Antarctic ice shelf) is impassable during midwinter polar night.",
+            impact_level="BLOCKING",
+        ),
+        RecoveryConstraint(
+            constraint_type="WEATHER_FLIGHT_RESTRICTION",
+            resource_id="POLAR_AVIATION",
+            description=f"{st_a.code} ambient wind speed ({st_a.wind_speed_knots} kt) exceeds 30-knot flight ceiling, grounding aircraft until blizzard front decays.",
+            impact_level="BLOCKING",
+        ),
+        RecoveryConstraint(
+            constraint_type="SATELLITE_BANDWIDTH_ASYMMETRY",
+            resource_id="COMMS_BRIDGE",
+            description=f"{st_b.code} backup link (512 kbps) requires deferring raw bulk radar files to maintain low-latency coordination telemetry.",
+            impact_level="MEDIUM",
+        ),
+    ]
+
+    next_steps = [
+        RecommendedNextStep(
+            action_code="INSPECT_STATIONS_PORTFOLIO",
+            title="Inspect Station Portfolio Comparison",
+            description="Review multi-domain capability headroom and structured differences between Bharati and Maitri.",
+            target_route="/stations",
+            action_type="REVIEW",
+        ),
+        RecommendedNextStep(
+            action_code="SIMULATE_CROSS_STATION_SCENARIO",
+            title="Evaluate Cross-Station Coordination Scenario",
+            description="Simulate G-02 failure coupling against Maitri energy reserve margins in What-If Scenarios.",
+            target_route="/scenarios",
+            action_type="SIMULATE",
+        ),
+        RecommendedNextStep(
+            action_code="REVIEW_OPERATIONAL_MEMORY",
+            title="Review Maitri Cold-Weather Mitigation Memory",
+            description="Consult historical engineering decisions for hydronic boiler preheating protocols in Resilience console.",
+            target_route="/resilience",
+            action_type="INSPECT",
+        ),
+    ]
+
+    return ExplanationResponse(
+        subject="Cross-Station Operational Pressure & Coordination Feasibility",
+        domain="CROSS_STATION",
+        entity_id="PORTFOLIO",
+        station_id=station_a_id,
+        severity="WARNING",
+        summary=(
+            f"{st_a.name} ({st_a.code}) is under significantly higher operational pressure (health: {st_a.overall_health}%, "
+            f"fuel runway: {st_a.fuel_runway_days or 70.3:.1f}d, SK-402 spares: {st_a.critical_spares_available}) while {st_b.name} ({st_b.code}) "
+            f"maintains robust operational stability (health: {st_b.overall_health}%, fuel runway: {st_b.fuel_runway_days or 133.1:.1f}d, "
+            f"SK-402 spares: {st_b.critical_spares_available})."
+        ),
+        why_it_matters=(
+            "Antarctic research stations operate as isolated microgrids during polar night. "
+            "Cross-station operational comparison identifies systemic vulnerabilities early, "
+            "enabling operators to evaluate advisory support options before unmitigated compound failure occurs."
+        ),
+        evidence=evidence,
+        consequences=consequences,
+        recovery_constraints=recovery_constraints,
+        recommended_next_steps=next_steps,
+        confidence=0.99,
+        truth_type="DERIVED",
+        source_context=["station_service", "energy_service", "resource_service", "weather_observations", "inventory_items"],
+        timestamp=datetime.now(timezone.utc),
+    )
+
+
 def generate_explanation(
     db: Session,
     domain: str,
@@ -873,9 +1035,11 @@ def generate_explanation(
         return explain_incident(db, incident_id=entity_id, station_id=station_id)
     elif clean_domain in ["SCENARIO", "SCENARIOS", "WHAT_IF"]:
         return explain_scenario(db, scenario_id=entity_id, station_id=station_id)
+    elif clean_domain in ["CROSS_STATION", "CROSS-STATION", "PORTFOLIO", "STATIONS", "STATION_COMPARISON"]:
+        return explain_cross_station(db, station_a_id=station_id, station_b_id=entity_id or "STATION-MAITRI")
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported explanation domain '{domain}'. Supported domains: ASSET, RESOURCE, COMMUNICATION, SCIENCE, INCIDENT, SCENARIO.",
+            detail=f"Unsupported explanation domain '{domain}'. Supported domains: ASSET, RESOURCE, COMMUNICATION, SCIENCE, INCIDENT, SCENARIO, CROSS_STATION.",
         )
 

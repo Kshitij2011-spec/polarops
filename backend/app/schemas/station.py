@@ -53,3 +53,81 @@ class StationOverviewResponse(BaseModel):
     ambient_weather: AmbientWeatherSchema
     subsystem_summary: list[SubsystemSummaryItem]
     critical_events: list[CriticalEventItem] = []
+
+
+class OperationalCapabilityItem(BaseModel):
+    """Derived operational capability headroom score and state for a station domain."""
+
+    domain: str  # "ENERGY_RESILIENCE", "COMMS_CONTINUITY", "SCIENCE_CONTINUITY", "LIFE_SUPPORT", "RECOVERY_BUFFER"
+    name: str
+    headroom_score: int = Field(ge=0, le=100)
+    status: str  # "NOMINAL", "CONSTRAINED", "CRITICAL"
+    summary: str
+    metrics: dict[str, str | int | float | bool] = Field(default_factory=dict)
+
+
+class OperationalDifferenceItem(BaseModel):
+    """Structured operational divergence between compared stations."""
+
+    dimension: str  # "STATION_HEALTH", "FUEL_RUNWAY", "ASSET_RISK", "COMMUNICATIONS", "CRITICAL_SPARES", "WEATHER_EXPOSURE"
+    title: str
+    station_a_value: str
+    station_b_value: str
+    delta_summary: str
+    pressure_direction: str  # "BHARATI_HIGHER", "MAITRI_HIGHER", "BALANCED"
+    significance: str  # "CRITICAL", "MODERATE", "INFORMATIONAL"
+
+
+class CoordinationConstraintItem(BaseModel):
+    """Explicit physical, meteorological, or telecommunications constraint."""
+
+    constraint_type: str  # "LOGISTICS_DISTANCE", "WEATHER_FLIGHT_WINDOW", "COMMS_ASYMMETRY", "TRAVERSE_SEASON"
+    name: str
+    status: str  # "RESTRICTED", "IMPASSABLE", "NOMINAL", "DEGRADED"
+    impact: str
+    details: str
+
+
+class CrossStationConsiderationItem(BaseModel):
+    """Advisory operational consideration for human operator decision support (non-actuating)."""
+
+    id: str
+    category: str  # "RESOURCE_SUPPORT", "RECOVERY_ALIGNMENT", "COMMS_READINESS", "RISK_MITIGATION"
+    title: str
+    recommendation: str
+    rationale: str
+    prerequisites: list[str] = Field(default_factory=list)
+    feasibility_status: str  # "FEASIBLE_WITH_CONSTRAINTS", "RESTRICTED", "ADVISORY_ONLY"
+
+
+class StationPortfolioItem(BaseModel):
+    """Summary of a station's canonical state within the portfolio comparison."""
+
+    station_id: str
+    code: str
+    name: str
+    status: StationStatus
+    overall_health: int
+    fuel_runway_days: Optional[float] = None
+    fuel_quantity_liters: Optional[float] = None
+    temperature_celsius: float
+    wind_speed_knots: float
+    conditions: str
+    comms_status: str
+    active_incidents_count: int
+    critical_spares_available: int
+    capabilities: list[OperationalCapabilityItem] = Field(default_factory=list)
+
+
+class StationComparisonResponse(BaseModel):
+    """Deterministic comparison between two research stations."""
+
+    station_a: StationPortfolioItem
+    station_b: StationPortfolioItem
+    capabilities_summary: list[dict[str, str | int | float]] = Field(default_factory=list)
+    differences: list[OperationalDifferenceItem] = Field(default_factory=list)
+    constraints: list[CoordinationConstraintItem] = Field(default_factory=list)
+    considerations: list[CrossStationConsiderationItem] = Field(default_factory=list)
+    higher_pressure_station_id: str
+    pressure_rationale: str
+    provenance: ProvenanceSchema

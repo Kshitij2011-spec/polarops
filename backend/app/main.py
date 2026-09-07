@@ -53,6 +53,8 @@ async def lifespan(app: FastAPI):
         from app.models import Station
         if not db.query(Station).first():
             seed_database(db)
+        from app.core.seed import ensure_maitri_canonical_state
+        ensure_maitri_canonical_state(db)
         from app.models.entities import EventLog
         from app.services.event_service import reset_operational_events
         if not db.query(EventLog).first():

@@ -22,7 +22,7 @@ def test_seed_database_idempotent(db_session):
     meas_count_2 = db_session.query(Measurement).count()
 
     assert station_count_1 == station_count_2 == 2
-    assert asset_count_1 == asset_count_2 == 6
+    assert asset_count_1 == asset_count_2 == 10  # 6 Bharati + 4 Maitri assets
     assert meas_count_1 == meas_count_2 == (25 * 4)  # 25 hourly measurements for 4 sensors
 
 

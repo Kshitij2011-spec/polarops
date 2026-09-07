@@ -15,6 +15,8 @@ import { PrivacyPolicy } from "./components/PrivacyPolicy";
 import { TermsAndConditions } from "./components/TermsAndConditions";
 import { ActivityStream } from "./components/ActivityStream";
 import { ExplanationDrawer } from "./components/ExplanationDrawer";
+import { CrossStationContextCard } from "./components/CrossStationContextCard";
+import { StationsView } from "./components/Stations/StationsView";
 
 function getViewFromPath(): ViewMode {
   if (typeof window === "undefined") return "COMMAND_CENTER";
@@ -23,6 +25,7 @@ function getViewFromPath(): ViewMode {
   if (path.startsWith("/resources")) return "RESOURCES";
   if (path.startsWith("/scenarios")) return "SCENARIOS";
   if (path.startsWith("/resilience")) return "RESILIENCE";
+  if (path.startsWith("/stations")) return "STATIONS";
   if (path.startsWith("/privacy")) return "PRIVACY";
   if (path.startsWith("/terms")) return "TERMS";
   return "COMMAND_CENTER";
@@ -59,6 +62,8 @@ export default function App() {
       navigateToView("RESOURCES");
     } else if (route.startsWith("/resilience")) {
       navigateToView("RESILIENCE");
+    } else if (route.startsWith("/stations")) {
+      navigateToView("STATIONS");
     } else if (route === "/") {
       navigateToView("COMMAND_CENTER");
     }
@@ -82,6 +87,8 @@ export default function App() {
         ? "/scenarios"
         : view === "RESILIENCE"
         ? "/resilience"
+        : view === "STATIONS"
+        ? "/stations"
         : view === "PRIVACY"
         ? "/privacy"
         : view === "TERMS"
@@ -210,6 +217,11 @@ export default function App() {
                 onBack={handleBackToCommandCenter}
                 onInspectAsset={handleInspectAsset}
               />
+            ) : activeView === "STATIONS" ? (
+              <StationsView
+                onBack={handleBackToCommandCenter}
+                onOpenExplanation={handleOpenExplanation}
+              />
             ) : (
               <div className="space-y-6 animate-in fade-in duration-150">
                 {/* 1. Situation Awareness / Top Status Row */}
@@ -229,13 +241,19 @@ export default function App() {
                   onNavigate={handleRouteNavigation}
                 />
 
-                {/* 4. Spatial Topology & Schematic */}
+                {/* 4. Cross-Station Coordination Context (Day 4) */}
+                <CrossStationContextCard
+                  onNavigateToStations={() => navigateToView("STATIONS")}
+                  onOpenExplanation={handleOpenExplanation}
+                />
+
+                {/* 5. Spatial Topology & Schematic */}
                 <StationSchematic
                   stationName={overview.name}
                   onInspectAsset={handleInspectAsset}
                 />
 
-                {/* 5. Subsystem Telemetry & Health Grid */}
+                {/* 6. Subsystem Telemetry & Health Grid */}
                 <SubsystemGrid subsystems={overview.subsystem_summary} />
               </div>
             )}

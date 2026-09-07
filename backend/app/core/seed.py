@@ -50,6 +50,188 @@ from app.models import (
 )
 
 
+def ensure_maitri_canonical_state(db: Session) -> None:
+    """Ensure STATION-MAITRI has full canonical operational state populated idempotently."""
+    base_time = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+
+    # 1. Station
+    maitri = db.query(Station).filter(Station.id == "STATION-MAITRI").first()
+    if not maitri:
+        maitri = Station(
+            id="STATION-MAITRI",
+            code="MAITRI",
+            name="Maitri Research Station",
+            location="Schirmacher Oasis (70°46'S, 11°44'E)",
+            status=StationStatus.NOMINAL,
+            environment_mode=EnvironmentMode.WINTER,
+            created_at=base_time - timedelta(days=365 * 3),
+            updated_at=base_time,
+        )
+        db.add(maitri)
+        db.flush()
+
+    # 2. Building & Zone
+    bld_maitri = db.query(Building).filter(Building.id == "BLD-MAITRI-MAIN").first()
+    if not bld_maitri:
+        bld_maitri = Building(
+            id="BLD-MAITRI-MAIN",
+            station_id="STATION-MAITRI",
+            name="Maitri Main Station Complex",
+            building_type="HABITAT_OPS",
+            created_at=base_time - timedelta(days=365),
+        )
+        db.add(bld_maitri)
+        db.flush()
+
+    zone_maitri = db.query(Zone).filter(Zone.id == "ZONE-MAITRI-HAB").first()
+    if not zone_maitri:
+        zone_maitri = Zone(
+            id="ZONE-MAITRI-HAB",
+            building_id="BLD-MAITRI-MAIN",
+            name="Maitri Primary Living & Ops Habitat",
+            occupancy=18,
+            target_temp_celsius=20.0,
+            criticality=Criticality.LIFE_SUPPORT,
+            created_at=base_time - timedelta(days=365),
+        )
+        db.add(zone_maitri)
+        db.flush()
+
+    # 3. Energy Resource (Fuel Runway ~133.1 days, +43.1 days headroom)
+    energy_maitri = db.query(EnergyResource).filter(EnergyResource.id == "ENG-MAITRI-DIESEL").first()
+    if not energy_maitri:
+        energy_maitri = EnergyResource(
+            id="ENG-MAITRI-DIESEL",
+            station_id="STATION-MAITRI",
+            resource_type="DIESEL_LFO",
+            current_quantity=198000.0,
+            max_capacity=240000.0,
+            burn_rate_per_hour=62.0,
+            unit="LITERS",
+            source="SYNTHETIC_SIMULATION",
+            truth_type=TruthType.MEASURED,
+            updated_at=base_time,
+        )
+        db.add(energy_maitri)
+
+    # 4. Weather Observation (-18.2°C, 14.5 kt wind)
+    weather_maitri = (
+        db.query(WeatherObservation)
+        .filter(WeatherObservation.station_id == "STATION-MAITRI")
+        .first()
+    )
+    if not weather_maitri:
+        weather_maitri = WeatherObservation(
+            station_id="STATION-MAITRI",
+            timestamp=base_time,
+            temperature_celsius=-18.2,
+            wind_speed_knots=14.5,
+            wind_chill_celsius=-24.8,
+            conditions="CLEAR_OASIS",
+            source="SYNTHETIC_SIMULATION",
+            truth_type=TruthType.MEASURED,
+            created_at=base_time,
+        )
+        db.add(weather_maitri)
+
+    # 5. Communication Link
+    comm_maitri = (
+        db.query(CommunicationLink)
+        .filter(CommunicationLink.station_id == "STATION-MAITRI")
+        .first()
+    )
+    if not comm_maitri:
+        comm_maitri = CommunicationLink(
+            id="LINK-MAITRI-SAT-01",
+            station_id="STATION-MAITRI",
+            name="Maitri Inmarsat/Iridium Primary Terminal",
+            status="ONLINE",
+            last_sync_at=base_time,
+            latency_ms=640,
+            bandwidth_kbps=512,
+            created_at=base_time - timedelta(days=180),
+            updated_at=base_time,
+        )
+        db.add(comm_maitri)
+
+    # 6. Assets (Generators, Boiler, Pump)
+    maitri_assets = [
+        ("MAITRI-GEN-01", "GEN-01", "Maitri Main Generator 1 (150 kVA)", AssetCategory.GENERATOR, AssetStatus.NOMINAL, 100, Criticality.CRITICAL),
+        ("MAITRI-GEN-02", "GEN-02", "Maitri Standby Generator 2 (150 kVA)", AssetCategory.GENERATOR, AssetStatus.NOMINAL, 100, Criticality.CRITICAL),
+        ("MAITRI-BLR-01", "BLR-01", "Maitri Central Hydronic Boiler", AssetCategory.BOILER, AssetStatus.NOMINAL, 96, Criticality.CRITICAL),
+        ("MAITRI-WP-01", "WP-01", "Lake Priyadarshini Intake Water Pump", AssetCategory.PUMP, AssetStatus.NOMINAL, 98, Criticality.LIFE_SUPPORT),
+    ]
+    for a_id, code, name, cat, stat, health, crit in maitri_assets:
+        existing_asset = db.query(Asset).filter(Asset.id == a_id).first()
+        if not existing_asset:
+            db.add(
+                Asset(
+                    id=a_id,
+                    station_id="STATION-MAITRI",
+                    building_id="BLD-MAITRI-MAIN",
+                    zone_id="ZONE-MAITRI-HAB",
+                    code=code,
+                    name=name,
+                    category=cat,
+                    status=stat,
+                    health_score=health,
+                    criticality=crit,
+                    commissioned_at=base_time - timedelta(days=700),
+                    source="SYNTHETIC_SIMULATION",
+                    created_at=base_time - timedelta(days=700),
+                    updated_at=base_time,
+                )
+            )
+
+    # 7. Inventory Spare (SK-402 with 2 units available at Maitri!)
+    inv_maitri = db.query(InventoryItem).filter(InventoryItem.id == "INV-MAITRI-SK402").first()
+    if not inv_maitri:
+        sp_sk = db.query(SparePart).filter(SparePart.id == "SP-SK-402").first()
+        if not sp_sk:
+            sp_sk = SparePart(
+                id="SP-SK-402",
+                part_number="SK-402",
+                name="High-Torque Rotary Bearing & Seal Kit",
+                description="Heavy-duty bearing assembly with fluorocarbon seals for marine/polar diesel gensets.",
+                category="MECHANICAL",
+                created_at=base_time - timedelta(days=180),
+            )
+            db.add(sp_sk)
+            db.flush()
+
+        inv_maitri = InventoryItem(
+            id="INV-MAITRI-SK402",
+            spare_part_id="SP-SK-402",
+            station_id="STATION-MAITRI",
+            quantity_available=2,
+            quantity_reserved=0,
+            reorder_threshold=1,
+            location="Maitri Powerhouse Spares Locker M-2",
+            updated_at=base_time,
+        )
+        db.add(inv_maitri)
+
+    # 8. Science Instrument
+    inst_maitri = db.query(ScientificInstrument).filter(ScientificInstrument.id == "MAITRI-INST-MAG-01").first()
+    if not inst_maitri:
+        db.add(
+            ScientificInstrument(
+                id="MAITRI-INST-MAG-01",
+                station_id="STATION-MAITRI",
+                code="MAG-01",
+                name="Schirmacher Geomagnetic Fluxgate Magnetometer",
+                instrument_type="MAGNETOMETER",
+                health="NOMINAL",
+                power_status="ACTIVE",
+                calibration_status="CALIBRATED",
+                source="SYNTHETIC_SIMULATION",
+                created_at=base_time - timedelta(days=200),
+            )
+        )
+
+    db.commit()
+
+
 def seed_database(db: Session | None = None) -> None:
     """Populate database with deterministic synthetic Antarctic station data."""
     close_after = False
@@ -83,6 +265,8 @@ def seed_database(db: Session | None = None) -> None:
             else:
                 inc_hero.status = IncidentStatus.ACTIVE
                 inc_hero.resolved_at = None
+
+            ensure_maitri_canonical_state(db)
             db.commit()
             return
 
@@ -947,6 +1131,7 @@ def seed_database(db: Session | None = None) -> None:
             ev_maitri_2,
         ])
 
+        ensure_maitri_canonical_state(db)
         db.commit()
     except Exception:
         db.rollback()

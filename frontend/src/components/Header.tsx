@@ -1,4 +1,4 @@
-import { Activity, Flame, Moon, Radio, RefreshCw, Snowflake, Sun, Zap } from "lucide-react";
+import { Activity, Flame, Globe, Moon, Radio, RefreshCw, Snowflake, Sun, Zap } from "lucide-react";
 import type { EnvironmentMode } from "../lib/api";
 import { useTheme } from "../hooks/useTheme";
 
@@ -8,6 +8,7 @@ export type ViewMode =
   | "RESOURCES"
   | "SCENARIOS"
   | "RESILIENCE"
+  | "STATIONS"
   | "PRIVACY"
   | "TERMS";
 
@@ -112,6 +113,19 @@ export function Header({
         >
           <Radio className="h-3.5 w-3.5" />
           <span>Resilience &amp; Disruption</span>
+        </button>
+
+        <button
+          onClick={() => onNavigateView?.("STATIONS")}
+          data-testid="nav-stations-btn"
+          className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer ${
+            activeView === "STATIONS"
+              ? "bg-white dark:bg-[#1e2230] text-blue-700 dark:text-[#5b9cf5] border border-slate-200 dark:border-[#3d4556] shadow-2xs font-bold"
+              : "text-slate-600 dark:text-[#9ca3b4] hover:text-slate-900 dark:hover:text-[#e4e8f0] hover:bg-slate-200/50 dark:hover:bg-[#181b24]"
+          }`}
+        >
+          <Globe className="h-3.5 w-3.5 text-blue-600 dark:text-[#5b9cf5]" />
+          <span>Station Portfolio</span>
         </button>
       </nav>
 

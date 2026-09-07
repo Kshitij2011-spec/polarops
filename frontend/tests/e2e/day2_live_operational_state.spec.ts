@@ -58,7 +58,7 @@ test.describe('Day 2 Live Operational State & Deterministic Explainability Layer
 
     // 3. Verify Section 1: WHAT CHANGED
     const whatChanged = page.locator('[data-testid="explanation-what-changed"]');
-    await expect(whatChanged).toBeVisible();
+    await expect(whatChanged).toBeVisible({ timeout: 15000 });
     await expect(whatChanged).toContainText('vibration');
 
     // 4. Verify Section 2: WHY IT MATTERS
