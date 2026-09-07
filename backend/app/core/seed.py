@@ -61,30 +61,30 @@ def seed_database(db: Session | None = None) -> None:
         # Check if already seeded to maintain idempotency
         existing_station = db.query(Station).filter(Station.id == "STATION-BHARATI").first()
         if existing_station:
-            # Clean existing records for deterministic re-seeding
-            db.query(Measurement).delete()
-            db.query(Sensor).delete()
-            db.query(AssetDependency).delete()
-            db.query(MaintenanceSpare).delete()
-            db.query(MaintenanceWorkOrder).delete()
-            db.query(InventoryItem).delete()
-            db.query(ResupplyOpportunity).delete()
-            db.query(SparePart).delete()
-            db.query(Asset).delete()
-            db.query(Service).delete()
-            db.query(Zone).delete()
-            db.query(Building).delete()
-            db.query(EnergyResource).delete()
-            db.query(WeatherObservation).delete()
-            db.query(ScientificObservation).delete()
-            db.query(ScientificInstrument).delete()
-            db.query(CommunicationLink).delete()
-            db.query(SyncQueueItem).delete()
-            db.query(Incident).delete()
-            db.query(OperationalMemory).delete()
-            db.query(EventLog).delete()
-            db.query(Station).delete()
+            # Database already initialized with canonical station data.
+            # Do NOT wipe or delete existing records on startup/re-seed.
+            # Prevents ForeignKeyViolation (operational_actions -> incidents) and
+            # preserves user actions, operational memory, queue items, and telemetry.
+            inc_hero = db.query(Incident).filter(Incident.id == "INC-2026-04").first()
+            if not inc_hero:
+                inc_04 = Incident(
+                    id="INC-2026-04",
+                    station_id="STATION-BHARATI",
+                    title="Generator G-02 High Vibration Anomaly & Thermal Loop Degradation",
+                    severity=IncidentSeverity.MAJOR,
+                    status=IncidentStatus.ACTIVE,
+                    location="Powerhouse Gen Bay 2",
+                    description="Bearing vibration reached 4.8 mm/s exceeding warning threshold (4.0 mm/s). Risk of thermal drop in Zone 2 habitat if unmitigated.",
+                    started_at=datetime.now(timezone.utc) - timedelta(hours=8),
+                    created_at=datetime.now(timezone.utc) - timedelta(hours=8),
+                    updated_at=datetime.now(timezone.utc),
+                )
+                db.add(inc_04)
+            else:
+                inc_hero.status = IncidentStatus.ACTIVE
+                inc_hero.resolved_at = None
             db.commit()
+            return
 
         base_time = datetime.now(timezone.utc).replace(second=0, microsecond=0)
 

@@ -120,7 +120,7 @@ test.describe("PolarOps Day 3: Cross-Domain Resources, Energy & Scenario Engine"
     await expect(page.getByText(/Baseline vs\. Simulated Scenario Impact Deltas/i)).toBeVisible();
 
     // Return to Command Center via Header nav button
-    await page.getByRole("button", { name: "Command Center", exact: true }).click();
+    await page.getByRole("button", { name: "Command Center", exact: true }).first().click();
 
     // Verify Command Center loads with intact baseline telemetry
     await expect(page.getByText(/STATION STATUS/i)).toBeVisible();

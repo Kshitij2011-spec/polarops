@@ -210,7 +210,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
   const isOffline = commsStatus?.status === "OFFLINE";
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-6 animate-fade-in pb-16">
       {/* ── Top Header Navigation & Action Bar ──────────── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-polar-800 pb-4">
         <div className="space-y-1">
@@ -218,6 +218,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
             {onBack && (
               <button
                 onClick={onBack}
+                aria-label="Return to Station Command Center"
                 className="flex items-center gap-1.5 text-xs font-mono text-polar-400 hover:text-accent-cyan transition-colors cursor-pointer"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -225,12 +226,12 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
               </button>
             )}
             <span className="text-polar-600">/</span>
-            <span className="text-xs font-mono text-accent-cyan uppercase tracking-wider font-semibold">
+            <span className="text-[10px] font-mono text-accent-cyan uppercase tracking-wider font-semibold">
               Disruption Resilience Workspace
             </span>
           </div>
-          <h1 className="text-2xl font-bold font-mono text-polar-100 flex items-center gap-2.5">
-            <Radio className="h-6 w-6 text-accent-cyan animate-pulse" />
+          <h1 className="text-xl font-bold font-mono text-polar-100 flex items-center gap-2.5">
+            <Radio className="h-5 w-5 text-accent-cyan" />
             <span>OPERATE THROUGH DISRUPTION</span>
           </h1>
           <p className="text-xs text-polar-400 max-w-2xl">
@@ -245,10 +246,10 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
             data-testid="simulate-outage-btn"
             onClick={handleSimulateOutage}
             disabled={actionLoading || isOffline}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all border cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono font-bold transition-all border cursor-pointer ${
               isOffline
                 ? "bg-rose-950/40 text-rose-400/50 border-rose-900/40 cursor-not-allowed"
-                : "bg-rose-950/60 text-rose-300 border-rose-700 hover:bg-rose-900/80 shadow-sm"
+                : "bg-rose-950/70 text-rose-300 border-rose-700 hover:bg-rose-900"
             }`}
           >
             <WifiOff className="h-3.5 w-3.5 text-rose-400" />
@@ -259,21 +260,21 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
             data-testid="restore-sync-btn"
             onClick={handleRestoreAndSync}
             disabled={actionLoading || !isOffline}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all border cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono font-bold transition-all border cursor-pointer ${
               !isOffline
                 ? "bg-emerald-950/40 text-emerald-400/50 border-emerald-900/40 cursor-not-allowed"
-                : "bg-emerald-950/60 text-emerald-300 border-emerald-700 hover:bg-emerald-900/80 shadow-sm"
+                : "bg-emerald-950/70 text-emerald-300 border-emerald-700 hover:bg-emerald-900"
             }`}
           >
             <Wifi className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Restore & Reconcile</span>
+            <span>Restore &amp; Reconcile</span>
           </button>
 
           <button
             data-testid="reset-simulation-btn"
             onClick={handleResetSimulation}
             disabled={actionLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-polar-800 hover:bg-polar-700 text-polar-300 hover:text-polar-100 border border-polar-700 text-xs font-mono transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-polar-900 hover:bg-polar-800 text-polar-300 hover:text-polar-100 border border-polar-700 text-xs font-mono transition-colors cursor-pointer"
             title="Reset Day 4 simulation state without mutating canonical resources"
           >
             <RotateCcw className="h-3.5 w-3.5 text-polar-400" />
@@ -284,7 +285,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
 
       {/* Feedback banner if any */}
       {actionFeedback && (
-        <div className="flex items-center justify-between p-3 rounded-lg bg-accent-cyan/10 border border-accent-cyan/30 text-xs font-mono text-cyan-200">
+        <div className="flex items-center justify-between p-3 rounded bg-polar-900 border border-accent-cyan/40 text-xs font-mono text-cyan-200">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-accent-cyan shrink-0" />
             <span>{actionFeedback}</span>
@@ -301,34 +302,34 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       {/* ── Comms Link Status Summary Card ──────────────── */}
       <div
         data-testid="comms-status-card"
-        className={`rounded-xl border p-5 backdrop-blur-sm transition-all ${
+        className={`rounded border p-4 transition-all ${
           isOffline
             ? "border-rose-800/80 bg-rose-950/20"
-            : "border-polar-700 bg-polar-800/40"
+            : "border-polar-700 bg-polar-900"
         }`}
       >
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
-              className={`p-3 rounded-xl border ${
+              className={`p-2.5 rounded border ${
                 isOffline
-                  ? "bg-rose-900/40 text-rose-400 border-rose-700"
-                  : "bg-emerald-900/40 text-emerald-400 border-emerald-700"
+                  ? "bg-rose-950 text-rose-400 border-rose-700"
+                  : "bg-emerald-950 text-emerald-400 border-emerald-700"
               }`}
             >
-              {isOffline ? <WifiOff className="h-6 w-6" /> : <Wifi className="h-6 w-6" />}
+              {isOffline ? <WifiOff className="h-5 w-5" /> : <Wifi className="h-5 w-5" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-mono font-bold text-polar-100">
+                <span className="text-xs font-mono font-bold text-polar-100">
                   {commsStatus?.name ?? "SATELLITE GROUND TERMINAL"}
                 </span>
                 <span
                   data-testid="comms-status-badge"
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
+                  className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
                     isOffline
-                      ? "bg-rose-900/80 text-rose-300 border border-rose-600"
-                      : "bg-emerald-900/80 text-emerald-300 border border-emerald-600"
+                      ? "bg-rose-900 text-rose-300 border border-rose-600"
+                      : "bg-emerald-900 text-emerald-300 border border-emerald-600"
                   }`}
                 >
                   {commsStatus?.status ?? "ONLINE"}
@@ -345,24 +346,24 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
 
           <div className="flex items-center gap-6 font-mono text-xs">
             <div className="text-right">
-              <span className="text-polar-500 block text-[10px] uppercase">Latency</span>
+              <span className="text-polar-500 block text-[9px] uppercase tracking-wider">Latency</span>
               <span data-testid="comms-latency" className="font-bold text-polar-200">
                 {isOffline ? "DISCONNECTED" : `${commsStatus?.latency_ms ?? 580} ms`}
               </span>
             </div>
             <div className="text-right">
-              <span className="text-polar-500 block text-[10px] uppercase">Bandwidth</span>
+              <span className="text-polar-500 block text-[9px] uppercase tracking-wider">Bandwidth</span>
               <span data-testid="comms-bandwidth" className="font-bold text-polar-200">
                 {isOffline ? "0 kbps" : `${commsStatus?.bandwidth_kbps ?? 2048} kbps`}
               </span>
             </div>
             <div className="text-right">
-              <span className="text-polar-500 block text-[10px] uppercase">Unsynced Items</span>
+              <span className="text-polar-500 block text-[9px] uppercase tracking-wider">Unsynced Items</span>
               <span
                 data-testid="comms-pending-count"
                 className={`font-bold px-2 py-0.5 rounded ${
                   (commsStatus?.pending_queue_count ?? 0) > 0
-                    ? "bg-amber-950/60 text-amber-300 border border-amber-700"
+                    ? "bg-amber-950/80 text-amber-300 border border-amber-700"
                     : "text-polar-200"
                 }`}
               >
@@ -374,53 +375,53 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       </div>
 
       {/* ── Sub-Navigation Tabs ───────────────────────────── */}
-      <div className="flex items-center gap-2 border-b border-polar-800 pb-2">
+      <div className="flex flex-wrap items-center gap-1.5 p-1 rounded bg-polar-950 border border-polar-800">
         <button
           onClick={() => setActiveTab("ALL")}
-          className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer ${
+          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer border ${
             activeTab === "ALL"
-              ? "bg-accent-cyan/20 text-accent-cyan font-bold"
-              : "text-polar-400 hover:text-polar-200 hover:bg-polar-800"
+              ? "bg-polar-800 border-accent-cyan text-accent-cyan font-bold"
+              : "border-transparent text-polar-400 hover:text-polar-200"
           }`}
         >
           Integrated Resilience View
         </button>
         <button
           onClick={() => setActiveTab("QUEUE")}
-          className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer ${
+          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer border ${
             activeTab === "QUEUE"
-              ? "bg-accent-cyan/20 text-accent-cyan font-bold"
-              : "text-polar-400 hover:text-polar-200 hover:bg-polar-800"
+              ? "bg-polar-800 border-accent-cyan text-accent-cyan font-bold"
+              : "border-transparent text-polar-400 hover:text-polar-200"
           }`}
         >
-          1. Priority Queue & SHA-256
+          1. Priority Queue &amp; SHA-256
         </button>
         <button
           onClick={() => setActiveTab("SCIENCE")}
-          className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer ${
+          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer border ${
             activeTab === "SCIENCE"
-              ? "bg-accent-cyan/20 text-accent-cyan font-bold"
-              : "text-polar-400 hover:text-polar-200 hover:bg-polar-800"
+              ? "bg-polar-800 border-accent-cyan text-accent-cyan font-bold"
+              : "border-transparent text-polar-400 hover:text-polar-200"
           }`}
         >
           2. Science Buffer (S-17)
         </button>
         <button
           onClick={() => setActiveTab("INCIDENTS")}
-          className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer ${
+          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer border ${
             activeTab === "INCIDENTS"
-              ? "bg-accent-cyan/20 text-accent-cyan font-bold"
-              : "text-polar-400 hover:text-polar-200 hover:bg-polar-800"
+              ? "bg-polar-800 border-accent-cyan text-accent-cyan font-bold"
+              : "border-transparent text-polar-400 hover:text-polar-200"
           }`}
         >
           3. Incident Blast Radius
         </button>
         <button
           onClick={() => setActiveTab("MEMORY")}
-          className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer ${
+          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer border ${
             activeTab === "MEMORY"
-              ? "bg-accent-cyan/20 text-accent-cyan font-bold"
-              : "text-polar-400 hover:text-polar-200 hover:bg-polar-800"
+              ? "bg-polar-800 border-accent-cyan text-accent-cyan font-bold"
+              : "border-transparent text-polar-400 hover:text-polar-200"
           }`}
         >
           4. Operational Memory
@@ -431,59 +432,59 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       {(activeTab === "ALL" || activeTab === "QUEUE") && (
         <div
           data-testid="sync-queue-table"
-          className="rounded-xl border border-polar-700 bg-polar-800/40 p-5 backdrop-blur-sm space-y-4"
+          className="rounded border border-polar-700 bg-polar-900 p-5 space-y-4"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-polar-800 pb-3">
             <div>
-              <h2 className="text-base font-mono font-bold text-polar-100 flex items-center gap-2">
+              <h2 className="text-xs font-mono font-bold text-polar-200 uppercase tracking-wider flex items-center gap-2">
                 <Database className="h-4 w-4 text-accent-cyan" />
                 <span>Deterministic Priority Synchronization Queue</span>
               </h2>
               <p className="text-xs text-polar-400 mt-0.5">
-                Strict ordering: <code className="text-polar-200">priority ASC (P0 &lt; P1 &lt; P2 &lt; P3)</code> &rarr;{" "}
-                <code className="text-polar-200">created_at ASC</code> &rarr; <code className="text-polar-200">id ASC</code>.
+                Strict ordering: <code className="text-polar-200 font-mono">priority ASC (P0 &lt; P1 &lt; P2 &lt; P3)</code> &rarr;{" "}
+                <code className="text-polar-200 font-mono">created_at ASC</code> &rarr; <code className="text-polar-200 font-mono">id ASC</code>.
                 Integrity verified via canonical UTF-8 SHA-256 payload checksums.
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="px-2 py-1 rounded bg-rose-950/60 text-rose-300 border border-rose-800">P0: Critical</span>
-              <span className="px-2 py-1 rounded bg-amber-950/60 text-amber-300 border border-amber-800">P1: High</span>
-              <span className="px-2 py-1 rounded bg-blue-950/60 text-blue-300 border border-blue-800">P2: Important</span>
-              <span className="px-2 py-1 rounded bg-polar-800 text-polar-400 border border-polar-700">P3: Routine</span>
+            <div className="flex items-center gap-1.5 text-xs font-mono">
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-950 text-rose-300 border border-rose-800">P0: Critical</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-950 text-amber-300 border border-amber-800">P1: High</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-950 text-blue-300 border border-blue-800">P2: Important</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-polar-950 text-polar-400 border border-polar-800">P3: Routine</span>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto border border-polar-800 rounded">
             <table className="w-full text-left text-xs font-mono">
               <thead>
-                <tr className="border-b border-polar-700/80 text-polar-400">
-                  <th className="py-2.5 px-3">Priority</th>
-                  <th className="py-2.5 px-3">Queue ID</th>
-                  <th className="py-2.5 px-3">Event Type</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3">Canonical SHA-256 Checksum</th>
-                  <th className="py-2.5 px-3">Integrity</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
+                <tr className="border-b border-polar-800 text-polar-400 bg-polar-950">
+                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Priority</th>
+                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Queue ID</th>
+                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Event Type</th>
+                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Status</th>
+                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Canonical SHA-256 Checksum</th>
+                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Integrity</th>
+                  <th className="py-2.5 px-3 text-right font-semibold text-[10px] tracking-wider">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-polar-800">
+              <tbody className="divide-y divide-polar-800/80 bg-polar-900">
                 {syncQueue?.items && syncQueue.items.length > 0 ? (
                   syncQueue.items.map((item) => (
                     <tr
                       key={item.id}
                       data-testid={`queue-item-${item.priority_label}`}
-                      className="hover:bg-polar-800/60 transition-colors"
+                      className="hover:bg-polar-800/40 transition-colors"
                     >
                       <td className="py-3 px-3">
                         <span
-                          className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                             item.priority === 0
-                              ? "bg-rose-950 text-rose-300 border border-rose-700"
+                              ? "bg-rose-950 text-rose-300 border border-rose-800"
                               : item.priority === 1
-                              ? "bg-amber-950 text-amber-300 border border-amber-700"
+                              ? "bg-amber-950 text-amber-300 border border-amber-800"
                               : item.priority === 2
-                              ? "bg-blue-950 text-blue-300 border border-blue-700"
-                              : "bg-polar-800 text-polar-400 border border-polar-700"
+                              ? "bg-blue-950 text-blue-300 border border-blue-800"
+                              : "bg-polar-950 text-polar-400 border border-polar-800"
                           }`}
                         >
                           {item.priority_label}
@@ -496,14 +497,14 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       </td>
                       <td className="py-3 px-3">
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
                             item.status === "RECONCILED"
                               ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
                               : item.status === "FAILED_RETRY"
                               ? "bg-rose-950 text-rose-300 border border-rose-800"
                               : item.status === "TRANSFERRING"
-                              ? "bg-cyan-950 text-cyan-300 border border-cyan-800 animate-pulse"
-                              : "bg-polar-800 text-amber-300 border border-polar-700"
+                              ? "bg-cyan-950 text-cyan-300 border border-cyan-800"
+                              : "bg-polar-950 text-amber-300 border border-polar-800"
                           }`}
                         >
                           {item.status}
@@ -515,7 +516,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       <td className="py-3 px-3">
                         <code
                           data-testid="checksum-hash"
-                          className="text-[11px] text-polar-400 bg-polar-900/80 px-2 py-1 rounded border border-polar-800"
+                          className="text-[11px] text-polar-400 bg-polar-950 px-2 py-0.5 rounded border border-polar-800"
                           title={item.checksum_sha256}
                         >
                           {item.checksum_sha256 ? `${item.checksum_sha256.slice(0, 16)}…` : "N/A"}
@@ -558,13 +559,13 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       {(activeTab === "ALL" || activeTab === "SCIENCE") && (
         <div
           data-testid="science-instruments-card"
-          className="rounded-xl border border-polar-700 bg-polar-800/40 p-5 backdrop-blur-sm space-y-4"
+          className="rounded border border-polar-700 bg-polar-900 p-5 space-y-4"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-polar-800 pb-3">
             <div>
-              <h2 className="text-base font-mono font-bold text-polar-100 flex items-center gap-2">
+              <h2 className="text-xs font-mono font-bold text-polar-200 uppercase tracking-wider flex items-center gap-2">
                 <Activity className="h-4 w-4 text-accent-cyan" />
-                <span>Scientific Data Continuity & Offline Buffering</span>
+                <span>Scientific Data Continuity &amp; Offline Buffering</span>
               </h2>
               <p className="text-xs text-polar-400 mt-0.5">
                 Generic scientific observation buffering model. S-17 is the hero ionospheric radar, backed by local circular edge buffer.
@@ -578,7 +579,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
               <div
                 key={inst.id}
                 data-testid={`instrument-${inst.code}`}
-                className="rounded-lg border border-polar-700 bg-polar-900/60 p-4 space-y-3"
+                className="rounded border border-polar-800 bg-polar-950/70 p-4 space-y-3"
               >
                 <div className="flex items-center justify-between">
                   <div>
@@ -587,10 +588,10 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                     <p className="text-[11px] text-polar-400">{inst.instrument_type}</p>
                   </div>
                   <div className="text-right font-mono text-xs">
-                    <span className="text-polar-500 block text-[10px]">Local Buffer</span>
+                    <span className="text-polar-500 block text-[9px] uppercase tracking-wider">Local Buffer</span>
                     <span
                       data-testid="buffered-count"
-                      className="font-bold text-emerald-400 px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800"
+                      className="font-bold text-emerald-400 px-2 py-0.5 rounded bg-emerald-950 border border-emerald-800 text-xs"
                     >
                       {inst.buffered_observations_count} queued
                     </span>
@@ -606,7 +607,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                     data-testid="buffer-observation-btn"
                     onClick={() => handleBufferObservation(inst.id)}
                     disabled={actionLoading}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded bg-accent-cyan/10 hover:bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/30 text-xs font-mono font-semibold transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-polar-900 hover:bg-polar-800 text-accent-cyan border border-polar-700 text-xs font-mono font-semibold transition-colors cursor-pointer"
                   >
                     <span>+ Buffer Reading (TECU)</span>
                   </button>
@@ -617,7 +618,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                     <span className="text-polar-500 text-[10px] uppercase">Recent Samples:</span>
                     <div className="flex flex-wrap gap-2">
                       {inst.recent_observations.slice(0, 4).map((obs) => (
-                        <span key={obs.id} className="bg-polar-800 px-2 py-0.5 rounded text-polar-300">
+                        <span key={obs.id} className="bg-polar-900 border border-polar-800 px-2 py-0.5 rounded text-polar-300">
                           {obs.measurement_value} {obs.unit} ({obs.sync_status})
                         </span>
                       ))}
@@ -636,9 +637,9 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
           {/* Incident List */}
           <div
             data-testid="incidents-list"
-            className="rounded-xl border border-polar-700 bg-polar-800/40 p-5 backdrop-blur-sm space-y-3 lg:col-span-1"
+            className="rounded border border-polar-700 bg-polar-900 p-5 space-y-3 lg:col-span-1"
           >
-            <h2 className="text-base font-mono font-bold text-polar-100 flex items-center gap-2">
+            <h2 className="text-xs font-mono font-bold text-polar-200 uppercase tracking-wider flex items-center gap-2 border-b border-polar-800 pb-2">
               <ShieldAlert className="h-4 w-4 text-rose-400" />
               <span>Active Incidents</span>
             </h2>
@@ -647,16 +648,16 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 <div
                   key={inc.id}
                   onClick={() => setSelectedIncidentId(inc.id)}
-                  className={`p-3 rounded-lg border transition-all cursor-pointer ${
+                  className={`p-3 rounded border transition-all cursor-pointer ${
                     selectedIncidentId === inc.id
-                      ? "border-accent-cyan bg-polar-700/60"
-                      : "border-polar-700/80 bg-polar-900/40 hover:bg-polar-800/60"
+                      ? "border-accent-cyan bg-polar-800"
+                      : "border-polar-800 bg-polar-950/70 hover:bg-polar-800/50"
                   }`}
                 >
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="font-bold text-rose-400">{inc.id}</span>
                     <span
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
                         inc.status === "ACTIVE"
                           ? "bg-rose-950 text-rose-300 border border-rose-800"
                           : inc.status === "CONTAINED"
@@ -667,8 +668,8 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       {inc.status}
                     </span>
                   </div>
-                  <h4 className="text-sm font-semibold text-polar-100 mt-1">{inc.title}</h4>
-                  <p className="text-xs text-polar-400 mt-0.5">{inc.location}</p>
+                  <h4 className="text-xs font-semibold text-polar-100 mt-1">{inc.title}</h4>
+                  <p className="text-[11px] text-polar-400 mt-0.5">{inc.location}</p>
                 </div>
               ))}
             </div>
@@ -677,7 +678,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
           {/* Incident Detail & Blast Radius */}
           <div
             data-testid="incident-detail-panel"
-            className="rounded-xl border border-polar-700 bg-polar-800/40 p-5 backdrop-blur-sm space-y-5 lg:col-span-2"
+            className="rounded border border-polar-700 bg-polar-900 p-5 space-y-5 lg:col-span-2"
           >
             {activeIncident ? (
               <>
@@ -685,14 +686,14 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono font-bold text-rose-400">{activeIncident.id}</span>
-                      <span className="text-xs font-mono px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-700 font-bold">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-700 font-bold">
                         {activeIncident.severity}
                       </span>
-                      <span className="text-xs font-mono px-2 py-0.5 rounded bg-polar-800 text-polar-300 border border-polar-700 font-bold">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-polar-950 text-polar-300 border border-polar-800 font-bold">
                         {activeIncident.status}
                       </span>
                     </div>
-                    <h3 className="text-lg font-bold text-polar-100 mt-1">{activeIncident.title}</h3>
+                    <h3 className="text-base font-bold text-polar-100 mt-1">{activeIncident.title}</h3>
                     <p className="text-xs text-polar-400">{activeIncident.description}</p>
                   </div>
 
@@ -701,7 +702,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                     {activeIncident.status === "ACTIVE" && (
                       <button
                         onClick={() => handleUpdateStatus("CONTAINED")}
-                        className="px-3 py-1 rounded bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-700 text-xs font-mono font-semibold cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-amber-950 hover:bg-amber-900 text-amber-300 border border-amber-700 text-xs font-mono font-semibold cursor-pointer"
                       >
                         Mark Contained
                       </button>
@@ -710,7 +711,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       <button
                         data-testid="resolve-incident-btn"
                         onClick={() => handleUpdateStatus("RESOLVED")}
-                        className="px-3 py-1 rounded bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 text-xs font-mono font-semibold cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 text-xs font-mono font-semibold cursor-pointer"
                       >
                         Resolve Incident
                       </button>
@@ -718,7 +719,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                     <button
                       data-testid="record-memory-btn"
                       onClick={() => setIsMemoryModalOpen(true)}
-                      className="px-3 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-700 text-xs font-mono font-semibold cursor-pointer"
+                      className="px-2.5 py-1 rounded bg-polar-800 hover:bg-polar-700 text-cyan-300 border border-polar-700 text-xs font-mono font-semibold cursor-pointer"
                     >
                       Record to Memory
                     </button>
@@ -727,7 +728,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
 
                 {/* Blast Radius & Day 2 Engine Reuse */}
                 <div data-testid="incident-blast-radius" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-3 rounded-lg bg-polar-900/60 border border-polar-800 space-y-2">
+                  <div className="p-3 rounded bg-polar-950/70 border border-polar-800 space-y-2">
                     <div className="flex items-center justify-between text-xs font-mono">
                       <span className="text-polar-400">Reused Day 2 Dependency Graph</span>
                       <Layers className="h-3.5 w-3.5 text-accent-cyan" />
@@ -740,7 +741,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                         <span
                           key={ast.asset_id}
                           onClick={() => onInspectAsset?.(ast.asset_id)}
-                          className="px-2 py-0.5 rounded bg-polar-800 border border-polar-700 text-[11px] font-mono text-polar-200 cursor-pointer hover:border-accent-cyan"
+                          className="px-2 py-0.5 rounded bg-polar-900 border border-polar-800 text-[10px] font-mono text-polar-200 cursor-pointer hover:border-accent-cyan"
                         >
                           {ast.name} ({ast.criticality})
                         </span>
@@ -748,7 +749,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-polar-900/60 border border-polar-800 space-y-2">
+                  <div className="p-3 rounded bg-polar-950/70 border border-polar-800 space-y-2">
                     <div className="flex items-center justify-between text-xs font-mono">
                       <span className="text-polar-400">Reused Day 2 Risk Engine</span>
                       <Shield className="h-3.5 w-3.5 text-rose-400" />
@@ -757,7 +758,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       <span className="text-xs text-polar-300">Composite Risk Score:</span>
                       <span
                         data-testid="incident-risk-score"
-                        className="text-lg font-mono font-bold text-rose-400 px-2 py-0.5 rounded bg-rose-950/80 border border-rose-800"
+                        className="text-base font-mono font-bold text-rose-400 px-2 py-0.5 rounded bg-rose-950 border border-rose-800"
                       >
                         {activeIncident.modeled_risk_score} / 100
                       </span>
@@ -772,7 +773,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 <form
                   data-testid="log-action-form"
                   onSubmit={handleLogAction}
-                  className="rounded-lg border border-polar-800 bg-polar-900/40 p-3 space-y-2"
+                  className="rounded border border-polar-800 bg-polar-950/50 p-3 space-y-2"
                 >
                   <span className="text-xs font-mono font-bold text-polar-200 block">
                     Log Operator Action (Human-in-the-Loop)
@@ -784,7 +785,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       placeholder="Action Code (e.g. PURGE_FUEL_LINE)"
                       value={newActionCode}
                       onChange={(e) => setNewActionCode(e.target.value)}
-                      className="px-2.5 py-1.5 rounded bg-polar-800 border border-polar-700 text-xs font-mono text-polar-100 focus:outline-none focus:border-accent-cyan"
+                      className="px-2.5 py-1.5 rounded bg-polar-900 border border-polar-700 text-xs font-mono text-polar-100 focus:outline-none focus:border-accent-cyan"
                       required
                     />
                     <input
@@ -793,7 +794,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       placeholder="Action Description / Findings"
                       value={newActionDesc}
                       onChange={(e) => setNewActionDesc(e.target.value)}
-                      className="px-2.5 py-1.5 rounded bg-polar-800 border border-polar-700 text-xs font-mono text-polar-100 md:col-span-2 focus:outline-none focus:border-accent-cyan"
+                      className="px-2.5 py-1.5 rounded bg-polar-900 border border-polar-700 text-xs font-mono text-polar-100 md:col-span-2 focus:outline-none focus:border-accent-cyan"
                       required
                     />
                   </div>
@@ -811,7 +812,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
 
                 {/* Action Audit Trail */}
                 <div className="space-y-2">
-                  <span className="text-xs font-mono font-semibold text-polar-400 uppercase">
+                  <span className="text-[10px] font-mono font-semibold text-polar-400 uppercase tracking-wider">
                     Incident Audit Trail ({activeIncident.actions.length})
                   </span>
                   <div className="space-y-1.5">
@@ -819,7 +820,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       <div
                         key={act.id}
                         data-testid="action-item"
-                        className="p-2.5 rounded bg-polar-900/60 border border-polar-800 flex items-center justify-between text-xs font-mono"
+                        className="p-2.5 rounded bg-polar-950/60 border border-polar-800 flex items-center justify-between text-xs font-mono"
                       >
                         <div>
                           <span className="font-bold text-accent-cyan">{act.action_code}</span>:{" "}
@@ -828,7 +829,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                             Logged by {act.executed_by} at {new Date(act.executed_at).toLocaleTimeString()}
                           </span>
                         </div>
-                        <span className="px-2 py-0.5 rounded bg-polar-800 text-emerald-400 text-[10px] font-bold">
+                        <span className="px-2 py-0.5 rounded bg-polar-900 text-emerald-400 text-[10px] font-bold border border-polar-800">
                           {act.outcome_status}
                         </span>
                       </div>
@@ -849,13 +850,13 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       {(activeTab === "ALL" || activeTab === "MEMORY") && (
         <div
           data-testid="operational-memory-panel"
-          className="rounded-xl border border-polar-700 bg-polar-800/40 p-5 backdrop-blur-sm space-y-4"
+          className="rounded border border-polar-700 bg-polar-900 p-5 space-y-4"
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-polar-800 pb-3">
             <div>
-              <h2 className="text-base font-mono font-bold text-polar-100 flex items-center gap-2">
+              <h2 className="text-xs font-mono font-bold text-polar-200 uppercase tracking-wider flex items-center gap-2">
                 <History className="h-4 w-4 text-accent-cyan" />
-                <span>Operational Memory & Institutional Knowledge</span>
+                <span>Operational Memory &amp; Institutional Knowledge</span>
               </h2>
               <p className="text-xs text-polar-400 mt-0.5">
                 Structured post-mortem lessons learned across wintering expeditions. Reusable operator knowledge prevents recurring incidents.
@@ -869,7 +870,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 placeholder="Search lessons (e.g. Boiler, Vapor Lock)..."
                 value={memorySearchQuery}
                 onChange={(e) => setMemorySearchQuery(e.target.value)}
-                className="pl-8 pr-3 py-1.5 rounded-lg bg-polar-900 border border-polar-700 text-xs font-mono text-polar-100 focus:outline-none focus:border-accent-cyan w-64"
+                className="pl-8 pr-3 py-1.5 rounded bg-polar-950 border border-polar-700 text-xs font-mono text-polar-100 focus:outline-none focus:border-accent-cyan w-64"
               />
             </div>
           </div>
@@ -880,19 +881,19 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 <div
                   key={mem.id}
                   data-testid="memory-card"
-                  className="rounded-lg border border-polar-700 bg-polar-900/60 p-4 space-y-2.5"
+                  className="rounded border border-polar-800 bg-polar-950/70 p-4 space-y-2.5"
                 >
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="font-bold text-accent-cyan">{mem.id}</span>
                     <span className="text-polar-500 text-[10px]">{new Date(mem.created_at).toLocaleDateString()}</span>
                   </div>
-                  <h3 className="text-sm font-semibold text-polar-100">{mem.title}</h3>
-                  <div className="text-xs text-polar-300 bg-polar-800/60 p-2 rounded border border-polar-800">
-                    <strong className="text-polar-400 block text-[10px] uppercase">Context & Decision:</strong>
+                  <h3 className="text-xs font-semibold text-polar-100">{mem.title}</h3>
+                  <div className="text-xs text-polar-300 bg-polar-900 p-2.5 rounded border border-polar-800">
+                    <strong className="text-polar-400 block text-[9px] uppercase tracking-wider mb-0.5">Context &amp; Decision:</strong>
                     {mem.context_summary}
                   </div>
-                  <div className="text-xs text-cyan-200 bg-cyan-950/30 p-2 rounded border border-cyan-900/40">
-                    <strong className="text-cyan-400 block text-[10px] uppercase">Lesson Learned:</strong>
+                  <div className="text-xs text-cyan-200 bg-polar-900 p-2.5 rounded border border-cyan-900/60">
+                    <strong className="text-cyan-400 block text-[9px] uppercase tracking-wider mb-0.5">Lesson Learned:</strong>
                     {mem.lessons_learned}
                   </div>
                 </div>
@@ -909,8 +910,8 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       {/* ── Record to Memory Modal ──────────────────────── */}
       {isMemoryModalOpen && (
         <div className="fixed inset-0 bg-polar-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="rounded-xl border border-polar-700 bg-polar-900 max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <h3 className="text-base font-mono font-bold text-polar-100 flex items-center gap-2">
+          <div className="rounded border border-polar-700 bg-polar-900 max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <h3 className="text-sm font-mono font-bold text-polar-100 flex items-center gap-2">
               <History className="h-4 w-4 text-accent-cyan" />
               <span>Record Incident to Operational Memory</span>
             </h3>
@@ -924,7 +925,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 <textarea
                   value={memDecision}
                   onChange={(e) => setMemDecision(e.target.value)}
-                  className="w-full p-2 rounded bg-polar-800 border border-polar-700 text-polar-100 focus:outline-none focus:border-accent-cyan"
+                  className="w-full p-2 rounded bg-polar-950 border border-polar-700 text-polar-100 focus:outline-none focus:border-accent-cyan"
                   rows={2}
                   required
                 />
@@ -935,7 +936,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 <textarea
                   value={memAction}
                   onChange={(e) => setMemAction(e.target.value)}
-                  className="w-full p-2 rounded bg-polar-800 border border-polar-700 text-polar-100 focus:outline-none focus:border-accent-cyan"
+                  className="w-full p-2 rounded bg-polar-950 border border-polar-700 text-polar-100 focus:outline-none focus:border-accent-cyan"
                   rows={2}
                   required
                 />
@@ -946,7 +947,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 <textarea
                   value={memOutcome}
                   onChange={(e) => setMemOutcome(e.target.value)}
-                  className="w-full p-2 rounded bg-polar-800 border border-polar-700 text-polar-100 focus:outline-none focus:border-accent-cyan"
+                  className="w-full p-2 rounded bg-polar-950 border border-polar-700 text-polar-100 focus:outline-none focus:border-accent-cyan"
                   rows={2}
                   required
                 />
@@ -957,7 +958,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 <textarea
                   value={memLesson}
                   onChange={(e) => setMemLesson(e.target.value)}
-                  className="w-full p-2 rounded bg-polar-800 border border-cyan-800/80 text-cyan-200 focus:outline-none focus:border-accent-cyan"
+                  className="w-full p-2 rounded bg-polar-950 border border-cyan-800/80 text-cyan-200 focus:outline-none focus:border-accent-cyan"
                   rows={2}
                   required
                 />
@@ -967,14 +968,14 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsMemoryModalOpen(false)}
-                  className="px-3 py-1.5 rounded bg-polar-800 hover:bg-polar-700 text-polar-300 text-xs font-mono cursor-pointer"
+                  className="px-3 py-1.5 rounded bg-polar-800 hover:bg-polar-700 text-polar-300 text-xs font-mono cursor-pointer border border-polar-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-1.5 rounded bg-accent-cyan hover:bg-accent-cyan/80 text-polar-950 text-xs font-mono font-bold cursor-pointer"
+                  className="px-4 py-1.5 rounded bg-accent-cyan hover:bg-accent-cyan/90 text-polar-950 text-xs font-mono font-bold cursor-pointer"
                 >
                   Commit to Memory
                 </button>

@@ -18,7 +18,7 @@ export function AssetHeader({ asset, onBack }: AssetHeaderProps) {
         <button
           onClick={onBack}
           aria-label="Return to Station Command Center"
-          className="flex items-center gap-2 rounded-lg border border-polar-700 bg-polar-800/80 px-3.5 py-1.5 text-xs font-mono font-medium text-polar-300 hover:text-polar-100 hover:border-polar-600 transition-colors cursor-pointer"
+          className="flex items-center gap-2 rounded border border-polar-700 bg-polar-800 px-3 py-1.5 text-xs font-mono font-medium text-polar-300 hover:text-polar-100 hover:border-polar-600 transition-colors cursor-pointer"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span>← Back to Station Command Center</span>
@@ -34,7 +34,7 @@ export function AssetHeader({ asset, onBack }: AssetHeaderProps) {
       </div>
 
       {/* ── Hero Profile Card ───────────────────────────── */}
-      <div className="rounded-xl border border-polar-700 bg-polar-800/70 p-5 backdrop-blur-sm shadow-md">
+      <div className="rounded border border-polar-700 bg-polar-800/90 p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
@@ -50,7 +50,7 @@ export function AssetHeader({ asset, onBack }: AssetHeaderProps) {
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-bold font-mono text-polar-100 tracking-tight">
+            <h1 className="text-2xl font-bold font-mono text-polar-100 tracking-tight">
               {asset.name}
             </h1>
 
@@ -60,21 +60,21 @@ export function AssetHeader({ asset, onBack }: AssetHeaderProps) {
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-2">
+          <div className="flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-2">
               <span
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-bold uppercase tracking-wider border ${
                   isCritical
-                    ? "bg-rose-950/80 text-rose-300 border-rose-700"
+                    ? "bg-rose-950 text-rose-300 border-rose-700"
                     : isWarning
-                    ? "bg-amber-950/80 text-amber-300 border-amber-700"
-                    : "bg-emerald-950/80 text-emerald-300 border-emerald-700"
+                    ? "bg-amber-950 text-amber-300 border-amber-700"
+                    : "bg-emerald-950 text-emerald-300 border-emerald-700"
                 }`}
               >
                 {isCritical ? (
                   <ShieldAlert className="h-4 w-4 text-rose-400" />
                 ) : isWarning ? (
-                  <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+                  <span className="h-2 w-2 rounded-full bg-amber-400" />
                 ) : (
                   <ShieldCheck className="h-4 w-4 text-emerald-400" />
                 )}

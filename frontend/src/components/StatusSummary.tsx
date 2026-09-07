@@ -21,11 +21,11 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* ── 1. Station Overall Health ─────────────────────── */}
-      <div className="rounded-xl border border-polar-700 bg-polar-800/70 p-4 backdrop-blur-sm flex flex-col justify-between">
-        <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="rounded border border-polar-700 bg-polar-800/90 p-4 flex flex-col justify-between">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-polar-700/60">
           <div className="flex items-center gap-2">
             <div
-              className={`p-1.5 rounded-lg border ${
+              className={`p-1.5 rounded border ${
                 isCritical
                   ? "bg-rose-950/40 text-rose-400 border-rose-800/60"
                   : isDegraded
@@ -62,28 +62,28 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
           <div>
             <div className="text-3xl font-bold font-mono tracking-tight text-polar-100">
               {overview.overall_health_score}
-              <span className="text-base font-normal text-polar-400">/100</span>
+              <span className="text-sm font-normal text-polar-400 font-mono">/100</span>
             </div>
-            <div className="text-xs text-polar-400 mt-0.5">Composite Station Health</div>
+            <div className="text-xs text-polar-400 mt-0.5 font-mono">Composite Station Health</div>
           </div>
           <div className="text-right">
             <div className="text-sm font-mono font-semibold text-amber-400">
               {overview.active_incidents_count}{" "}
               {overview.active_incidents_count === 1 ? "Active Issue" : "Active Issues"}
             </div>
-            <div className="text-[11px] text-polar-400">Attention required</div>
+            <div className="text-[11px] text-polar-400 font-mono">Attention required</div>
           </div>
         </div>
 
         {/* Health progress bar */}
-        <div className="w-full bg-polar-700/60 rounded-full h-1.5 mt-3 overflow-hidden">
+        <div className="w-full bg-polar-950 rounded-sm h-1.5 mt-3 overflow-hidden border border-polar-700/50">
           <div
-            className={`h-full rounded-full ${
+            className={`h-full ${
               isCritical
                 ? "bg-rose-500"
                 : isDegraded
-                ? "bg-amber-400"
-                : "bg-emerald-400"
+                ? "bg-amber-500"
+                : "bg-emerald-500"
             }`}
             style={{ width: `${overview.overall_health_score}%` }}
           />
@@ -91,11 +91,11 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
       </div>
 
       {/* ── 2. Fuel & Energy Runway ───────────────────────── */}
-      <div className="rounded-xl border border-polar-700 bg-polar-800/70 p-4 backdrop-blur-sm flex flex-col justify-between">
-        <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="rounded border border-polar-700 bg-polar-800/90 p-4 flex flex-col justify-between">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-polar-700/60">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg border bg-cyan-950/40 text-cyan-400 border-cyan-800/60">
-              <Flame className="h-4 w-4" />
+            <div className="p-1.5 rounded border bg-polar-900 text-polar-300 border-polar-700">
+              <Flame className="h-4 w-4 text-polar-300" />
             </div>
             <span className="text-xs font-semibold text-polar-300 uppercase tracking-wider font-mono">
               FUEL & RUNWAY
@@ -115,25 +115,25 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
           </div>
 
           <div className="flex items-center justify-between mt-2 pt-2 border-t border-polar-700/60">
-            <span className="text-xs text-polar-400">Estimated Runway:</span>
-            <span className="text-sm font-mono font-bold text-accent-cyan">
+            <span className="text-xs text-polar-400 font-mono">Estimated Runway:</span>
+            <span className="text-sm font-mono font-bold text-polar-100">
               ≈ {overview.fuel_runway_days ?? 70.2} days
             </span>
           </div>
         </div>
 
-        <div className="text-[11px] text-polar-400 mt-2 flex items-center justify-between">
+        <div className="text-[11px] text-polar-400 mt-2 flex items-center justify-between font-mono">
           <span>Winter Target: 90 days</span>
-          <span className="text-accent-amber font-mono">Resupply in 11d</span>
+          <span className="text-amber-400 font-mono font-medium">Resupply in 11d</span>
         </div>
       </div>
 
       {/* ── 3. Ambient Weather / Environment ──────────────── */}
-      <div className="rounded-xl border border-polar-700 bg-polar-800/70 p-4 backdrop-blur-sm flex flex-col justify-between">
-        <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="rounded border border-polar-700 bg-polar-800/90 p-4 flex flex-col justify-between">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-polar-700/60">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg border bg-blue-950/40 text-blue-400 border-blue-800/60">
-              <Thermometer className="h-4 w-4" />
+            <div className="p-1.5 rounded border bg-polar-900 text-polar-300 border-polar-700">
+              <Thermometer className="h-4 w-4 text-polar-300" />
             </div>
             <span className="text-xs font-semibold text-polar-300 uppercase tracking-wider font-mono">
               ENVIRONMENT
@@ -147,7 +147,7 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
             <div className="text-2xl font-bold font-mono text-polar-100">
               {overview.ambient_weather.temperature_celsius.toFixed(1)}°C
             </div>
-            <div className="text-[11px] text-polar-400">
+            <div className="text-[11px] text-polar-400 font-mono">
               Wind Chill: {overview.ambient_weather.wind_chill_celsius.toFixed(1)}°C
             </div>
           </div>
@@ -156,7 +156,7 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
               <Wind className="h-3.5 w-3.5 text-accent-cyan" />
               {overview.ambient_weather.wind_speed_knots} kt
             </div>
-            <div className="text-[11px] font-medium text-accent-amber truncate">
+            <div className="text-[11px] font-mono font-medium text-amber-400 truncate">
               {overview.ambient_weather.conditions}
             </div>
           </div>
@@ -168,35 +168,35 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
       </div>
 
       {/* ── 4. Communications / Uplink ────────────────────── */}
-      <div className="rounded-xl border border-polar-700 bg-polar-800/70 p-4 backdrop-blur-sm flex flex-col justify-between">
-        <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="rounded border border-polar-700 bg-polar-800/90 p-4 flex flex-col justify-between">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-polar-700/60">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg border bg-emerald-950/40 text-emerald-400 border-emerald-800/60">
-              <Radio className="h-4 w-4" />
+            <div className="p-1.5 rounded border bg-polar-900 text-polar-300 border-polar-700">
+              <Radio className="h-4 w-4 text-polar-300" />
             </div>
             <span className="text-xs font-semibold text-polar-300 uppercase tracking-wider font-mono">
               COMMUNICATIONS
             </span>
           </div>
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-700">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950 text-emerald-400 border border-emerald-800">
             {overview.connectivity_status}
           </span>
         </div>
 
-        <div className="mt-1">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-polar-300">Carrier Uplink</span>
-            <span className="font-mono text-polar-100 font-semibold">VSAT Ku-Band</span>
+        <div className="mt-1 font-mono">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-polar-400">Carrier Uplink</span>
+            <span className="text-polar-200 font-semibold">VSAT Ku-Band</span>
           </div>
-          <div className="flex items-center justify-between text-xs text-polar-400 mt-1">
-            <span>Latency / Freshness</span>
-            <span className="font-mono text-emerald-400">680 ms &middot; Real-time</span>
+          <div className="flex items-center justify-between text-xs mt-1.5">
+            <span className="text-polar-400">Latency / Freshness</span>
+            <span className="text-emerald-400 font-semibold">680 ms · Real-time</span>
           </div>
         </div>
 
-        <div className="text-[11px] text-polar-400 mt-2 pt-2 border-t border-polar-700/60 flex items-center justify-between">
+        <div className="text-[11px] text-polar-400 mt-2 pt-2 border-t border-polar-700/60 flex items-center justify-between font-mono">
           <span>Telemetry Quality:</span>
-          <span className="text-accent-green font-mono">NOMINAL (99.8%)</span>
+          <span className="text-emerald-400 font-semibold">NOMINAL (99.8%)</span>
         </div>
       </div>
     </div>

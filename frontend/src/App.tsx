@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { useStationOverview } from "./hooks/useStationOverview";
 import { Header, type ViewMode } from "./components/Header";
+import { Footer } from "./components/Footer";
 import { StatusSummary } from "./components/StatusSummary";
 import { CriticalEvents } from "./components/CriticalEvents";
 import { StationSchematic } from "./components/StationSchematic";
@@ -10,24 +11,36 @@ import { AssetIntelligenceView } from "./components/AssetIntelligence/AssetIntel
 import { ResourcesView } from "./components/Resources/ResourcesView";
 import { ScenariosView } from "./components/Scenarios/ScenariosView";
 import { ResilienceView } from "./components/Resilience/ResilienceView";
+import { PrivacyPolicy } from "./components/PrivacyPolicy";
+import { TermsAndConditions } from "./components/TermsAndConditions";
 
 function getViewFromPath(): ViewMode {
   if (typeof window === "undefined") return "COMMAND_CENTER";
   const path = window.location.pathname;
+  if (path.startsWith("/assets")) return "ASSET_DETAIL";
   if (path.startsWith("/resources")) return "RESOURCES";
   if (path.startsWith("/scenarios")) return "SCENARIOS";
   if (path.startsWith("/resilience")) return "RESILIENCE";
+  if (path.startsWith("/privacy")) return "PRIVACY";
+  if (path.startsWith("/terms")) return "TERMS";
   return "COMMAND_CENTER";
+}
+
+function getAssetIdFromPath(): string {
+  if (typeof window === "undefined") return "G-02";
+  const match = window.location.pathname.match(/\/assets\/([^/]+)/);
+  return match ? (match[1] === "ASSET-GEN-02" ? "G-02" : match[1]) : "G-02";
 }
 
 export default function App() {
   const [selectedStationId, setSelectedStationId] = useState<string>("STATION-BHARATI");
   const [activeView, setActiveView] = useState<ViewMode>(getViewFromPath);
-  const [inspectedAssetId, setInspectedAssetId] = useState<string>("G-02");
+  const [inspectedAssetId, setInspectedAssetId] = useState<string>(getAssetIdFromPath);
 
   useEffect(() => {
     const handlePopState = () => {
       setActiveView(getViewFromPath());
+      setInspectedAssetId(getAssetIdFromPath());
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -42,6 +55,10 @@ export default function App() {
         ? "/scenarios"
         : view === "RESILIENCE"
         ? "/resilience"
+        : view === "PRIVACY"
+        ? "/privacy"
+        : view === "TERMS"
+        ? "/terms"
         : "/";
     window.history.pushState({}, "", path);
   };
@@ -68,7 +85,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-polar-900 text-polar-100 flex flex-col font-sans selection:bg-accent-cyan/30 selection:text-white">
+    <div className="min-h-screen bg-polar-900 text-polar-100 flex flex-col font-sans selection:bg-accent-cyan/20 selection:text-white">
       {/* ── Top Command Bar ─────────────────────────────── */}
       <Header
         selectedStationId={selectedStationId}
@@ -91,14 +108,14 @@ export default function App() {
         {isLoading && (
           <div
             data-testid="loading-indicator"
-            className="flex flex-col items-center justify-center min-h-[450px] gap-4 rounded-xl border border-polar-700 bg-polar-800/40 p-12 backdrop-blur-sm"
+            className="flex flex-col items-center justify-center min-h-[420px] gap-4 rounded border border-polar-700 bg-polar-800/40 p-12 backdrop-blur-sm"
           >
-            <Loader2 className="h-10 w-10 animate-spin text-accent-cyan" />
+            <Loader2 className="h-8 w-8 animate-spin text-accent-cyan" />
             <div className="text-center">
-              <div className="text-base font-mono font-bold text-polar-200">
+              <div className="text-sm font-mono font-bold text-polar-200 uppercase tracking-wider">
                 CONNECTING TO STATION TELEMETRY BUS…
               </div>
-              <p className="text-xs text-polar-400 mt-1">
+              <p className="text-xs text-polar-400 mt-1 font-mono">
                 Synchronizing real-time sensor metrics and topological state from {selectedStationId}
               </p>
             </div>
@@ -109,13 +126,13 @@ export default function App() {
         {isError && (
           <div
             data-testid="error-state"
-            className="flex flex-col items-center justify-center min-h-[400px] gap-4 rounded-xl border-2 border-rose-800/80 bg-rose-950/20 p-8 text-center backdrop-blur-sm"
+            className="flex flex-col items-center justify-center min-h-[380px] gap-4 rounded border border-rose-800 bg-rose-950/20 p-8 text-center"
           >
-            <div className="p-3 rounded-full bg-rose-900/40 text-rose-400 border border-rose-700">
-              <ShieldAlert className="h-8 w-8" />
+            <div className="p-3 rounded bg-rose-900/40 text-rose-400 border border-rose-700">
+              <ShieldAlert className="h-7 w-7" />
             </div>
             <div className="max-w-md">
-              <h2 className="text-lg font-bold font-mono text-rose-300 uppercase tracking-wider">
+              <h2 className="text-base font-bold font-mono text-rose-300 uppercase tracking-wider">
                 Station Telemetry Feed Unavailable
               </h2>
               <p className="text-xs text-polar-300 mt-2 leading-relaxed">
@@ -126,7 +143,7 @@ export default function App() {
             </div>
             <button
               onClick={() => refetch()}
-              className="flex items-center gap-2 rounded-lg bg-rose-900/60 hover:bg-rose-900 text-rose-200 border border-rose-700 px-4 py-2 text-xs font-mono font-semibold transition-colors cursor-pointer"
+              className="flex items-center gap-2 rounded bg-rose-900/60 hover:bg-rose-900 text-rose-200 border border-rose-700 px-4 py-2 text-xs font-mono font-semibold transition-colors cursor-pointer"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               <span>Retry Telemetry Connection</span>
@@ -134,8 +151,12 @@ export default function App() {
           </div>
         )}
 
-        {/* Success / Operational Content */}
-        {overview && (
+        {/* View Routing */}
+        {activeView === "PRIVACY" ? (
+          <PrivacyPolicy onBack={handleBackToCommandCenter} />
+        ) : activeView === "TERMS" ? (
+          <TermsAndConditions onBack={handleBackToCommandCenter} />
+        ) : overview ? (
           <>
             {activeView === "ASSET_DETAIL" ? (
               <AssetIntelligenceView
@@ -161,7 +182,7 @@ export default function App() {
                 onInspectAsset={handleInspectAsset}
               />
             ) : (
-              <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="space-y-6 animate-in fade-in duration-150">
                 {/* 1. Situation Awareness / Top Status Row */}
                 <StatusSummary overview={overview} />
 
@@ -182,23 +203,15 @@ export default function App() {
               </div>
             )}
           </>
-        )}
+        ) : null}
       </main>
 
       {/* ── Operational Status Footer ───────────────────── */}
-      <footer className="border-t border-polar-800 bg-polar-950 px-6 py-3 text-xs text-polar-500 flex flex-wrap items-center justify-between gap-2 font-mono">
-        <div className="flex items-center gap-3">
-          <span>POLAROPS MISSION CONTROL</span>
-          <span>&middot;</span>
-          <span>STATION: {overview?.name ?? selectedStationId}</span>
-          <span>&middot;</span>
-          <span>MODE: {overview?.environment_mode ?? "WINTER"}</span>
-        </div>
-        <div className="text-[11px] text-polar-400">
-          Day 4 &middot; Resilience, Science Continuity &amp; Incident Memory
-        </div>
-      </footer>
+      <Footer
+        stationName={overview?.name ?? selectedStationId}
+        environmentMode={overview?.environment_mode ?? "WINTER"}
+        onNavigate={(view) => navigateToView(view)}
+      />
     </div>
   );
 }
-

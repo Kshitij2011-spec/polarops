@@ -17,29 +17,29 @@ export function SubsystemGrid({ subsystems }: SubsystemGridProps) {
   const getSubsystemIcon = (code: string) => {
     switch (code) {
       case "POWER":
-        return <Zap className="h-4 w-4" />;
+        return <Zap className="h-4 w-4 text-accent-cyan" />;
       case "HEATING":
       case "THERMAL":
-        return <Flame className="h-4 w-4" />;
+        return <Flame className="h-4 w-4 text-amber-400" />;
       case "WATER":
-        return <Droplets className="h-4 w-4" />;
+        return <Droplets className="h-4 w-4 text-sky-400" />;
       case "COMMS":
-        return <Radio className="h-4 w-4" />;
+        return <Radio className="h-4 w-4 text-emerald-400" />;
       case "RESEARCH":
       case "SCIENCE":
-        return <Cpu className="h-4 w-4" />;
+        return <Cpu className="h-4 w-4 text-indigo-400" />;
       default:
-        return <Server className="h-4 w-4" />;
+        return <Server className="h-4 w-4 text-polar-300" />;
     }
   };
 
   return (
-    <div className="rounded-xl border border-polar-700 bg-polar-800/70 p-5 backdrop-blur-sm">
-      <div className="flex items-center justify-between pb-3 border-b border-polar-700 mb-4">
+    <div className="rounded border border-polar-700 bg-polar-800/90 p-5">
+      <div className="flex items-center justify-between pb-2.5 border-b border-polar-700 mb-3.5">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-accent-cyan" />
-          <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-polar-200">
-            SUBSYSTEM HEALTH & TELEMETRY MATRIX
+          <h2 className="text-xs font-bold font-mono uppercase tracking-wider text-polar-200">
+            SUBSYSTEM HEALTH &amp; TELEMETRY MATRIX
           </h2>
         </div>
         <span className="text-xs font-mono text-polar-400">
@@ -47,7 +47,7 @@ export function SubsystemGrid({ subsystems }: SubsystemGridProps) {
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {subsystems.map((sub) => {
           const isWarning = sub.status === "WARNING" || sub.health_score < 80;
           const isCritical = sub.status === "CRITICAL" || sub.health_score < 50;
@@ -55,25 +55,17 @@ export function SubsystemGrid({ subsystems }: SubsystemGridProps) {
           return (
             <div
               key={sub.code}
-              className={`rounded-lg border p-3.5 flex flex-col justify-between transition-all ${
+              className={`rounded border p-3 flex flex-col justify-between transition-colors ${
                 isCritical
-                  ? "bg-rose-950/20 border-rose-800/80"
+                  ? "bg-rose-950/20 border-rose-800"
                   : isWarning
-                  ? "bg-amber-950/20 border-amber-800/80"
-                  : "bg-polar-900/80 border-polar-700/80 hover:border-polar-600"
+                  ? "bg-amber-950/20 border-amber-800"
+                  : "bg-polar-900 border-polar-700 hover:border-polar-600"
               }`}
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <div
-                    className={`p-1.5 rounded ${
-                      isCritical
-                        ? "bg-rose-900/40 text-rose-400"
-                        : isWarning
-                        ? "bg-amber-900/40 text-amber-400"
-                        : "bg-polar-800 text-accent-cyan"
-                    }`}
-                  >
+                  <div className="p-1 rounded bg-polar-800 border border-polar-700">
                     {getSubsystemIcon(sub.code)}
                   </div>
                   <span
@@ -89,7 +81,7 @@ export function SubsystemGrid({ subsystems }: SubsystemGridProps) {
                   </span>
                 </div>
 
-                <div className="text-xs font-bold font-mono text-polar-200 truncate">
+                <div className="text-xs font-bold font-mono text-polar-100 truncate">
                   {sub.name}
                 </div>
                 <div className="text-[10px] text-polar-400 font-mono mt-0.5">
@@ -112,14 +104,14 @@ export function SubsystemGrid({ subsystems }: SubsystemGridProps) {
                     {sub.health_score}%
                   </span>
                 </div>
-                <div className="w-full bg-polar-800 rounded-full h-1 overflow-hidden">
+                <div className="w-full bg-polar-950 rounded-sm h-1 overflow-hidden border border-polar-700/50">
                   <div
-                    className={`h-full rounded-full ${
+                    className={`h-full ${
                       isCritical
                         ? "bg-rose-500"
                         : isWarning
-                        ? "bg-amber-400"
-                        : "bg-emerald-400"
+                        ? "bg-amber-500"
+                        : "bg-emerald-500"
                     }`}
                     style={{ width: `${sub.health_score}%` }}
                   />
