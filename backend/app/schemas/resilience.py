@@ -101,6 +101,8 @@ class ScienceObservationSchema(BaseModel):
     truth_type: str
     is_buffered: bool = False
     sync_status: str = "RECONCILED"
+    metadata_completeness: str = "COMPLETE"
+    provenance: Optional[ProvenanceSchema] = None
 
     class Config:
         from_attributes = True
@@ -122,6 +124,7 @@ class ScienceInstrumentDetailResponse(BaseModel):
     buffered_observations_count: int = 0
     recent_observations: List[ScienceObservationSchema] = []
     truth_type: str = "MEASURED"
+    provenance: Optional[ProvenanceSchema] = None
 
     class Config:
         from_attributes = True

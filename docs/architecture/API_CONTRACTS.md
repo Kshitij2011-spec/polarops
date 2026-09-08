@@ -438,6 +438,12 @@ Simulates link recovery and triggers queue flush reconciliation.
 ### `GET /science/instruments`
 Returns active scientific experiment payloads and power allocation status.
 
+### `POST /science/observations/buffer`
+Buffers a scientific measurement locally in edge buffer and enqueues P2 synchronization queue item.
+
+### `POST /science/observations`
+Records a scientific measurement with automatic link-state continuity awareness (direct when ONLINE, buffered when OFFLINE).
+
 ### `GET /incidents` & `POST /incidents`
 Manages station operational incidents.
 

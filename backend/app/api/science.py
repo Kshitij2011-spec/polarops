@@ -1,6 +1,6 @@
 """API router for Scientific Instrument Continuity and Observation Buffering."""
 
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from app.services.science_service import (
     buffer_science_observation,
     get_all_instruments,
     get_instrument_detail,
+    record_science_observation,
 )
 
 router = APIRouter(prefix="/science", tags=["Science Continuity"])
@@ -48,5 +49,18 @@ def buffer_observation(
     """Buffer a scientific measurement locally while operating disconnected."""
     try:
         return buffer_science_observation(db, req)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/observations", response_model=ScienceObservationSchema)
+def create_observation(
+    req: BufferObservationRequest,
+    force_buffer: Optional[bool] = Query(None, description="Force buffering independent of link state"),
+    db: Session = Depends(get_db),
+) -> ScienceObservationSchema:
+    """Record a scientific measurement with automatic link-state continuity handling."""
+    try:
+        return record_science_observation(db, req, force_buffer=force_buffer)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
