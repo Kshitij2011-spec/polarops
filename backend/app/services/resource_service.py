@@ -73,6 +73,7 @@ def list_station_inventory(db: Session, station_id: str = "STATION-BHARATI") -> 
     )
 
     result: list[InventorySpareItem] = []
+    now = datetime.now(timezone.utc)
     for item in items:
         sp = item.spare_part
         if not sp:
@@ -88,6 +89,17 @@ def list_station_inventory(db: Session, station_id: str = "STATION-BHARATI") -> 
         elif item.quantity_reserved > 0:
             status = "RESERVED"
 
+        # Freshness from the inventory record's own updated_at — same UTC-safe guard
+        # used by asset_service.py and telemetry_service.py.
+        item_ts = item.updated_at
+        if item_ts is not None and item_ts.tzinfo is None:
+            item_ts = item_ts.replace(tzinfo=timezone.utc)
+        item_freshness = (
+            max(0.0, (now - item_ts).total_seconds())
+            if item_ts is not None
+            else 1.0
+        )
+
         result.append(
             InventorySpareItem(
                 id=item.id,
@@ -102,6 +114,14 @@ def list_station_inventory(db: Session, station_id: str = "STATION-BHARATI") -> 
                 location=item.location,
                 status=status,
                 work_order_ids=wo_ids,
+                provenance=ProvenanceSchema(
+                    source=f"inventory:{item.id}",
+                    timestamp=item_ts or now,
+                    freshness_seconds=round(item_freshness, 1),
+                    quality=Quality.GOOD,
+                    truth_type=TruthType.MEASURED,
+                    confidence=0.95,
+                ),
             )
         )
 
@@ -131,6 +151,18 @@ def list_station_resupply(db: Session, station_id: str = "STATION-BHARATI") -> l
         delta = (exp - now).total_seconds() / 86400.0
         eta_days = max(0.0, round(delta, 1))
 
+        # Freshness from the resupply record's own updated_at, not the expected arrival date.
+        # updated_at = when the vessel schedule entry was last modified in the database.
+        # truth_type FORECAST: expected_date is a planned future value, not a sensor reading.
+        opp_ts = opp.updated_at
+        if opp_ts is not None and opp_ts.tzinfo is None:
+            opp_ts = opp_ts.replace(tzinfo=timezone.utc)
+        opp_freshness = (
+            max(0.0, (now - opp_ts).total_seconds())
+            if opp_ts is not None
+            else 1.0
+        )
+
         result.append(
             ResupplyOpportunityItem(
                 id=opp.id,
@@ -143,10 +175,24 @@ def list_station_resupply(db: Session, station_id: str = "STATION-BHARATI") -> l
                 quantity=opp.quantity,
                 delay_days=opp.delay_days,
                 status=str(opp.status.value if hasattr(opp.status, "value") else opp.status),
+                provenance=ProvenanceSchema(
+                    source=f"resupply:{opp.id}",
+                    timestamp=opp_ts or now,
+                    freshness_seconds=round(opp_freshness, 1),
+                    quality=Quality.GOOD,
+                    truth_type=TruthType.FORECAST,
+                    confidence=0.85,
+                ),
             )
         )
 
     return result
+
+def _utc(ts: "datetime | None") -> "datetime | None":
+    """Normalize a possibly-naive datetime to UTC-aware, or return None."""
+    if ts is None:
+        return None
+    return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
 
 
 def get_asset_recovery_exposure(db: Session, asset_id: str) -> AssetRecoveryExposureResponse | None:
@@ -222,6 +268,52 @@ def get_asset_recovery_exposure(db: Session, asset_id: str) -> AssetRecoveryExpo
                 delta = (exp - now).total_seconds() / 86400.0
                 resupply_eta = max(0.0, round(delta, 1))
 
+    # 3. Composite provenance freshness.
+    # Recovery exposure is derived from multiple operational inputs.
+    # We use the MOST RECENT updated_at among the inputs that actually contributed
+    # to this result, following the task B3/B8 specification.
+    now = datetime.now(timezone.utc)
+    candidate_ts: list[datetime] = []
+    if active_wo is not None:
+        ts = _utc(active_wo.updated_at)
+        if ts is not None:
+            candidate_ts.append(ts)
+    # inv and res are only defined inside the `if active_wo / if m_spare` block;
+    # re-query them here in a lightweight way to get their timestamps.
+    if active_wo:
+        _m = db.query(MaintenanceSpare).filter(MaintenanceSpare.work_order_id == active_wo.id).first()
+        if _m and _m.spare_part:
+            _inv = db.query(InventoryItem).filter(InventoryItem.spare_part_id == _m.spare_part_id).first()
+            if _inv is not None:
+                ts = _utc(_inv.updated_at)
+                if ts is not None:
+                    candidate_ts.append(ts)
+            _res = (
+                db.query(ResupplyOpportunity)
+                .filter(
+                    ResupplyOpportunity.spare_part_id == _m.spare_part_id,
+                    ResupplyOpportunity.status.in_([
+                        ResupplyStatus.SCHEDULED,
+                        ResupplyStatus.IN_TRANSIT,
+                        ResupplyStatus.DELAYED,
+                    ]),
+                )
+                .order_by(ResupplyOpportunity.expected_date.asc())
+                .first()
+            )
+            if _res is not None:
+                ts = _utc(_res.updated_at)
+                if ts is not None:
+                    candidate_ts.append(ts)
+
+    if candidate_ts:
+        latest_input_ts = max(candidate_ts)
+        recovery_freshness = max(0.0, (now - latest_input_ts).total_seconds())
+        recovery_ts = latest_input_ts
+    else:
+        recovery_freshness = 1.0
+        recovery_ts = now
+
     # 2. Deterministic Exposure Scoring
     is_critical_asset = str(asset.criticality) in ["CRITICAL", "LIFE_SUPPORT", "Criticality.CRITICAL", "Criticality.LIFE_SUPPORT"]
     is_blocked = active_wo and (active_wo.status == MaintenanceStatus.BLOCKED_PARTS or str(active_wo.status) == "BLOCKED_PARTS")
@@ -232,7 +324,7 @@ def get_asset_recovery_exposure(db: Session, asset_id: str) -> AssetRecoveryExpo
         reasoning = (
             f"Recovery is constrained: {asset.name} is a critical asset with active work order "
             f"{active_wo.id} blocked by zero local stock of {req_spare_num} ({req_spare_name}). "
-            f"Resupply vessel {vessel_name or 'MV Vasiliy Golovnin'} is ≈ {resupply_eta if resupply_eta is not None else 'unknown'} days away."
+            f"Resupply vessel {vessel_name or 'MV Vasiliy Golovnin'} is \u2248 {resupply_eta if resupply_eta is not None else 'unknown'} days away."
         )
     elif is_blocked and is_stockout:
         exposure_level = "MEDIUM"
@@ -268,7 +360,8 @@ def get_asset_recovery_exposure(db: Session, asset_id: str) -> AssetRecoveryExpo
         assumptions=assumptions,
         provenance=ProvenanceSchema(
             source=f"recovery_model:{asset.code}",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=recovery_ts,
+            freshness_seconds=round(recovery_freshness, 1),
             quality=Quality.GOOD,
             truth_type=TruthType.DERIVED,
             confidence=0.92,

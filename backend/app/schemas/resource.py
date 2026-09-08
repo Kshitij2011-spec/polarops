@@ -36,6 +36,7 @@ class InventorySpareItem(BaseModel):
     location: str
     status: str  # "AVAILABLE", "RESERVED", "CRITICAL_SHORTAGE"
     work_order_ids: list[str] = []
+    provenance: Optional[ProvenanceSchema] = None
 
 
 class ResupplyOpportunityItem(BaseModel):
@@ -51,6 +52,7 @@ class ResupplyOpportunityItem(BaseModel):
     quantity: int
     delay_days: int = 0
     status: str  # "SCHEDULED", "IN_TRANSIT", "DELAYED", "ARRIVED"
+    provenance: Optional[ProvenanceSchema] = None
 
 
 class AssetRecoveryExposureResponse(BaseModel):
