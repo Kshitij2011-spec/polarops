@@ -19,6 +19,7 @@ from app.services.sync_service import (
     reset_resilience_simulation,
     restore_and_sync_all,
     retry_failed_item,
+    simulate_link_degradation,
     simulate_link_failure,
 )
 
@@ -50,6 +51,19 @@ def trigger_simulate_offline(
 ) -> CommsLinkStatusResponse:
     """Simulate satellite communication outage (ONLINE -> OFFLINE)."""
     return simulate_link_failure(db, station_id=station_id)
+
+
+@router.post("/simulate-degraded", response_model=CommsLinkStatusResponse)
+def trigger_simulate_degraded(
+    station_id: str = Query("STATION-BHARATI", description="Station identifier"),
+    latency_ms: int = Query(1450, description="Degraded link latency in ms"),
+    bandwidth_kbps: int = Query(256, description="Degraded link bandwidth in kbps"),
+    db: Session = Depends(get_db),
+) -> CommsLinkStatusResponse:
+    """Simulate satellite communication link degradation (reduced bandwidth, elevated latency)."""
+    return simulate_link_degradation(
+        db, station_id=station_id, latency_ms=latency_ms, bandwidth_kbps=bandwidth_kbps
+    )
 
 
 @router.post("/restore", response_model=RestoreLinkResponse)

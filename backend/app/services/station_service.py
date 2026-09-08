@@ -240,11 +240,17 @@ def _evaluate_station_capabilities(
     )
 
     # 2. Communications Continuity
-    is_online = comm_link.status == "ONLINE" if comm_link else False
+    comm_status_str = str(comm_link.status) if comm_link else "OFFLINE"
+    is_online = comm_status_str == "ONLINE"
+    is_degraded = comm_status_str == "DEGRADED"
     bw = comm_link.bandwidth_kbps if comm_link else 0
     lat = comm_link.latency_ms if comm_link else 999
     
-    if is_online:
+    if is_degraded:
+        comms_score = 68
+        comms_status = "CONSTRAINED"
+        comms_summary = f"Carrier DEGRADED via {comm_link.name if comm_link else 'Link'} ({bw} kbps, {lat} ms latency). Operational link maintained at reduced bandwidth and elevated latency."
+    elif is_online:
         if bw >= 1024:
             comms_score = 92
             comms_status = "NOMINAL"
@@ -272,11 +278,12 @@ def _evaluate_station_capabilities(
             summary=comms_summary,
             calculation_basis="Derived from satellite carrier link state, bandwidth allocation, modeled latency, and edge buffering readiness.",
             metrics={
-                "online": is_online,
+                "online": is_online or is_degraded,
+                "degraded": is_degraded,
                 "bandwidth_kbps": bw,
                 "latency_ms": lat,
-                "link_type": "PRIMARY_VSAT" if bw >= 1024 else "BACKUP_INMARSAT" if is_online else "OFFLINE_AUTONOMOUS",
-                "continuity_mode": "REALTIME_UPLINK" if (is_online and bw >= 1024) else "TELEMETRY_STREAMING" if is_online else "LOCAL_EDGE_BUFFERED",
+                "link_type": "DEGRADED_VSAT" if is_degraded else ("PRIMARY_VSAT" if bw >= 1024 else "BACKUP_INMARSAT" if is_online else "OFFLINE_AUTONOMOUS"),
+                "continuity_mode": "DEGRADED_STREAMING" if is_degraded else ("REALTIME_UPLINK" if (is_online and bw >= 1024) else "TELEMETRY_STREAMING" if is_online else "LOCAL_EDGE_BUFFERED"),
             },
         )
     )

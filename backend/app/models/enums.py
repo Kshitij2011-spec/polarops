@@ -138,6 +138,7 @@ class CommsLinkStatus(StrEnum):
     """Satellite communication link state machine."""
 
     ONLINE = "ONLINE"
+    DEGRADED = "DEGRADED"
     OFFLINE = "OFFLINE"
     RESTORING = "RESTORING"
     SYNCING = "SYNCING"

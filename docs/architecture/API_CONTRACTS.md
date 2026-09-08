@@ -415,6 +415,9 @@ Returns satellite comms link status and local sync queue size.
 ### `POST /resilience/simulate-offline`
 Simulates satellite link blackout (`link_state: OFFLINE`).
 
+### `POST /resilience/simulate-degraded`
+Simulates satellite link degradation with elevated latency and throttled bandwidth (`link_state: DEGRADED`).
+
 ### `POST /resilience/restore`
 Simulates link recovery and triggers queue flush reconciliation.
 

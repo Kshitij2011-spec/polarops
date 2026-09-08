@@ -27,6 +27,14 @@ PRIORITY_LABELS = {
     3: "P3",
 }
 
+VALID_COMMS_TRANSITIONS: Dict[CommsLinkStatus, List[CommsLinkStatus]] = {
+    CommsLinkStatus.ONLINE: [CommsLinkStatus.OFFLINE, CommsLinkStatus.DEGRADED],
+    CommsLinkStatus.DEGRADED: [CommsLinkStatus.ONLINE, CommsLinkStatus.OFFLINE],
+    CommsLinkStatus.OFFLINE: [CommsLinkStatus.RESTORING, CommsLinkStatus.ONLINE],
+    CommsLinkStatus.RESTORING: [CommsLinkStatus.SYNCING, CommsLinkStatus.ONLINE],
+    CommsLinkStatus.SYNCING: [CommsLinkStatus.ONLINE],
+}
+
 
 def compute_canonical_checksum(payload: Any) -> str:
     """Compute deterministic SHA-256 hash using canonical JSON serialization.
@@ -97,7 +105,7 @@ def get_comms_status(db: Session, station_id: str = "STATION-BHARATI") -> CommsL
             freshness_seconds=0.5,
             quality=Quality.GOOD if link.status == CommsLinkStatus.ONLINE else Quality.SUSPECT,
             truth_type=TruthType.MEASURED,
-            confidence=1.0,
+            confidence=0.75 if link.status == CommsLinkStatus.DEGRADED else 1.0,
         ),
     )
 
@@ -106,6 +114,8 @@ def simulate_link_failure(db: Session, station_id: str = "STATION-BHARATI") -> C
     """Transition communication link from ONLINE to OFFLINE and accumulate local events."""
     link = get_or_create_link(db, station_id)
     link.status = CommsLinkStatus.OFFLINE
+    link.latency_ms = 9999
+    link.bandwidth_kbps = 0
     
     # Record communication outage event
     ev = EventLog(
@@ -122,6 +132,92 @@ def simulate_link_failure(db: Session, station_id: str = "STATION-BHARATI") -> C
         source="SYNTHETIC_SIMULATION",
         truth_type="MEASURED",
         metadata_json='{"status":"OFFLINE","autonomous_mode":true}',
+    )
+    db.add(ev)
+    db.commit()
+    db.refresh(link)
+    return get_comms_status(db, station_id)
+
+
+def simulate_link_degradation(
+    db: Session,
+    station_id: str = "STATION-BHARATI",
+    latency_ms: int = 1450,
+    bandwidth_kbps: int = 256,
+) -> CommsLinkStatusResponse:
+    """Transition communication link to DEGRADED state with reduced bandwidth and elevated latency."""
+    link = get_or_create_link(db, station_id)
+    link.status = CommsLinkStatus.DEGRADED
+    link.latency_ms = latency_ms
+    link.bandwidth_kbps = bandwidth_kbps
+
+    ev = EventLog(
+        station_id=station_id,
+        event_type="COMMUNICATION_STATE",
+        category="COMMS",
+        severity="WARNING",
+        entity_type="COMMS",
+        entity_id="VSAT_UPLINK",
+        title="Satellite carrier link degraded (Elevated Latency & Throttled Bandwidth)",
+        summary="Communication link transitioned to DEGRADED. Operational link maintained with reduced bandwidth and elevated latency.",
+        message="Satellite link degraded. Data flow active at reduced capacity.",
+        timestamp=datetime.now(timezone.utc),
+        source="SYNTHETIC_SIMULATION",
+        truth_type="MEASURED",
+        metadata_json=f'{{"status":"DEGRADED","bandwidth_kbps":{bandwidth_kbps},"latency_ms":{latency_ms}}}',
+    )
+    db.add(ev)
+    db.commit()
+    db.refresh(link)
+    return get_comms_status(db, station_id)
+
+
+def is_valid_link_transition(
+    current_status: CommsLinkStatus | str,
+    target_status: CommsLinkStatus | str,
+) -> bool:
+    """Check if state transition between comms link statuses is valid."""
+    curr = CommsLinkStatus(current_status)
+    target = CommsLinkStatus(target_status)
+    return target in VALID_COMMS_TRANSITIONS.get(curr, [])
+
+
+def transition_link_status(
+    db: Session,
+    station_id: str = "STATION-BHARATI",
+    target_status: CommsLinkStatus | str = CommsLinkStatus.ONLINE,
+) -> CommsLinkStatusResponse:
+    """Transition link status, updating nominal latency/bandwidth and logging state event."""
+    target = CommsLinkStatus(target_status)
+    link = get_or_create_link(db, station_id)
+    prev = CommsLinkStatus(link.status)
+
+    link.status = target
+    if target == CommsLinkStatus.ONLINE:
+        link.latency_ms = 580
+        link.bandwidth_kbps = 2048
+        link.last_sync_at = datetime.now(timezone.utc)
+    elif target == CommsLinkStatus.DEGRADED:
+        link.latency_ms = 1450
+        link.bandwidth_kbps = 256
+    elif target == CommsLinkStatus.OFFLINE:
+        link.latency_ms = 9999
+        link.bandwidth_kbps = 0
+
+    ev = EventLog(
+        station_id=station_id,
+        event_type="COMMUNICATION_STATE",
+        category="COMMS",
+        severity="WARNING" if target == CommsLinkStatus.DEGRADED else "CRITICAL" if target == CommsLinkStatus.OFFLINE else "INFO",
+        entity_type="COMMS",
+        entity_id="VSAT_UPLINK",
+        title=f"Satellite carrier link transitioned to {target.value}",
+        summary=f"Communication link transitioned from {prev.value} to {target.value}.",
+        message=f"Link state change: {prev.value} -> {target.value}.",
+        timestamp=datetime.now(timezone.utc),
+        source="SYNTHETIC_SIMULATION",
+        truth_type="MEASURED",
+        metadata_json=f'{{"previous_status":"{prev.value}","status":"{target.value}","latency_ms":{link.latency_ms},"bandwidth_kbps":{link.bandwidth_kbps}}}',
     )
     db.add(ev)
     db.commit()
@@ -316,6 +412,8 @@ def restore_and_sync_all(db: Session, station_id: str = "STATION-BHARATI") -> Re
 
     # 4. Link successfully reconciles all operations and returns to ONLINE
     link.status = CommsLinkStatus.ONLINE
+    link.latency_ms = 580
+    link.bandwidth_kbps = 2048
     link.last_sync_at = datetime.now(timezone.utc)
     
     # Record priority synchronization event
@@ -385,6 +483,8 @@ def reset_resilience_simulation(db: Session, station_id: str = "STATION-BHARATI"
     # 1. Reset link to ONLINE
     link = get_or_create_link(db, station_id)
     link.status = CommsLinkStatus.ONLINE
+    link.latency_ms = 580
+    link.bandwidth_kbps = 2048
     link.last_sync_at = datetime.now(timezone.utc)
 
     # 2. Reset baseline hero incident INC-2026-04 if it was resolved in simulation
