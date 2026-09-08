@@ -13,6 +13,7 @@ from app.models import (
     MaintenanceWorkOrder,
     Quality,
     ResupplyOpportunity,
+    ResupplyStatus,
     SparePart,
     TruthType,
 )
@@ -118,15 +119,17 @@ def list_station_resupply(db: Session, station_id: str = "STATION-BHARATI") -> l
     result: list[ResupplyOpportunityItem] = []
     for opp in opportunities:
         sp = opp.spare_part
-        # Calculate ETA days relative to simulated window (seed target is ~11 days)
-        # Using 11.0 days baseline from voyage schedule
-        eta_days = 11.0
-        if opp.expected_date:
-            now = datetime.now(timezone.utc)
-            exp = opp.expected_date if opp.expected_date.tzinfo else opp.expected_date.replace(tzinfo=timezone.utc)
-            delta = (exp - now).total_seconds() / 86400.0
-            if delta > 0:
-                eta_days = round(delta, 1)
+        # Compute ETA from the actual expected_date stored in the database.
+        # Use the project-standard UTC convention (matching risk_service.py Factor 6).
+        # Past dates clamp to 0.0; there is no hardcoded fallback.
+        now = datetime.now(timezone.utc)
+        exp = (
+            opp.expected_date
+            if opp.expected_date.tzinfo
+            else opp.expected_date.replace(tzinfo=timezone.utc)
+        )
+        delta = (exp - now).total_seconds() / 86400.0
+        eta_days = max(0.0, round(delta, 1))
 
         result.append(
             ResupplyOpportunityItem(
@@ -189,11 +192,35 @@ def get_asset_recovery_exposure(db: Session, asset_id: str) -> AssetRecoveryExpo
                 qty_avail = inv.quantity_available
                 qty_res = inv.quantity_reserved
 
-            # Resupply opportunity
-            res = db.query(ResupplyOpportunity).filter(ResupplyOpportunity.spare_part_id == sp.id).first()
+            # Resupply opportunity — earliest viable (non-delivered) opportunity only.
+            # Status filter matches project ResupplyStatus enum; DELIVERED is excluded
+            # because a delivered vessel carries no meaningful future ETA.
+            # Ordering by expected_date ASC ensures the soonest opportunity is chosen
+            # when multiple opportunities exist for the same spare part.
+            res = (
+                db.query(ResupplyOpportunity)
+                .filter(
+                    ResupplyOpportunity.spare_part_id == sp.id,
+                    ResupplyOpportunity.status.in_([
+                        ResupplyStatus.SCHEDULED,
+                        ResupplyStatus.IN_TRANSIT,
+                        ResupplyStatus.DELAYED,
+                    ]),
+                )
+                .order_by(ResupplyOpportunity.expected_date.asc())
+                .first()
+            )
             if res:
                 vessel_name = res.vessel_name
-                resupply_eta = 11.0
+                # Compute ETA from expected_date (same UTC-safe pattern as risk_service.py L258-262).
+                now = datetime.now(timezone.utc)
+                exp = (
+                    res.expected_date
+                    if res.expected_date.tzinfo
+                    else res.expected_date.replace(tzinfo=timezone.utc)
+                )
+                delta = (exp - now).total_seconds() / 86400.0
+                resupply_eta = max(0.0, round(delta, 1))
 
     # 2. Deterministic Exposure Scoring
     is_critical_asset = str(asset.criticality) in ["CRITICAL", "LIFE_SUPPORT", "Criticality.CRITICAL", "Criticality.LIFE_SUPPORT"]
@@ -205,7 +232,7 @@ def get_asset_recovery_exposure(db: Session, asset_id: str) -> AssetRecoveryExpo
         reasoning = (
             f"Recovery is constrained: {asset.name} is a critical asset with active work order "
             f"{active_wo.id} blocked by zero local stock of {req_spare_num} ({req_spare_name}). "
-            f"Resupply vessel {vessel_name or 'MV Vasiliy Golovnin'} is ≈ {resupply_eta or 11.0} days away."
+            f"Resupply vessel {vessel_name or 'MV Vasiliy Golovnin'} is ≈ {resupply_eta if resupply_eta is not None else 'unknown'} days away."
         )
     elif is_blocked and is_stockout:
         exposure_level = "MEDIUM"
