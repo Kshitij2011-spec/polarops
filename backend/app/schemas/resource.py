@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
 
+from app.models.enums import Criticality, ResupplyStatus
 from app.schemas.common import ProvenanceSchema
 
 
@@ -29,7 +30,7 @@ class InventorySpareItem(BaseModel):
     part_number: str
     name: str
     description: str
-    criticality: str
+    criticality: Criticality
     quantity_available: int
     quantity_reserved: int
     reorder_threshold: int
@@ -51,7 +52,7 @@ class ResupplyOpportunityItem(BaseModel):
     spare_part_name: str
     quantity: int
     delay_days: int = 0
-    status: str  # "SCHEDULED", "IN_TRANSIT", "DELAYED", "ARRIVED"
+    status: ResupplyStatus
     provenance: Optional[ProvenanceSchema] = None
 
 

@@ -2,9 +2,16 @@
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import CommsLinkStatus, IncidentSeverity, IncidentStatus, SyncStatus
+from app.models.enums import (
+    CommsLinkStatus,
+    IncidentSeverity,
+    IncidentStatus,
+    Quality,
+    SyncStatus,
+    TruthType,
+)
 from app.schemas.common import ProvenanceSchema
 
 
@@ -27,8 +34,7 @@ class SyncQueueItemSchema(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SyncQueueListResponse(BaseModel):
@@ -96,16 +102,15 @@ class ScienceObservationSchema(BaseModel):
     timestamp: datetime
     measurement_value: float
     unit: str
-    quality: str
+    quality: Quality = Field(default=Quality.GOOD, description="Signal quality: GOOD, SUSPECT, or BAD")
     source: str
-    truth_type: str
+    truth_type: TruthType = Field(default=TruthType.MEASURED, description="Data provenance: MEASURED, DERIVED, etc.")
     is_buffered: bool = False
     sync_status: str = "RECONCILED"
     metadata_completeness: str = "COMPLETE"
     provenance: Optional[ProvenanceSchema] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ScienceInstrumentDetailResponse(BaseModel):
@@ -126,8 +131,7 @@ class ScienceInstrumentDetailResponse(BaseModel):
     truth_type: str = "MEASURED"
     provenance: Optional[ProvenanceSchema] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BufferObservationRequest(BaseModel):
@@ -152,8 +156,7 @@ class IncidentActionSchema(BaseModel):
     executed_at: datetime
     outcome_status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class IncidentListItemResponse(BaseModel):
@@ -169,8 +172,7 @@ class IncidentListItemResponse(BaseModel):
     resolved_at: Optional[datetime] = None
     actions_count: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class IncidentDetailResponse(BaseModel):
@@ -227,8 +229,7 @@ class OperationalMemorySchema(BaseModel):
     outcome: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CreateMemoryRequest(BaseModel):

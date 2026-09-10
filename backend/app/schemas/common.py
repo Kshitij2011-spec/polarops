@@ -39,3 +39,10 @@ class ErrorResponse(BaseModel):
     """Standard HTTP 4xx/5xx error response wrapper."""
 
     error: ErrorDetail
+
+
+class HealthResponse(BaseModel):
+    """Typed response schema for the service health-check endpoint."""
+
+    status: str = Field(description="Service liveness status — always 'ok' when the API is reachable")
+    service: str = Field(description="Service identifier")

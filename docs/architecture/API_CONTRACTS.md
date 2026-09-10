@@ -791,3 +791,107 @@ Returns **HTTP 409** if a duplicate ID or overlapping interval is detected.
   "created_at": "2026-09-10T14:30:00Z"
 }
 ```
+
+---
+
+## 11. B9 — API Contract Hardening (Confirmed Standards)
+
+**B9** is a systematic API contract hardening pass that established and enforced the following backend-wide conventions.
+
+### 11.1 Health Endpoint
+
+`GET /health` returns a typed response with explicit schema enforcement:
+
+```json
+{
+  "status": "ok",
+  "service": "polarops-api"
+}
+```
+
+### 11.2 Enum Serialization Standard
+
+All API-facing enums use `StrEnum` and serialize as their upper-case string values.
+
+| Enum | Values |
+|------|--------|
+| `Quality` | `GOOD`, `SUSPECT`, `BAD` |
+| `TruthType` | `MEASURED`, `DERIVED`, `FORECAST`, `SCENARIO`, `SYNTHETIC_SIMULATION` |
+| `AssetStatus` | `NOMINAL`, `WARNING`, `CRITICAL`, `SHUTDOWN`, `MAINTENANCE` |
+| `AssetCategory` | `GENERATOR`, `BOILER`, `WATER_MAKER`, `COMM_DOME`, `HVAC`, `PUMP`, `POWER_DISTRIBUTION` |
+| `Criticality` | `LIFE_SUPPORT`, `CRITICAL`, `STANDARD`, `DEFERRABLE` |
+| `ResupplyStatus` | `SCHEDULED`, `IN_TRANSIT`, `DELAYED`, `DELIVERED` |
+| `CommsLinkStatus` | `ONLINE`, `DEGRADED`, `OFFLINE`, `RESTORING`, `SYNCING` |
+| `LifecycleStatus` | `ACTIVE`, `DEPRECATED`, `RETIRED` |
+| `SyncStatus` | `PENDING`, `TRANSFERRING`, `VERIFIED`, `ACKNOWLEDGED`, `RECONCILED`, `FAILED_RETRY` |
+| `IncidentSeverity` | `MINOR`, `MAJOR`, `CRITICAL` |
+| `IncidentStatus` | `ACTIVE`, `CONTAINED`, `RESOLVED` |
+
+No raw Python enum representations (`<Quality.GOOD: 'GOOD'>`) will appear in any API response.
+
+### 11.3 Canonical Provenance Fields
+
+Every domain that exposes provenance MUST use `ProvenanceSchema` from `app.schemas.common`:
+
+```json
+{
+  "source": "string",
+  "timestamp": "ISO-8601 UTC datetime",
+  "freshness_seconds": 0.0,
+  "quality": "GOOD | SUSPECT | BAD",
+  "truth_type": "MEASURED | DERIVED | FORECAST | SCENARIO | SYNTHETIC_SIMULATION",
+  "confidence": 0.0
+}
+```
+
+There is exactly **one** provenance schema. No domain may define an alternative shape.
+
+### 11.4 Sensor Health vs Quality (B6 Contract)
+
+The B6 orthogonality rule is enforced at the schema and service layers:
+
+- **`health`** — recency classification: `FRESH`, `STALE`, or `UNKNOWN`
+- **`quality`** — signal trustworthiness: `GOOD`, `SUSPECT`, or `BAD`
+
+These are **independent** dimensions. `GOOD + STALE` and `SUSPECT + FRESH` are both valid combinations and must remain representable.
+
+### 11.5 Datetime Semantics
+
+- All externally exposed timestamps are UTC (either timezone-aware or naive-UTC from SQLite, normalized via `_utc()` helpers in each service).
+- `Measurement.timestamp` = physical observation time (when the measurement was taken).
+- `Measurement.created_at` = database insertion time (when the record was persisted).
+- These two fields must never be conflated or substituted.
+
+### 11.6 HTTP Status Code Conventions
+
+| Situation | Status Code |
+|-----------|-------------|
+| Resource not found | `404` |
+| Request body validation failure | `422` (FastAPI/Pydantic) |
+| Invalid enum query parameter | `422` |
+| Lifecycle interval overlap | `409` |
+| No status field in PATCH body | `422` |
+| Successful creation | `201` (lifecycle), `200` (others) |
+
+### 11.7 No-Expose Contract
+
+The following must never appear in any API response:
+- Database connection strings
+- Environment variable values
+- Internal Python stack traces
+- File system paths
+- API credentials or secrets
+
+### 11.8 Lifecycle Routing
+
+`GET /lifecycle/resolve` is registered **before** `GET /lifecycle/{id}` in FastAPI router registration order. This ensures the literal string `"resolve"` is never misinterpreted as a record ID value. This ordering must be preserved in all future router modifications.
+
+### 11.9 Schema Files Modified by B9
+
+| File | Change |
+|------|--------|
+| `app/schemas/common.py` | Added `HealthResponse` schema |
+| `app/api/health.py` | Added `response_model=HealthResponse` |
+| `app/schemas/resilience.py` | Replaced Pydantic v1 `class Config` with `model_config = ConfigDict(from_attributes=True)` on 6 schemas; typed `ScienceObservationSchema.quality` as `Quality` and `.truth_type` as `TruthType` |
+| `app/schemas/resource.py` | Typed `InventorySpareItem.criticality` as `Criticality`; typed `ResupplyOpportunityItem.status` as `ResupplyStatus` |
+| `tests/test_b9_api_contracts.py` | 63 new B9 contract tests (full suite: 251/251 passing) |
