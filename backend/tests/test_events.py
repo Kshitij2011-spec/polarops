@@ -20,6 +20,7 @@ from app.services.event_service import (
 
 def test_get_operational_events_endpoint(client):
     """Test GET /api/v1/events returns seeded events with deterministic ordering."""
+    client.post("/api/v1/events/reset?station_id=STATION-BHARATI")
     response = client.get("/api/v1/events?station_id=STATION-BHARATI")
     assert response.status_code == 200
     data = response.json()

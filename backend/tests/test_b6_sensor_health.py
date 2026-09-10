@@ -165,7 +165,7 @@ def test_future_timestamp_health_is_fresh():
 
 def test_naive_timestamp_treated_as_utc():
     """7. A naive datetime (no tzinfo) is safely handled as UTC."""
-    naive_recent = datetime.utcnow() - timedelta(minutes=10)
+    naive_recent = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
     assert naive_recent.tzinfo is None
     assert evaluate_sensor_health(naive_recent, _now()) == "FRESH"
 

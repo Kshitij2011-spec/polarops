@@ -69,6 +69,7 @@ def list_station_inventory(db: Session, station_id: str = "STATION-BHARATI") -> 
     items = (
         db.query(InventoryItem)
         .filter(InventoryItem.station_id == station_id)
+        .order_by(InventoryItem.spare_part_id.asc())
         .all()
     )
 
@@ -133,16 +134,18 @@ def list_station_resupply(db: Session, station_id: str = "STATION-BHARATI") -> l
     opportunities = (
         db.query(ResupplyOpportunity)
         .filter(ResupplyOpportunity.station_id == station_id)
+        .order_by(ResupplyOpportunity.expected_date.asc())
         .all()
     )
 
     result: list[ResupplyOpportunityItem] = []
+    # Hoist now() outside the loop — a single reference time for all ETA/freshness calcs.
+    now = datetime.now(timezone.utc)
     for opp in opportunities:
         sp = opp.spare_part
         # Compute ETA from the actual expected_date stored in the database.
         # Use the project-standard UTC convention (matching risk_service.py Factor 6).
         # Past dates clamp to 0.0; there is no hardcoded fallback.
-        now = datetime.now(timezone.utc)
         exp = (
             opp.expected_date
             if opp.expected_date.tzinfo
@@ -272,26 +275,25 @@ def get_asset_recovery_exposure(db: Session, asset_id: str) -> AssetRecoveryExpo
     # Recovery exposure is derived from multiple operational inputs.
     # We use the MOST RECENT updated_at among the inputs that actually contributed
     # to this result, following the task B3/B8 specification.
+    # Re-use already-fetched objects from the work-order block above — no duplicate queries.
     now = datetime.now(timezone.utc)
     candidate_ts: list[datetime] = []
     if active_wo is not None:
         ts = _utc(active_wo.updated_at)
         if ts is not None:
             candidate_ts.append(ts)
-    # inv and res are only defined inside the `if active_wo / if m_spare` block;
-    # re-query them here in a lightweight way to get their timestamps.
     if active_wo:
-        _m = db.query(MaintenanceSpare).filter(MaintenanceSpare.work_order_id == active_wo.id).first()
-        if _m and _m.spare_part:
-            _inv = db.query(InventoryItem).filter(InventoryItem.spare_part_id == _m.spare_part_id).first()
-            if _inv is not None:
-                ts = _utc(_inv.updated_at)
+        _m2 = db.query(MaintenanceSpare).filter(MaintenanceSpare.work_order_id == active_wo.id).first()
+        if _m2 and _m2.spare_part:
+            _inv2 = db.query(InventoryItem).filter(InventoryItem.spare_part_id == _m2.spare_part_id).first()
+            if _inv2 is not None:
+                ts = _utc(_inv2.updated_at)
                 if ts is not None:
                     candidate_ts.append(ts)
-            _res = (
+            _res2 = (
                 db.query(ResupplyOpportunity)
                 .filter(
-                    ResupplyOpportunity.spare_part_id == _m.spare_part_id,
+                    ResupplyOpportunity.spare_part_id == _m2.spare_part_id,
                     ResupplyOpportunity.status.in_([
                         ResupplyStatus.SCHEDULED,
                         ResupplyStatus.IN_TRANSIT,
@@ -301,8 +303,8 @@ def get_asset_recovery_exposure(db: Session, asset_id: str) -> AssetRecoveryExpo
                 .order_by(ResupplyOpportunity.expected_date.asc())
                 .first()
             )
-            if _res is not None:
-                ts = _utc(_res.updated_at)
+            if _res2 is not None:
+                ts = _utc(_res2.updated_at)
                 if ts is not None:
                     candidate_ts.append(ts)
 
