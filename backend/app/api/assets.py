@@ -13,12 +13,14 @@ from app.schemas.asset import (
     AssetRiskResponse,
     AssetTelemetryResponse,
 )
+from app.schemas.sensor_health import AssetSensorHealthResponse
 from app.services.asset_service import (
     get_asset_detail,
     list_assets,
 )
 from app.services.dependency_service import traverse_asset_dependencies
 from app.services.risk_service import calculate_asset_risk
+from app.services.sensor_health_service import get_asset_sensor_health
 from app.services.telemetry_service import get_asset_telemetry_history
 
 router = APIRouter(prefix="/assets", tags=["Assets"])
@@ -95,3 +97,23 @@ def get_asset_risk_assessment(
             detail=f"Asset with ID '{asset_id}' was not found.",
         )
     return risk
+
+
+@router.get("/{asset_id}/sensor-health", response_model=AssetSensorHealthResponse)
+def get_asset_sensor_health_summary(
+    asset_id: str,
+    db: Session = Depends(get_db),
+) -> AssetSensorHealthResponse:
+    """Retrieve deterministic sensor freshness and health classification for all sensors on an asset.
+
+    Health (FRESH / STALE / UNKNOWN) reflects measurement recency only.
+    Quality (GOOD / SUSPECT / BAD) reflects signal trustworthiness and is preserved independently.
+    Both dimensions are returned for each sensor, enabling truthful Digital Twin data-quality reporting.
+    """
+    health = get_asset_sensor_health(db, asset_id=asset_id)
+    if not health:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Asset with ID '{asset_id}' was not found in station equipment registry.",
+        )
+    return health

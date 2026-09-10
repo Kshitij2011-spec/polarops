@@ -23,6 +23,11 @@ from app.schemas.asset import (
     UpstreamDependencyItem,
 )
 from app.schemas.common import ProvenanceSchema
+from app.services.sensor_health_service import (
+    _confidence_from_quality,
+    _resolve_quality,
+    _resolve_truth_type,
+)
 
 
 def list_assets(
@@ -68,6 +73,7 @@ def get_asset_detail(db: Session, asset_id: str) -> AssetDetailResponse | None:
     latest_timestamp = asset.updated_at
     latest_source = asset.source
     latest_truth_type = TruthType.MEASURED
+    latest_quality = Quality.GOOD
 
     for sensor in asset.sensors:
         latest_meas = (
@@ -82,6 +88,8 @@ def get_asset_detail(db: Session, asset_id: str) -> AssetDetailResponse | None:
             latest_timestamp = latest_meas.timestamp
             latest_source = latest_meas.source
             latest_truth_type = latest_meas.truth_type
+            # B6 fix: capture actual measurement quality (not hardcoded GOOD)
+            latest_quality = _resolve_quality(latest_meas.quality)
 
         # Assess threshold status
         metric_status = "NOMINAL"
@@ -117,13 +125,14 @@ def get_asset_detail(db: Session, asset_id: str) -> AssetDetailResponse | None:
         else 1.0
     )
 
+    # B6 fix: provenance reflects actual measurement quality and confidence
     provenance = ProvenanceSchema(
         source=latest_source,
         timestamp=latest_timestamp or now,
         freshness_seconds=round(freshness, 1),
-        quality=Quality.GOOD,
-        truth_type=latest_truth_type,
-        confidence=0.98,
+        quality=latest_quality,
+        truth_type=_resolve_truth_type(latest_truth_type),
+        confidence=_confidence_from_quality(latest_quality),
     )
 
     return AssetDetailResponse(
