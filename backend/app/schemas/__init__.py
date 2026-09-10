@@ -57,4 +57,13 @@ __all__ = [
     "RecoveryConstraint",
     "RecommendedNextStep",
     "ExplanationQueryRequest",
+    "CausalStageItem",
+    "OperationalDecisionItem",
+    "OperationalInsightResponse",
 ]
+
+from app.schemas.intelligence import (
+    CausalStageItem,
+    OperationalDecisionItem,
+    OperationalInsightResponse,
+)

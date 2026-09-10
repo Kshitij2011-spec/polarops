@@ -151,7 +151,7 @@ class AssetTelemetryResponse(BaseModel):
     provenance: ProvenanceSchema
 
 
-# ── EXPLAINABLE RISK ENGINE SCHEMAS ────────────────────────────────────────
+# ── EXPLAINABLE RISK ENGINE SCHEMAS (RISK INTELLIGENCE 2.0) ───────────────
 
 class RiskFactorItem(BaseModel):
     """Individual factor contributing to composite operational risk."""
@@ -164,8 +164,118 @@ class RiskFactorItem(BaseModel):
     evidence: str
 
 
+class RiskDriverItem(BaseModel):
+    """Ranked contributor to operational risk with explicit derivation and trend."""
+
+    rank: int
+    factor: str  # "condition", "dependency", "criticality", "maintenance", "spare", "resupply"
+    title: str
+    score: int
+    max_score: int
+    severity: str  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    evidence: str
+    threshold: Optional[str] = None
+    trend: str = "STABLE"  # "DEGRADING", "IMPROVING", "STABLE"
+    derivation_rule: str
+    truth_type: str = "DERIVED"
+    provenance_source: str
+
+
+class FailureExposureItem(BaseModel):
+    """Deterministic assessment of consequences if this asset becomes unavailable."""
+
+    level: str  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    score: int  # 0-100 normalized
+    affected_critical_services: list[str] = []
+    affected_zones: list[str] = []
+    redundancy_posture: str  # e.g. "N-0 (Loss of single-point redundant backup)"
+    generation_reserve_kw: Optional[float] = None
+    summary: str
+    truth_type: str = "DERIVED"
+
+
+class RecoveryExposureItem(BaseModel):
+    """Deterministic assessment of operational constraints hindering equipment recovery."""
+
+    level: str  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    work_order_status: Optional[str] = None
+    work_order_id: Optional[str] = None
+    spare_part_number: Optional[str] = None
+    spare_part_name: Optional[str] = None
+    spare_available_quantity: int = 0
+    resupply_vessel_name: Optional[str] = None
+    resupply_days: Optional[float] = None
+    recovery_bottleneck: str
+    truth_type: str = "DERIVED"
+
+
+class EnvironmentalAmplificationItem(BaseModel):
+    """Coupling between ambient weather extremes and asset operational exposure."""
+
+    ambient_temp_celsius: float
+    wind_speed_knots: float
+    wind_chill_celsius: float
+    weather_condition: str
+    amplification_level: str  # "NONE", "MODERATE", "SEVERE"
+    amplification_factor: float  # e.g. 1.25 (+25% thermal loss acceleration)
+    explanation: str
+    truth_type: str = "DERIVED"
+
+
+class OperationalHeadroomItem(BaseModel):
+    """Remaining operational safety margins under current station conditions."""
+
+    rating: str  # "NOMINAL", "NARROW", "COMPRESSED", "CRITICAL"
+    generation_reserve_kw: float
+    generation_headroom_label: str
+    fuel_runway_days: float
+    recovery_buffer_days: float
+    thermal_hold_hours: float
+    summary: str
+    truth_type: str = "DERIVED"
+
+
+class RiskConcentrationItem(BaseModel):
+    """Topological graph concentration of operational risk from BFS traversal."""
+
+    direct_dependents: list[str] = []
+    indirect_dependents: list[str] = []
+    critical_services: list[str] = []
+    affected_zones: list[str] = []
+    primary_domain: str
+    max_depth: int = 0
+    summary: str
+    truth_type: str = "DERIVED"
+
+
+class RiskProjectionItem(BaseModel):
+    """Deterministic scenario evolution showing how risk score changes under operational conditions."""
+
+    scenario_id: str
+    name: str
+    condition: str
+    current_risk_score: int
+    projected_risk_score: int
+    score_delta: int
+    projected_level: str  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    operational_impact: str
+    headroom_effect: str
+    truth_type: str = "SCENARIO"
+
+
+class RiskStateTransitionItem(BaseModel):
+    """Deterministic risk state ladder with explicit operational trigger conditions."""
+
+    current_state: str  # "NOMINAL", "WATCH", "ELEVATED", "HIGH", "CRITICAL"
+    state_trend: str  # "ESCALATING", "STABLE", "DE-ESCALATING"
+    ladder: list[str] = ["NOMINAL", "WATCH", "ELEVATED", "HIGH", "CRITICAL"]
+    triggered_by: list[str] = []
+    next_threshold_trigger: Optional[str] = None
+    truth_type: str = "DERIVED"
+
+
 class AssetRiskResponse(BaseModel):
-    """Deterministic explainable composite risk profile for an asset."""
+    """Deterministic explainable composite risk profile for an asset (Risk Intelligence 2.0)."""
 
     asset_id: str
     asset_name: str
@@ -181,3 +291,14 @@ class AssetRiskResponse(BaseModel):
     computed_at: datetime
     truth_type: str = "DERIVED"
     assumptions: list[str] = []
+
+    # ── Risk Intelligence 2.0 Layers ──────────────────────────────────────
+    drivers: list[RiskDriverItem] = []
+    failure_exposure: Optional[FailureExposureItem] = None
+    recovery_exposure: Optional[RecoveryExposureItem] = None
+    environmental_amplification: Optional[EnvironmentalAmplificationItem] = None
+    headroom: Optional[OperationalHeadroomItem] = None
+    concentration: Optional[RiskConcentrationItem] = None
+    projections: list[RiskProjectionItem] = []
+    state_transition: Optional[RiskStateTransitionItem] = None
+

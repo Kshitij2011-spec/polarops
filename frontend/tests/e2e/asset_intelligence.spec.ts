@@ -80,7 +80,7 @@ test.describe("Day 2 Asset Intelligence, Multi-Hop Dependency & Explainable Risk
 
     // Verify evidence factors are presented with structured evidence
     await expect(page.getByText(/OPERATIONAL EVIDENCE & RATIONALE BREAKDOWN/i)).toBeVisible();
-    await expect(page.getByText(/G-02 Bearing Vibration: 4\.8 mm\/s.*exceeds warning threshold/i)).toBeVisible();
+    await expect(page.getByText(/G-02 Bearing Vibration: 4\.8 mm\/s.*exceeds warning threshold/i).first()).toBeVisible();
     await expect(page.getByText(/Habitat Zone 2 Heating/i).first()).toBeVisible();
     await expect(page.getByText(/Work Order MWO-2026-089 is BLOCKED_PARTS/i)).toBeVisible();
     await expect(page.getByText(/has 0 available units in station stock/i)).toBeVisible();

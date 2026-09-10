@@ -13,9 +13,10 @@ export interface AssetIntelligenceViewProps {
   assetId: string;
   onBack: () => void;
   onOpenExplanation?: (domain: string, entityId: string) => void;
+  onNavigate?: (route: string) => void;
 }
 
-export function AssetIntelligenceView({ assetId, onBack, onOpenExplanation }: AssetIntelligenceViewProps) {
+export function AssetIntelligenceView({ assetId, onBack, onOpenExplanation, onNavigate }: AssetIntelligenceViewProps) {
   const {
     data: asset,
     isLoading: isAssetLoading,
@@ -127,7 +128,7 @@ export function AssetIntelligenceView({ assetId, onBack, onOpenExplanation }: As
           Risk scoring calculation unavailable.
         </div>
       ) : (
-        <RiskEngineCard risk={risk} onOpenExplanation={onOpenExplanation} />
+        <RiskEngineCard risk={risk} onOpenExplanation={onOpenExplanation} onNavigate={onNavigate} />
       )}
 
       {/* ── 4. Multi-Hop Relational Dependency Blast Radius ── */}

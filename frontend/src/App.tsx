@@ -197,6 +197,7 @@ export default function App() {
                 assetId={inspectedAssetId}
                 onBack={handleBackToCommandCenter}
                 onOpenExplanation={handleOpenExplanation}
+                onNavigate={handleRouteNavigation}
               />
             ) : activeView === "RESOURCES" ? (
               <ResourcesView
@@ -227,11 +228,13 @@ export default function App() {
                 {/* 1. Situation Awareness / Top Status Row */}
                 <StatusSummary overview={overview} />
 
-                {/* 2. Critical Operational Anomaly Banner */}
+                {/* 2. Operational Intelligence Narrative Surface (Causal Chain) */}
                 <CriticalEvents
                   events={overview.critical_events}
+                  stationId={selectedStationId}
                   onInspectAsset={handleInspectAsset}
                   onOpenExplanation={handleOpenExplanation}
+                  onNavigateRoute={handleRouteNavigation}
                 />
 
                 {/* 3. Live Operational Activity Stream (Day 2) */}

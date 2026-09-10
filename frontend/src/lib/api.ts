@@ -183,7 +183,7 @@ export interface AssetTelemetry {
   provenance: Provenance;
 }
 
-// ── EXPLAINABLE RISK ──────────────────────────────────────────────────────
+// ── EXPLAINABLE RISK (RISK INTELLIGENCE 2.0) ───────────────────────────────
 
 export interface RiskFactorItem {
   factor: string;
@@ -192,6 +192,100 @@ export interface RiskFactorItem {
   max_score: number;
   severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   evidence: string;
+}
+
+export interface RiskDriverItem {
+  rank: number;
+  factor: string;
+  title: string;
+  score: number;
+  max_score: number;
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  evidence: string;
+  threshold?: string | null;
+  trend: "DEGRADING" | "IMPROVING" | "STABLE";
+  derivation_rule: string;
+  truth_type: string;
+  provenance_source: string;
+}
+
+export interface FailureExposureItem {
+  level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  score: number;
+  affected_critical_services: string[];
+  affected_zones: string[];
+  redundancy_posture: string;
+  generation_reserve_kw?: number | null;
+  summary: string;
+  truth_type: string;
+}
+
+export interface RecoveryExposureItem {
+  level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  work_order_status?: string | null;
+  work_order_id?: string | null;
+  spare_part_number?: string | null;
+  spare_part_name?: string | null;
+  spare_available_quantity: number;
+  resupply_vessel_name?: string | null;
+  resupply_days?: number | null;
+  recovery_bottleneck: string;
+  truth_type: string;
+}
+
+export interface EnvironmentalAmplificationItem {
+  ambient_temp_celsius: number;
+  wind_speed_knots: number;
+  wind_chill_celsius: number;
+  weather_condition: string;
+  amplification_level: "NONE" | "MODERATE" | "SEVERE";
+  amplification_factor: number;
+  explanation: string;
+  truth_type: string;
+}
+
+export interface OperationalHeadroomItem {
+  rating: "NOMINAL" | "NARROW" | "COMPRESSED" | "CRITICAL";
+  generation_reserve_kw: number;
+  generation_headroom_label: string;
+  fuel_runway_days: number;
+  recovery_buffer_days: number;
+  thermal_hold_hours: number;
+  summary: string;
+  truth_type: string;
+}
+
+export interface RiskConcentrationItem {
+  direct_dependents: string[];
+  indirect_dependents: string[];
+  critical_services: string[];
+  affected_zones: string[];
+  primary_domain: string;
+  max_depth: number;
+  summary: string;
+  truth_type: string;
+}
+
+export interface RiskProjectionItem {
+  scenario_id: string;
+  name: string;
+  condition: string;
+  current_risk_score: number;
+  projected_risk_score: number;
+  score_delta: number;
+  projected_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  operational_impact: string;
+  headroom_effect: string;
+  truth_type: string;
+}
+
+export interface RiskStateTransitionItem {
+  current_state: "NOMINAL" | "WATCH" | "ELEVATED" | "HIGH" | "CRITICAL";
+  state_trend: "ESCALATING" | "STABLE" | "DE-ESCALATING";
+  ladder: string[];
+  triggered_by: string[];
+  next_threshold_trigger?: string | null;
+  truth_type: string;
 }
 
 export interface AssetRisk {
@@ -209,6 +303,16 @@ export interface AssetRisk {
   computed_at: string;
   truth_type: string;
   assumptions: string[];
+
+  // ── Risk Intelligence 2.0 Layers ──────────────────────────────────────
+  drivers?: RiskDriverItem[];
+  failure_exposure?: FailureExposureItem | null;
+  recovery_exposure?: RecoveryExposureItem | null;
+  environmental_amplification?: EnvironmentalAmplificationItem | null;
+  headroom?: OperationalHeadroomItem | null;
+  concentration?: RiskConcentrationItem | null;
+  projections?: RiskProjectionItem[];
+  state_transition?: RiskStateTransitionItem | null;
 }
 
 // ── API ENDPOINT CALLS ────────────────────────────────────────────────────
@@ -1122,5 +1226,52 @@ export async function simulateCrossStationScenario(
   }
   return res.json() as Promise<CrossStationScenarioResponse>;
 }
+
+// ── Operational Intelligence & Causal Reasoning Types ───────────────────
+
+export interface CausalStageItem {
+  stage: "CHANGE" | "CONTEXT" | "DEPENDENCY" | "RISK" | "CONSEQUENCE" | "SCENARIO" | "ACTION" | string;
+  title: string;
+  headline: string;
+  description: string;
+  severity: "CRITICAL" | "WARNING" | "NOMINAL" | "INFO" | string;
+  truth_type: "MEASURED" | "DERIVED" | "SCENARIO" | "FORECAST" | string;
+  supporting_metrics: Record<string, any>;
+  target_route?: string | null;
+  action_label?: string | null;
+}
+
+export interface OperationalDecisionItem {
+  id: string;
+  title: string;
+  rationale: string;
+  action_type: "INSPECT" | "SIMULATE" | "RECOVERY" | "RESILIENCE" | "ADVISORY" | string;
+  target_route: string;
+  button_label: string;
+  is_primary: boolean;
+}
+
+export interface OperationalInsightResponse {
+  station_id: string;
+  station_name: string;
+  primary_condition_id: string;
+  severity: "CRITICAL" | "WARNING" | "NOMINAL" | string;
+  status_label: string;
+  headline: string;
+  summary: string;
+  causal_chain: CausalStageItem[];
+  decisions: OperationalDecisionItem[];
+  provenance: Provenance;
+}
+
+export async function fetchOperationalIntelligence(
+  stationId: string = "STATION-BHARATI"
+): Promise<OperationalInsightResponse> {
+  const url = `${API_BASE}/intelligence/narrative?station_id=${encodeURIComponent(stationId)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to fetch operational intelligence (${res.status})`);
+  return res.json() as Promise<OperationalInsightResponse>;
+}
+
 
 
