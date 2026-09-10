@@ -171,3 +171,18 @@ class IncidentStatus(StrEnum):
     ACTIVE = "ACTIVE"
     CONTAINED = "CONTAINED"
     RESOLVED = "RESOLVED"
+
+
+class LifecycleStatus(StrEnum):
+    """Operational lifecycle state for model/schema/configuration versions.
+
+    ACTIVE     — Currently valid for operational use and version selection.
+    DEPRECATED — Historically valid and traceable, but should not be selected
+                 as the preferred current version for new operations.
+    RETIRED    — No longer operationally valid.  Must remain available for
+                 historical provenance; must never be deleted.
+    """
+
+    ACTIVE = "ACTIVE"
+    DEPRECATED = "DEPRECATED"
+    RETIRED = "RETIRED"

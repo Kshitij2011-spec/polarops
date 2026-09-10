@@ -576,3 +576,218 @@ Derives a complete, deterministic, machine-readable causal explanation from trus
 ### `POST /explain` & `POST /api/v1/explain`
 Allows ad-hoc explanation queries with optional client context.
 
+---
+
+## 10. Model / Schema Lifecycle Metadata (B7)
+
+Provides deterministic operational traceability: which model/schema/configuration version produced a given piece of operational data, and was that version valid at the time?
+
+### Version Semantics
+
+| Field | Meaning | Example |
+|---|---|---|
+| `version` | Component / model version | `"2.1.0"` |
+| `schema_version` | Data schema contract version | `"1.2"` |
+
+These are **always distinct fields**. A model can upgrade its implementation version without changing its schema contract, and vice versa.
+
+### Lifecycle Status
+
+| Status | Meaning |
+|---|---|
+| `ACTIVE` | Currently valid for operational use and version selection. |
+| `DEPRECATED` | Historically valid and traceable, but not selected as the preferred current version. |
+| `RETIRED` | No longer operationally valid. Remains available for historical provenance. Never deleted. |
+
+### Interval Semantics
+
+Effective intervals are **half-open**: `[effective_from, effective_to)`.
+
+- At exactly `effective_to`, the **old** version is no longer valid.
+- The new version (with the same `effective_from`) becomes valid at that instant.
+- `effective_to = null` means the record is open-ended (valid indefinitely into the future).
+
+Two records for the same `component_type` + `component_name` must never have overlapping effective intervals. Adjacent intervals are valid.
+
+---
+
+### `GET /lifecycle`
+
+Lists lifecycle records with optional filters.
+
+**Query Parameters**:
+- `component_type` (str, optional): Filter by component type (e.g. `MODEL`, `SCHEMA`, `CONFIG`).
+- `component_name` (str, optional): Filter by component name.
+- `status` (str, optional): Filter by status: `ACTIVE`, `DEPRECATED`, or `RETIRED`.
+
+**Response (200 OK)**:
+```json
+{
+  "total": 2,
+  "items": [
+    {
+      "id": "LC-001",
+      "component_type": "MODEL",
+      "component_name": "risk-engine",
+      "version": "1.0.0",
+      "schema_version": "1.0",
+      "status": "DEPRECATED",
+      "effective_from": "2026-01-01T00:00:00Z",
+      "effective_to": "2026-09-01T00:00:00Z",
+      "description": "Initial risk engine — replaced by 2.x series.",
+      "created_at": "2026-01-01T00:00:00Z"
+    },
+    {
+      "id": "LC-002",
+      "component_type": "MODEL",
+      "component_name": "risk-engine",
+      "version": "2.1.0",
+      "schema_version": "1.2",
+      "status": "ACTIVE",
+      "effective_from": "2026-09-01T00:00:00Z",
+      "effective_to": null,
+      "description": null,
+      "created_at": "2026-09-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### `GET /lifecycle/resolve`
+
+Resolve the lifecycle version applicable for a component at a given timestamp.
+
+When `timestamp` is omitted, returns the preferred current **ACTIVE** version.
+When `timestamp` is provided, returns the version valid at that historical moment — including DEPRECATED and RETIRED records, which remain historically traceable.
+
+**Query Parameters**:
+- `component_type` (str, required): Component type to resolve.
+- `component_name` (str, required): Component name to resolve.
+- `timestamp` (ISO 8601 datetime, optional): Historical timestamp. Omit for current resolution.
+
+**Response (200 OK) — historical resolution**:
+```json
+{
+  "component_type": "MODEL",
+  "component_name": "risk-engine",
+  "query_timestamp": "2026-05-15T00:00:00Z",
+  "resolved_record": {
+    "id": "LC-001",
+    "component_type": "MODEL",
+    "component_name": "risk-engine",
+    "version": "1.0.0",
+    "schema_version": "1.0",
+    "status": "DEPRECATED",
+    "effective_from": "2026-01-01T00:00:00Z",
+    "effective_to": "2026-09-01T00:00:00Z",
+    "description": "Initial risk engine.",
+    "created_at": "2026-01-01T00:00:00Z"
+  },
+  "resolution_note": "Resolved to version '1.0.0' (schema '1.0') [2026-01-01T00:00:00Z, 2026-09-01T00:00:00Z). Status: DEPRECATED.",
+  "is_current": false
+}
+```
+
+**Response (200 OK) — current ACTIVE resolution (no timestamp)**:
+```json
+{
+  "component_type": "MODEL",
+  "component_name": "risk-engine",
+  "query_timestamp": "2026-09-10T14:30:00Z",
+  "resolved_record": {
+    "id": "LC-002",
+    "component_type": "MODEL",
+    "component_name": "risk-engine",
+    "version": "2.1.0",
+    "schema_version": "1.2",
+    "status": "ACTIVE",
+    "effective_from": "2026-09-01T00:00:00Z",
+    "effective_to": null,
+    "description": null,
+    "created_at": "2026-09-01T00:00:00Z"
+  },
+  "resolution_note": "Current ACTIVE version is '2.1.0' (schema '1.2'), effective from 2026-09-01T00:00:00Z.",
+  "is_current": true
+}
+```
+
+**Response (200 OK) — no record found**:
+```json
+{
+  "component_type": "MODEL",
+  "component_name": "unknown-engine",
+  "query_timestamp": "2026-09-10T14:30:00Z",
+  "resolved_record": null,
+  "resolution_note": "No lifecycle record for 'MODEL/unknown-engine' is valid at 2026-09-10T14:30:00Z.",
+  "is_current": false
+}
+```
+
+---
+
+### `GET /lifecycle/{id}`
+
+Retrieve a single lifecycle record by its primary key.
+
+**Response (200 OK)**:
+```json
+{
+  "id": "LC-002",
+  "component_type": "MODEL",
+  "component_name": "risk-engine",
+  "version": "2.1.0",
+  "schema_version": "1.2",
+  "status": "ACTIVE",
+  "effective_from": "2026-09-01T00:00:00Z",
+  "effective_to": null,
+  "description": null,
+  "created_at": "2026-09-01T00:00:00Z"
+}
+```
+
+**Response (404 Not Found)** when ID does not exist.
+
+---
+
+### `POST /lifecycle`
+
+Register a new lifecycle record for a versioned component.
+
+The service validates:
+- ID uniqueness across all lifecycle records.
+- No overlapping effective intervals for the same `component_type` + `component_name` pair.
+
+Returns **HTTP 409** if a duplicate ID or overlapping interval is detected.
+
+**Request Body**:
+```json
+{
+  "id": "LC-002",
+  "component_type": "MODEL",
+  "component_name": "risk-engine",
+  "version": "2.1.0",
+  "schema_version": "1.2",
+  "status": "ACTIVE",
+  "effective_from": "2026-09-01T00:00:00Z",
+  "effective_to": null,
+  "description": "Refactored 6-factor risk engine with telemetry provenance integration."
+}
+```
+
+**Response (201 Created)**:
+```json
+{
+  "id": "LC-002",
+  "component_type": "MODEL",
+  "component_name": "risk-engine",
+  "version": "2.1.0",
+  "schema_version": "1.2",
+  "status": "ACTIVE",
+  "effective_from": "2026-09-01T00:00:00Z",
+  "effective_to": null,
+  "description": "Refactored 6-factor risk engine with telemetry provenance integration.",
+  "created_at": "2026-09-10T14:30:00Z"
+}
+```

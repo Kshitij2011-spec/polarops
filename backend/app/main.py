@@ -9,6 +9,7 @@ from app.api.events import router as events_router
 from app.api.explainability import router as explainability_router
 from app.api.health import router as health_router
 from app.api.incidents import router as incidents_router
+from app.api.lifecycle import router as lifecycle_router
 from app.api.memory import router as memory_router
 from app.api.resilience import router as resilience_router
 from app.api.resources import router as resources_router
@@ -92,3 +93,4 @@ app.include_router(incidents_router)
 app.include_router(memory_router)
 app.include_router(events_router)
 app.include_router(explainability_router)
+app.include_router(lifecycle_router)

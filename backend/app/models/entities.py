@@ -29,6 +29,7 @@ from app.models.enums import (
     EnvironmentMode,
     IncidentSeverity,
     IncidentStatus,
+    LifecycleStatus,
     MaintenancePriority,
     MaintenanceStatus,
     Quality,
@@ -635,3 +636,53 @@ class EventLog(Base):
     source: Mapped[str] = mapped_column(String(128), default="SYNTHETIC_SIMULATION")
     truth_type: Mapped[str] = mapped_column(String(32), default="MEASURED")
     metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+# ── 8. LIFECYCLE METADATA ────────────────────────────────────────────
+
+
+class ComponentLifecycle(Base):
+    """Lifecycle metadata record for a versioned model, schema, or configuration component.
+
+    Tracks which version of a component was effective over a given time interval,
+    enabling historical provenance traces to answer:
+
+        "Which version produced this operational data, and was it valid at that time?"
+
+    Design invariants
+    -----------------
+    * component_type + component_name together identify a component family.
+    * version and schema_version are separate concepts (never overloaded).
+    * Effective intervals are half-open: [effective_from, effective_to).
+      At exactly effective_to the OLD version is NO LONGER valid.
+    * Two records for the same component family MUST NOT have overlapping
+      effective intervals.  The service layer enforces this before insert.
+    * Records are never deleted — RETIRED records remain for historical provenance.
+    """
+
+    __tablename__ = "component_lifecycles"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    component_type: Mapped[str] = mapped_column(String(64), index=True)
+    component_name: Mapped[str] = mapped_column(String(128), index=True)
+    version: Mapped[str] = mapped_column(String(64))
+    schema_version: Mapped[str] = mapped_column(String(64))
+    status: Mapped[LifecycleStatus] = mapped_column(
+        String(16), default=LifecycleStatus.ACTIVE, index=True
+    )
+    effective_from: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+    effective_to: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    __table_args__ = (
+        Index(
+            "ix_component_lifecycles_type_name",
+            "component_type",
+            "component_name",
+        ),
+    )
