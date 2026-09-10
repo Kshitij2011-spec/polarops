@@ -21,11 +21,11 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* ── 1. Station Overall Health ─────────────────────── */}
-      <div className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-4 flex flex-col justify-between shadow-2xs transition-colors">
-        <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-[#2a2f3e]/60">
+      <div className="rounded-xl border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-4 flex flex-col justify-between shadow-2xs transition-colors">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-2.5 border-b border-slate-100 dark:border-[#2a2f3e]/60">
           <div className="flex items-center gap-2">
             <div
-              className={`p-1.5 rounded-md border ${
+              className={`p-1.5 rounded-lg border ${
                 isCritical
                   ? "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800/60"
                   : isDegraded
@@ -41,12 +41,12 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
                 <ShieldCheck className="h-4 w-4" />
               )}
             </div>
-            <span className="text-xs font-semibold text-slate-600 dark:text-[#9ca3b4] uppercase tracking-wider font-mono">
+            <span className="text-[11px] font-bold text-slate-600 dark:text-[#9ca3b4] uppercase tracking-wider font-mono">
               STATION STATUS
             </span>
           </div>
           <span
-            className={`px-2 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider border ${
+            className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase tracking-wider border ${
               isCritical
                 ? "bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-700"
                 : isDegraded
@@ -58,7 +58,7 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
           </span>
         </div>
 
-        <div className="flex items-baseline justify-between mt-2">
+        <div className="flex items-baseline justify-between mt-1">
           <div>
             <div className="text-3xl font-bold font-mono tracking-tight text-slate-900 dark:text-[#e4e8f0]">
               {overview.overall_health_score}
@@ -91,13 +91,13 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
       </div>
 
       {/* ── 2. Fuel & Energy Runway ───────────────────────── */}
-      <div className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-4 flex flex-col justify-between shadow-2xs transition-colors">
-        <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-[#2a2f3e]/60">
+      <div className="rounded-xl border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-4 flex flex-col justify-between shadow-2xs transition-colors">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-2.5 border-b border-slate-100 dark:border-[#2a2f3e]/60">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md border bg-slate-50 dark:bg-[#12141c] text-slate-600 dark:text-[#9ca3b4] border-slate-200 dark:border-[#2a2f3e]">
-              <Flame className="h-4 w-4" />
+            <div className="p-1.5 rounded-lg border bg-slate-50 dark:bg-[#12141c] text-slate-600 dark:text-[#9ca3b4] border-slate-200 dark:border-[#2a2f3e]">
+              <Flame className="h-4 w-4 text-amber-500" />
             </div>
-            <span className="text-xs font-semibold text-slate-600 dark:text-[#9ca3b4] uppercase tracking-wider font-mono">
+            <span className="text-[11px] font-bold text-slate-600 dark:text-[#9ca3b4] uppercase tracking-wider font-mono">
               FUEL &amp; RUNWAY
             </span>
           </div>
@@ -129,13 +129,13 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
       </div>
 
       {/* ── 3. Ambient Weather / Environment ──────────────── */}
-      <div className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-4 flex flex-col justify-between shadow-2xs transition-colors">
-        <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-[#2a2f3e]/60">
+      <div className="rounded-xl border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-4 flex flex-col justify-between shadow-2xs transition-colors">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-2.5 border-b border-slate-100 dark:border-[#2a2f3e]/60">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md border bg-slate-50 dark:bg-[#12141c] text-slate-600 dark:text-[#9ca3b4] border-slate-200 dark:border-[#2a2f3e]">
-              <Thermometer className="h-4 w-4" />
+            <div className="p-1.5 rounded-lg border bg-slate-50 dark:bg-[#12141c] text-slate-600 dark:text-[#9ca3b4] border-slate-200 dark:border-[#2a2f3e]">
+              <Thermometer className="h-4 w-4 text-sky-500" />
             </div>
-            <span className="text-xs font-semibold text-slate-600 dark:text-[#9ca3b4] uppercase tracking-wider font-mono">
+            <span className="text-[11px] font-bold text-slate-600 dark:text-[#9ca3b4] uppercase tracking-wider font-mono">
               ENVIRONMENT
             </span>
           </div>
@@ -156,8 +156,11 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
               <Wind className="h-3.5 w-3.5 text-blue-600 dark:text-[#5b9cf5]" />
               {overview.ambient_weather.wind_speed_knots} kt
             </div>
-            <div className="text-[11px] font-mono font-medium text-amber-600 dark:text-amber-400 truncate">
-              {overview.ambient_weather.conditions}
+            <div
+              className="text-[10px] font-mono font-semibold text-amber-600 dark:text-amber-400 mt-0.5 leading-tight"
+              title={overview.ambient_weather.conditions}
+            >
+              {overview.ambient_weather.conditions.replace(/_/g, " ")}
             </div>
           </div>
         </div>
@@ -168,13 +171,13 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
       </div>
 
       {/* ── 4. Communications / Uplink ────────────────────── */}
-      <div className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-4 flex flex-col justify-between shadow-2xs transition-colors">
-        <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-[#2a2f3e]/60">
+      <div className="rounded-xl border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-4 flex flex-col justify-between shadow-2xs transition-colors">
+        <div className="flex items-center justify-between gap-2 mb-2 pb-2.5 border-b border-slate-100 dark:border-[#2a2f3e]/60">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md border bg-slate-50 dark:bg-[#12141c] text-slate-600 dark:text-[#9ca3b4] border-slate-200 dark:border-[#2a2f3e]">
-              <Radio className="h-4 w-4" />
+            <div className="p-1.5 rounded-lg border bg-slate-50 dark:bg-[#12141c] text-slate-600 dark:text-[#9ca3b4] border-slate-200 dark:border-[#2a2f3e]">
+              <Radio className="h-4 w-4 text-emerald-500" />
             </div>
-            <span className="text-xs font-semibold text-slate-600 dark:text-[#9ca3b4] uppercase tracking-wider font-mono">
+            <span className="text-[11px] font-bold text-slate-600 dark:text-[#9ca3b4] uppercase tracking-wider font-mono">
               COMMUNICATIONS
             </span>
           </div>

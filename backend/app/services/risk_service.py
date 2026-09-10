@@ -296,7 +296,10 @@ def calculate_asset_risk(db: Session, asset_id: str) -> AssetRiskResponse | None
                 )
             else:
                 resupply_score = 4
-                resupply_evidence = f"Vessel {resupply.vessel_name} expected within {resupply_days} days."
+                resupply_evidence = (
+                    f"Next scheduled resupply vessel ({resupply.vessel_name}) ETA is in "
+                    f"≈ {resupply_days} days. High pack-ice conditions approaching."
+                )
         else:
             resupply_score = 10
             resupply_evidence = "No maritime or aerial resupply scheduled within 30-day window."

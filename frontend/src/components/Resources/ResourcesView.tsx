@@ -9,6 +9,7 @@ import {
   ShieldAlert,
   Thermometer,
   Zap,
+  Wrench,
 } from "lucide-react";
 import { useFuelStatus } from "../../hooks/useFuelStatus";
 import { useInventory } from "../../hooks/useInventory";
@@ -119,6 +120,83 @@ export function ResourcesView({ stationId, onBack, onInspectAsset }: ResourcesVi
               <ShieldAlert className="h-3.5 w-3.5" />
               <span>G-02 Recovery Chain</span>
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── HERO RECOVERY BANNER: "CAN WE FIX G-02?" ──────────────── */}
+      <div className="rounded-xl border border-slate-200 dark:border-[#2a2f3e] bg-slate-50/80 dark:bg-[#151924] p-5 shadow-2xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-[#222838]">
+          <div className="flex items-center gap-2">
+            <Wrench className="h-4 w-4 text-amber-500" />
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-[#f0f3fa]">
+              OPERATIONAL RECOVERY PATHWAY &middot; &quot;CAN WE FIX GENERATOR G-02?&quot;
+            </span>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+              RECOVERY CONSTRAINED
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-slate-500 dark:text-[#7a8194]">
+            Cross-Domain Asset-to-Logistics Trace
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs font-mono">
+          {/* 1. PART REQUIRED */}
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">1. PART REQUIRED</div>
+            <div className="font-bold text-slate-900 dark:text-[#e4e8f0]">SK-402 Seal Kit</div>
+            <p className="text-[11px] text-slate-500 dark:text-[#7a8194] font-sans">Fuel Injection Pump &amp; Bearing Seal</p>
+          </div>
+
+          {/* 2. LOCAL STOCK */}
+          <div className="p-3 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50/40 dark:bg-rose-950/20 space-y-1 shadow-2xs">
+            <div className="text-[10px] text-rose-700 dark:text-rose-400 uppercase font-bold">2. LOCAL STOCK</div>
+            <div className="font-bold text-rose-600 dark:text-rose-400">0 Units (STOCKOUT)</div>
+            <p className="text-[11px] text-rose-700/80 dark:text-rose-300/80 font-sans">Powerhouse Spares Rack B-04 empty</p>
+          </div>
+
+          {/* 3. WORK ORDER STATUS */}
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">3. WORK ORDER</div>
+            <div className="font-bold text-slate-900 dark:text-[#e4e8f0]">MWO-2026-089</div>
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 font-sans">Status: BLOCKED_PARTS</p>
+          </div>
+
+          {/* 4. RESUPPLY VESSEL */}
+          <div className="p-3 rounded-lg border border-sky-200 dark:border-cyan-900/60 bg-sky-50/40 dark:bg-cyan-950/20 space-y-1 shadow-2xs">
+            <div className="text-[10px] text-sky-700 dark:text-cyan-400 uppercase font-bold">4. INBOUND RESUPPLY</div>
+            <div className="font-bold text-sky-800 dark:text-cyan-200">MV Vasiliy Golovnin</div>
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 font-sans">ETA ≈ 11 Days (Carrying 2x SK-402)</p>
+          </div>
+
+          {/* 5. RECOVERY STATUS */}
+          <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/40 dark:bg-amber-950/20 space-y-1 shadow-2xs">
+            <div className="text-[10px] text-amber-800 dark:text-amber-400 uppercase font-bold">5. RECOVERY STATUS</div>
+            <div className="font-bold text-amber-700 dark:text-amber-300">HIGH EXPOSURE</div>
+            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">De-rate load to 65 kW; preheat Boiler B-01</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-[#222838] text-xs font-mono">
+          <span className="text-slate-500 dark:text-[#7a8194]">
+            Direct correlation: G-02 recovery is strictly gated on maritime vessel arrival through pack ice.
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab("recovery")}
+              className="px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-colors cursor-pointer"
+            >
+              View Full Recovery Chain &rarr;
+            </button>
+            {onInspectAsset && (
+              <button
+                onClick={() => onInspectAsset("G-02")}
+                className="px-3 py-1.5 rounded-md border border-slate-300 dark:border-[#3d4556] bg-white dark:bg-[#181d2c] text-slate-800 dark:text-[#e4e8f0] font-semibold hover:bg-slate-50 dark:hover:bg-[#202534] transition-colors cursor-pointer"
+              >
+                Inspect Asset G-02
+              </button>
+            )}
           </div>
         </div>
       </div>

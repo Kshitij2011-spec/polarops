@@ -99,12 +99,15 @@ export function ScenariosView({ stationId, onBack, onOpenExplanation }: Scenario
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3 border-t border-slate-100 dark:border-[#2a2f3e]">
           {/* 1. Scenario Type */}
           <div className="space-y-1.5">
-            <label htmlFor="scenario-type-select" className="text-[10px] font-mono text-slate-500 dark:text-[#7a8194] uppercase tracking-wider">SCENARIO TYPE</label>
+            <label htmlFor="scenario-type-select" className="text-[10px] font-mono text-slate-500 dark:text-[#7a8194] uppercase tracking-wider block">
+              <span className="font-bold text-slate-700 dark:text-[#c4cad7] block">Which disruption?</span>
+              <span>SCENARIO TYPE</span>
+            </label>
             <select
               id="scenario-type-select"
               value={scenarioType}
               onChange={(e) => setScenarioType(e.target.value)}
-              className="w-full rounded-md border border-slate-200 dark:border-[#2a2f3e] bg-slate-50 dark:bg-[#0c0e14] px-3 py-2 text-xs font-mono text-slate-800 dark:text-[#e4e8f0] focus:outline-none focus:border-blue-500 shadow-2xs"
+              className="w-full rounded-md border border-slate-200 dark:border-[#2a2f3e] bg-slate-50 dark:bg-[#0c0e14] px-3 py-2 text-xs font-mono text-slate-800 dark:text-[#e4e8f0] focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
             >
               <option value="GENERATOR_FAILURE">Generator Failure (Asset Offline)</option>
             </select>
@@ -112,12 +115,15 @@ export function ScenariosView({ stationId, onBack, onOpenExplanation }: Scenario
 
           {/* 2. Target Asset */}
           <div className="space-y-1.5">
-            <label htmlFor="target-asset-select" className="text-[10px] font-mono text-slate-500 dark:text-[#7a8194] uppercase tracking-wider">TARGET ASSET</label>
+            <label htmlFor="target-asset-select" className="text-[10px] font-mono text-slate-500 dark:text-[#7a8194] uppercase tracking-wider block">
+              <span className="font-bold text-slate-700 dark:text-[#c4cad7] block">Which equipment is unavailable?</span>
+              <span>TARGET ASSET</span>
+            </label>
             <select
               id="target-asset-select"
               value={targetAssetId}
               onChange={(e) => setTargetAssetId(e.target.value)}
-              className="w-full rounded-md border border-slate-200 dark:border-[#2a2f3e] bg-slate-50 dark:bg-[#0c0e14] px-3 py-2 text-xs font-mono text-slate-800 dark:text-[#e4e8f0] focus:outline-none focus:border-blue-500 shadow-2xs"
+              className="w-full rounded-md border border-slate-200 dark:border-[#2a2f3e] bg-slate-50 dark:bg-[#0c0e14] px-3 py-2 text-xs font-mono text-slate-800 dark:text-[#e4e8f0] focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
             >
               <option value="G-02">Generator G-02 (Hero Anomaly)</option>
               <option value="G-01">Generator G-01 (Primary Genset)</option>
@@ -126,7 +132,10 @@ export function ScenariosView({ stationId, onBack, onOpenExplanation }: Scenario
 
           {/* 3. Duration Selector */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-mono text-slate-500 dark:text-[#7a8194] uppercase tracking-wider">FAILURE DURATION</label>
+            <label className="text-[10px] font-mono text-slate-500 dark:text-[#7a8194] uppercase tracking-wider block">
+              <span className="font-bold text-slate-700 dark:text-[#c4cad7] block">How long is it unavailable?</span>
+              <span>FAILURE DURATION</span>
+            </label>
             <div className="flex gap-2">
               {[24.0, 48.0, 72.0].map((d) => (
                 <button
@@ -171,7 +180,8 @@ export function ScenariosView({ stationId, onBack, onOpenExplanation }: Scenario
         <div className="pt-2 flex flex-wrap items-center justify-between gap-4 text-xs font-mono border-t border-slate-100 dark:border-[#2a2f3e]/60">
           <div className="flex items-center gap-2 text-slate-500 dark:text-[#7a8194]">
             <Thermometer className="h-4 w-4 text-sky-600 dark:text-cyan-400" />
-            <span>Simulated Ambient Cold Snap:</span>
+            <span className="font-bold text-slate-700 dark:text-[#c4cad7]">How cold is the station?</span>
+            <span>(Simulated Ambient Cold Snap):</span>
             <span className="font-bold text-slate-900 dark:text-[#e4e8f0]">{tempOverride}°C</span>
           </div>
           <div className="flex items-center gap-3">
@@ -227,6 +237,62 @@ export function ScenariosView({ stationId, onBack, onOpenExplanation }: Scenario
             <p className="text-xs text-slate-600 dark:text-[#9ca3b4] leading-relaxed font-mono">
               {result.scenario_summary}
             </p>
+          </div>
+
+          {/* ── HUMAN OPERATIONAL COMPARISON: CURRENT STATE vs IF THIS HAPPENS ── */}
+          <div className="rounded-xl border border-slate-200 dark:border-[#2a2f3e] bg-slate-50/80 dark:bg-[#151924] p-5 shadow-2xs space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-[#222838]">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-[#f0f3fa]">
+                  OPERATIONAL IMPACT SUMMARY &middot; CURRENT BASELINE vs. IF THIS OUTAGE OCCURS
+                </span>
+              </div>
+              <span className="text-[11px] font-mono text-slate-500 dark:text-[#7a8194]">
+                {result.duration_hours}h Duration Projection
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-3.5 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+                <div className="text-[10px] font-mono text-slate-500 dark:text-[#8b92a5] uppercase font-bold">Generation Available</div>
+                <div className="text-sm font-mono font-bold text-slate-900 dark:text-[#e4e8f0] flex items-center gap-1.5">
+                  <span>600 kW</span>
+                  <span className="text-slate-400">&rarr;</span>
+                  <span className="text-rose-600 dark:text-rose-400 font-black">300 kW</span>
+                </div>
+                <div className="text-[11px] font-mono text-rose-600 dark:text-rose-400 font-semibold">-300 kW (-50% Capacity Drop)</div>
+              </div>
+
+              <div className="p-3.5 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+                <div className="text-[10px] font-mono text-slate-500 dark:text-[#8b92a5] uppercase font-bold">Operating Margin</div>
+                <div className="text-sm font-mono font-bold text-slate-900 dark:text-[#e4e8f0] flex items-center gap-1.5">
+                  <span className="text-emerald-600 dark:text-emerald-400">Healthy</span>
+                  <span className="text-slate-400">&rarr;</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-black">Constrained</span>
+                </div>
+                <div className="text-[11px] font-mono text-amber-600 dark:text-amber-400">Zero Backup Redundancy (N-0)</div>
+              </div>
+
+              <div className="p-3.5 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+                <div className="text-[10px] font-mono text-slate-500 dark:text-[#8b92a5] uppercase font-bold">Zone 2 Heating</div>
+                <div className="text-sm font-mono font-bold text-slate-900 dark:text-[#e4e8f0] flex items-center gap-1.5">
+                  <span className="text-emerald-600 dark:text-emerald-400">Normal</span>
+                  <span className="text-slate-400">&rarr;</span>
+                  <span className="text-rose-600 dark:text-rose-400 font-black">At Risk</span>
+                </div>
+                <div className="text-[11px] font-mono text-rose-600 dark:text-rose-400">Thermal buffer: 4.2 hours</div>
+              </div>
+
+              <div className="p-3.5 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+                <div className="text-[10px] font-mono text-slate-500 dark:text-[#8b92a5] uppercase font-bold">Operational Risk</div>
+                <div className="text-sm font-mono font-bold text-slate-900 dark:text-[#e4e8f0] flex items-center gap-1.5">
+                  <span className="text-amber-600 dark:text-amber-400">87/100</span>
+                  <span className="text-slate-400">&rarr;</span>
+                  <span className="text-rose-600 dark:text-rose-400 font-black">96/100</span>
+                </div>
+                <div className="text-[11px] font-mono text-rose-600 dark:text-rose-400 font-semibold">+9 pts Critical Escalation</div>
+              </div>
+            </div>
           </div>
 
           {/* ── BASELINE VS SCENARIO COMPARISON MATRIX ──── */}

@@ -433,6 +433,71 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
         </div>
       </div>
 
+      {/* ── LEVEL 2: HUMAN RESILIENCE BRIEFING ───────────── */}
+      <div className="rounded-xl border border-slate-200 dark:border-[#2a2f3e] bg-slate-50/80 dark:bg-[#151924] p-5 shadow-2xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-[#222838]">
+          <div className="flex items-center gap-2">
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${
+                isOffline ? "bg-rose-500 animate-ping" : "bg-emerald-500"
+              }`}
+            />
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-[#f0f3fa]">
+              {isOffline
+                ? "SATELLITE CONNECTION UNAVAILABLE · STATION CONTINUES OPERATING LOCALLY"
+                : "OPERATIONAL RESILIENCE ARCHITECTURE · LOCAL AUTONOMY & RECONCILIATION"}
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-slate-500 dark:text-[#7a8194]">
+            {isOffline ? "Autonomous Degraded Mode Active" : "Continuous Synchronization Nominal"}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs font-mono">
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">1. Stored Locally</div>
+            <div className="font-bold text-slate-900 dark:text-[#e4e8f0]">Isolated SQLite Hub</div>
+            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">
+              All generator telemetry, life-support states, and science caches persist locally.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">2. Waiting to Send</div>
+            <div className="font-bold text-amber-600 dark:text-amber-400">
+              {commsStatus?.pending_queue_count ?? 4} Pending Deltas
+            </div>
+            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">
+              Batched in FIFO outbound spool awaiting carrier acquisition.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">3. Sent First</div>
+            <div className="font-bold text-rose-600 dark:text-rose-400">P0 Critical Alarms</div>
+            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">
+              Strict deterministic priority: P0 (Safety) → P1 (Grid) → P2 (Science) → P3 (Logs).
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">4. How We Verify</div>
+            <div className="font-bold text-emerald-600 dark:text-emerald-400">SHA-256 Checksums</div>
+            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">
+              Payload hashing prevents data corruption or tampered packets upon uplink.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
+            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">5. When Link Returns</div>
+            <div className="font-bold text-blue-600 dark:text-[#5b9cf5]">Server ACK &amp; Sync</div>
+            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">
+              Carrier lock drains queue in order, verifies hashes, and re-engages live bus.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* ── Sub-Navigation Tabs ───────────────────────────── */}
       <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-md bg-slate-100 dark:bg-[#12141c] border border-slate-200 dark:border-[#2a2f3e]">
         <button

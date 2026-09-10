@@ -132,6 +132,55 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
         </div>
       </div>
 
+      {/* ── Level 2: Human Situation Briefing: "Which station has more operational room right now?" ── */}
+      <div
+        data-testid="station-portfolio-briefing-banner"
+        className="rounded-lg border border-blue-200 dark:border-blue-900/50 bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-slate-50/60 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-[#181b24] p-4 shadow-2xs space-y-3"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-100 dark:border-blue-900/40 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-blue-600 text-white uppercase tracking-wider">
+              Operational Comparison
+            </span>
+            <h2 className="text-sm font-bold font-mono text-slate-900 dark:text-[#e4e8f0]">
+              Which station has more operational room right now?
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono text-slate-500 dark:text-[#7a8194]">
+            Bharati vs Maitri operational comparison (Advisory Only)
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded border border-amber-200/80 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-950/20 p-2.5 space-y-1">
+            <div className="text-[10px] font-mono font-bold text-amber-700 dark:text-amber-400 uppercase">
+              Bharati: Current Operational Pressure
+            </div>
+            <p className="text-xs font-mono text-slate-700 dark:text-[#c4cbd8]">
+              Generator G-02 vibration elevated (4.8 mm/s), 0 SK-402 seals in stock, and 42 kt blizzard restricting flights.
+            </p>
+          </div>
+
+          <div className="rounded border border-emerald-200/80 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/20 p-2.5 space-y-1">
+            <div className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400 uppercase">
+              Maitri: Available Operational Buffer
+            </div>
+            <p className="text-xs font-mono text-slate-700 dark:text-[#c4cbd8]">
+              Nominal power generation, +62.9d diesel fuel runway surplus (111.1d), and 2 spare SK-402 seal kits stocked in Locker M-2.
+            </p>
+          </div>
+
+          <div className="rounded border border-slate-200 dark:border-[#2a2f3e] bg-white/80 dark:bg-[#141721] p-2.5 space-y-1">
+            <div className="text-[10px] font-mono font-bold text-slate-500 dark:text-[#7a8194] uppercase">
+              What Constraints Prevent Direct Support?
+            </div>
+            <p className="text-xs font-mono text-slate-700 dark:text-[#c4cbd8]">
+              3,000 km polar ice sheet impassable by ground traverse; polar flight operations restricted. Support is strictly advisory.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* ── Station Comparison Cards (Bharati vs Maitri) ─ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Bharati Station Card */}

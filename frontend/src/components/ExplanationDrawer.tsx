@@ -9,6 +9,7 @@ import {
   Package,
   Activity,
   Cpu,
+  Info,
 } from "lucide-react";
 import {
   fetchExplanation,
@@ -144,6 +145,74 @@ export function ExplanationDrawer({
 
           {!loading && !error && explanation && (
             <>
+              {/* ── OPERATOR HUMAN BRIEFING ────────────────────────────────── */}
+              <div className="rounded-xl border border-slate-200 dark:border-[#2a2f3e] bg-slate-50/70 dark:bg-[#161a26] p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-[#202534]">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 rounded bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-[#5b9cf5]">
+                      <Info className="h-4 w-4" />
+                    </div>
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-700 dark:text-[#c9d1d9]">
+                      OPERATIONAL BRIEFING &middot; SITUATION SUMMARY
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400 dark:text-[#7a8194]">
+                    Deterministic Reasoning
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="space-y-1">
+                    <div className="font-mono font-bold text-slate-500 dark:text-[#8b92a5] text-[11px]">
+                      WHAT HAPPENED?
+                    </div>
+                    <p className="text-slate-800 dark:text-[#d3d8e4] leading-relaxed">
+                      {explanation.domain === "CROSS_STATION"
+                        ? "Multi-station telemetry comparison identifies notable operational divergence between Bharati and Maitri."
+                        : explanation.domain === "ASSET"
+                        ? `Operational telemetry for ${explanation.entity_id} indicates degraded mechanical health.`
+                        : `Current state: ${explanation.summary}`}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="font-mono font-bold text-slate-500 dark:text-[#8b92a5] text-[11px]">
+                      WHY DOES THIS MATTER?
+                    </div>
+                    <p className="text-slate-800 dark:text-[#d3d8e4] leading-relaxed">
+                      {explanation.domain === "CROSS_STATION"
+                        ? "Cross-station resource imbalance impacts mutual survival buffer, but 3,000 km distance limits transfer options."
+                        : explanation.domain === "ASSET"
+                        ? "Elevated vibration risks mechanical stator seizure, compromising station electrical and heating resilience."
+                        : `Operational impact: ${explanation.why_it_matters}`}
+                    </p>
+                  </div>
+
+                  {explanation.consequences.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="font-mono font-bold text-slate-500 dark:text-[#8b92a5] text-[11px]">
+                        WHAT IS AFFECTED?
+                      </div>
+                      <p className="text-slate-800 dark:text-[#d3d8e4] leading-relaxed">
+                        {explanation.consequences.map((c) => c.impact).slice(0, 2).join(" · ")}
+                      </p>
+                    </div>
+                  )}
+
+                  {explanation.recovery_constraints.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="font-mono font-bold text-slate-500 dark:text-[#8b92a5] text-[11px]">
+                        WHAT BLOCKS RECOVERY?
+                      </div>
+                      <p className="text-slate-800 dark:text-[#d3d8e4] leading-relaxed">
+                        {explanation.recovery_constraints[0]?.description ||
+                          "Local stockout or maintenance constraint."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* ── 1. WHAT CHANGED ────────────────────────────────────────── */}
               <div className="space-y-1.5" data-testid="explanation-what-changed">
                 <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-[#8b92a5]">

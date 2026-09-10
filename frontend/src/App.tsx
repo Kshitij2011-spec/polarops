@@ -119,7 +119,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0f1117] text-slate-900 dark:text-[#e4e8f0] flex flex-col font-sans selection:bg-blue-100 dark:selection:bg-blue-900/40 transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0f1117] text-slate-900 dark:text-[#e4e8f0] flex flex-col font-sans selection:bg-blue-100 dark:selection:bg-blue-900/40 transition-colors overflow-x-hidden">
       {/* ── Top Command Bar ─────────────────────────────── */}
       <Header
         selectedStationId={selectedStationId}
