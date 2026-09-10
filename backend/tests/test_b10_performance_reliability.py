@@ -280,7 +280,30 @@ class TestDeterminism:
         assert dates == sorted(dates)
 
     def test_inventory_stable(self, client: TestClient):
-        assert client.get("/resources/inventory").json() == client.get("/resources/inventory").json()
+        """Inventory list ordering and business data must be stable across repeated reads.
+
+        Compares stable structural fields only (id, part, quantities, status).
+        Provenance timestamps (freshness_seconds, timestamp) are deliberately excluded
+        because they reflect wall-clock age and will differ between two HTTP requests.
+        """
+        def _stable_fields(items: list) -> list:
+            return [
+                {
+                    "id": item["id"],
+                    "spare_part_id": item["spare_part_id"],
+                    "part_number": item["part_number"],
+                    "name": item["name"],
+                    "quantity_available": item["quantity_available"],
+                    "quantity_reserved": item["quantity_reserved"],
+                    "reorder_threshold": item["reorder_threshold"],
+                    "status": item["status"],
+                }
+                for item in items
+            ]
+
+        r1 = client.get("/resources/inventory").json()
+        r2 = client.get("/resources/inventory").json()
+        assert _stable_fields(r1) == _stable_fields(r2)
 
     def test_lifecycle_resolve_stable(self, client: TestClient):
         name = f"b10-stable-{_uid()}"

@@ -266,7 +266,7 @@ def test_naive_updated_at_is_treated_as_utc(db_session, client):
     )
     assert opp is not None
     # Naive datetime — simulates SQLite tz-stripping
-    opp.updated_at = datetime.utcnow() - timedelta(hours=1)
+    opp.updated_at = datetime.now() - timedelta(hours=1)  # naive intentionally (simulates SQLite tz-stripping)
     db_session.commit()
 
     res = client.get("/resources/resupply?station_id=STATION-BHARATI")
