@@ -13,10 +13,12 @@ Validates multi-station divergence: Bharati G-02 critical case vs. Maitri nomina
 Validates backward compatibility and deterministic repeatability.
 """
 
+from datetime import datetime, timedelta, timezone
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.seed import ensure_maitri_canonical_state
+from app.models import MaintenanceStatus, MaintenanceWorkOrder
 from app.services.risk_service import calculate_asset_risk
 
 
@@ -259,3 +261,69 @@ def test_risk_intelligence_deterministic_repeatability(db_session: Session):
     assert res1.failure_exposure.score == res2.failure_exposure.score
     assert res1.environmental_amplification.amplification_factor == res2.environmental_amplification.amplification_factor
     assert [p.projected_risk_score for p in res1.projections] == [p.projected_risk_score for p in res2.projections]
+
+
+def test_risk_maintenance_status_lifecycle(db_session: Session):
+    """Verify that calculate_asset_risk correctly evaluates canonical MaintenanceStatus enum members without AttributeErrors."""
+    mwo = db_session.query(MaintenanceWorkOrder).filter(MaintenanceWorkOrder.asset_id == "G-02").first()
+    assert mwo is not None
+    orig_status = mwo.status
+    orig_due = mwo.due_at
+
+    try:
+        # 1. BLOCKED_PARTS (baseline) -> 15 pts, maint_blocked=True
+        mwo.status = MaintenanceStatus.BLOCKED_PARTS
+        db_session.commit()
+        res_blocked = calculate_asset_risk(db_session, "G-02")
+        assert res_blocked is not None
+        maint_factor = next(f for f in res_blocked.factors if f.factor == "maintenance")
+        assert maint_factor.score == 15
+        assert res_blocked.maintenance_blocked is True
+        assert "BLOCKED_PARTS" in maint_factor.evidence
+
+        # 2. IN_PROGRESS -> 8 pts, maint_blocked=False
+        mwo.status = MaintenanceStatus.IN_PROGRESS
+        db_session.commit()
+        res_prog = calculate_asset_risk(db_session, "G-02")
+        assert res_prog is not None
+        maint_factor = next(f for f in res_prog.factors if f.factor == "maintenance")
+        assert maint_factor.score == 8
+        assert res_prog.maintenance_blocked is False
+        assert "under repair" in maint_factor.evidence
+
+        # 3. PENDING with past due_at (overdue) -> 12 pts, maint_blocked=False
+        mwo.status = MaintenanceStatus.PENDING
+        mwo.due_at = datetime.now(timezone.utc) - timedelta(days=2)
+        db_session.commit()
+        res_overdue = calculate_asset_risk(db_session, "G-02")
+        assert res_overdue is not None
+        maint_factor = next(f for f in res_overdue.factors if f.factor == "maintenance")
+        assert maint_factor.score == 12
+        assert "OVERDUE" in maint_factor.evidence
+
+        # 4. PENDING with future due_at (scheduled) -> 5 pts, maint_blocked=False
+        mwo.status = MaintenanceStatus.PENDING
+        mwo.due_at = datetime.now(timezone.utc) + timedelta(days=5)
+        db_session.commit()
+        res_pending = calculate_asset_risk(db_session, "G-02")
+        assert res_pending is not None
+        maint_factor = next(f for f in res_pending.factors if f.factor == "maintenance")
+        assert maint_factor.score == 5
+        assert "scheduled" in maint_factor.evidence.lower() or "preventive" in maint_factor.evidence.lower()
+
+        # 5. COMPLETED -> 0 pts, active_work_order_id=None
+        mwo.status = MaintenanceStatus.COMPLETED
+        db_session.commit()
+        res_completed = calculate_asset_risk(db_session, "G-02")
+        assert res_completed is not None
+        maint_factor = next(f for f in res_completed.factors if f.factor == "maintenance")
+        assert maint_factor.score == 0
+        assert res_completed.active_work_order_id is None
+        assert "No open maintenance" in maint_factor.evidence
+
+    finally:
+        # Restore canonical state
+        mwo.status = orig_status
+        mwo.due_at = orig_due
+        db_session.commit()
+

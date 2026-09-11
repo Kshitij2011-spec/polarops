@@ -195,19 +195,23 @@ def calculate_asset_risk(db: Session, asset_id: str) -> AssetRiskResponse | None
     active_mwo_id = None
     required_part_name = None
 
-    if mwo:
+    if mwo and mwo.status != MaintenanceStatus.COMPLETED:
         active_mwo_id = mwo.id
-        if mwo.status == MaintenanceStatus.BLOCKED_PARTS:
+        now = datetime.now(timezone.utc)
+        mwo_due = mwo.due_at.replace(tzinfo=timezone.utc) if mwo.due_at and mwo.due_at.tzinfo is None else mwo.due_at
+        is_overdue = bool((mwo_due and mwo_due < now) or str(mwo.status) == "OVERDUE")
+
+        if mwo.status == MaintenanceStatus.BLOCKED_PARTS or str(mwo.status) == "BLOCKED_PARTS":
             maint_score = 15
             maint_blocked = True
             maint_evidence = f"Work Order {mwo.id} is BLOCKED_PARTS ({mwo.title}). Action: {mwo.required_action}"
-        elif mwo.status == MaintenanceStatus.OVERDUE:
+        elif is_overdue:
             maint_score = 12
             maint_evidence = f"Work Order {mwo.id} is OVERDUE for required maintenance."
-        elif mwo.status == MaintenanceStatus.IN_PROGRESS:
+        elif mwo.status == MaintenanceStatus.IN_PROGRESS or str(mwo.status) == "IN_PROGRESS":
             maint_score = 8
             maint_evidence = f"Work Order {mwo.id} is currently under repair."
-        elif mwo.status == MaintenanceStatus.SCHEDULED:
+        elif mwo.status == MaintenanceStatus.PENDING or str(mwo.status) in ("PENDING", "SCHEDULED"):
             maint_score = 5
             maint_evidence = f"Work Order {mwo.id} is scheduled for preventive maintenance."
 
@@ -388,7 +392,7 @@ def calculate_asset_risk(db: Session, asset_id: str) -> AssetRiskResponse | None
             "evidence": maint_factor_item.evidence,
             "threshold": "Active Work Order Status",
             "trend": "DEGRADING" if maint_score >= 12 else "STABLE",
-            "derivation_rule": "Work order status score: BLOCKED_PARTS=15pts, OVERDUE=12pts, IN_PROGRESS=8pts, SCHEDULED=5pts, None=0pts",
+            "derivation_rule": "Work order status score: BLOCKED_PARTS=15pts, OVERDUE=12pts, IN_PROGRESS=8pts, PENDING=5pts, None=0pts",
             "provenance_source": "mwo:work_order_registry",
         },
         {
