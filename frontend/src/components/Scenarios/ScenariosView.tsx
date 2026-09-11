@@ -270,7 +270,12 @@ export function ScenariosView({ stationId, onBack, onOpenExplanation }: Scenario
                   <span className="text-slate-400">&rarr;</span>
                   <span className="text-amber-600 dark:text-amber-400 font-black">Constrained</span>
                 </div>
-                <div className="text-[11px] font-mono text-amber-600 dark:text-amber-400">Zero Backup Redundancy (N-0)</div>
+                <div
+                  className="text-[11px] font-mono text-amber-600 dark:text-amber-400 font-medium"
+                  title="N-0: No backup generator available (Single point of failure)"
+                >
+                  N-0 &middot; No backup generator available
+                </div>
               </div>
 
               <div className="p-3.5 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">

@@ -126,8 +126,8 @@ export function CriticalEvents({
                   <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                 )}
                 {isCritical
-                  ? "CRITICAL OPERATIONAL EVENT · HIGH ATTENTION"
-                  : "NOMINAL OPERATIONAL POSTURE"}
+                  ? "CRITICAL OPERATIONAL EVENT · NO POWER REDUNDANCY"
+                  : "NOMINAL OPERATIONAL POSTURE · FULL REDUNDANCY"}
               </span>
 
               <span className="text-xs font-mono font-bold text-slate-700 dark:text-[#c9d1d9] px-2 py-0.5 rounded bg-slate-100 dark:bg-[#21262d] border border-slate-200 dark:border-[#30363d]">
@@ -142,10 +142,6 @@ export function CriticalEvents({
                 }`}
               >
                 {insight?.status_label ?? (isCritical ? "SINGLE FAULT VULNERABLE" : "FLEET NOMINAL")}
-              </span>
-
-              <span className="text-[10px] font-mono text-slate-400 dark:text-[#7a8194]">
-                [OPERATIONAL INTELLIGENCE AGGREGATION]
               </span>
             </div>
 
@@ -166,9 +162,23 @@ export function CriticalEvents({
             </p>
           </div>
 
-          {/* Quick Primary Actions Bar — Guided Operator Workflow */}
+          {/* Quick Actions Bar — Primary CTA + Subordinate Secondary Actions */}
           <div className="flex flex-wrap items-center gap-2 lg:self-start pt-1">
-            {/* 1. WHY? Explanation Button (Strict data-testid preserved) */}
+            {/* PRIMARY ACTION: Inspect Asset Intelligence (G-02) */}
+            {isCritical && (
+              <button
+                onClick={() => {
+                  if (onInspectAsset) onInspectAsset("G-02");
+                  else handleRoute("/assets/G-02");
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2.5 text-xs font-mono font-bold transition-all cursor-pointer shadow-sm hover:shadow-md ring-1 ring-amber-400"
+              >
+                <span>Inspect Asset G-02 (Asset Intelligence)</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            )}
+
+            {/* SECONDARY ACTION 1: WHY? Explanation Button */}
             <button
               onClick={() =>
                 onOpenExplanation?.(
@@ -177,45 +187,29 @@ export function CriticalEvents({
                 )
               }
               data-testid="critical-event-why-btn"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400 dark:border-amber-700 bg-amber-100/90 hover:bg-amber-200 dark:bg-amber-950/70 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-200 px-3.5 py-2 text-xs font-mono font-bold transition-all cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-[#383f52] bg-white dark:bg-[#181b24] hover:bg-slate-100 dark:hover:bg-[#222736] text-slate-800 dark:text-[#c9d1d9] px-3 py-2 text-xs font-mono font-medium transition-colors cursor-pointer shadow-2xs"
               title="Open deterministic operational explanation drawer"
             >
-              <HelpCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <span>WHY?</span>
+              <HelpCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              <span>Why is this high risk?</span>
             </button>
 
-            {/* 2. Primary Hero Action: Inspect Asset G-02 */}
-            {isCritical && (
-              <button
-                onClick={() => {
-                  if (onInspectAsset) onInspectAsset("G-02");
-                  else handleRoute("/assets/G-02");
-                }}
-                className="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 text-xs font-mono font-bold transition-all cursor-pointer shadow-sm hover:shadow-md ring-1 ring-amber-400"
-              >
-                <span>Inspect Asset G-02</span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            )}
-
-            {/* 3. Explore Scenarios Link */}
+            {/* SECONDARY ACTION 2: Explore Scenarios */}
             <button
               onClick={() => handleRoute("/scenarios")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-[#30363d] bg-white dark:bg-[#21262d] hover:bg-slate-50 dark:hover:bg-[#30363d] text-slate-800 dark:text-[#c9d1d9] px-3 py-2 text-xs font-mono font-semibold transition-colors cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-[#383f52] bg-white dark:bg-[#181b24] hover:bg-slate-100 dark:hover:bg-[#222736] text-slate-800 dark:text-[#c9d1d9] px-3 py-2 text-xs font-mono font-medium transition-colors cursor-pointer shadow-2xs"
             >
-              <Layers className="h-4 w-4 text-blue-500" />
+              <Layers className="h-3.5 w-3.5 text-blue-500" />
               <span>Simulate 72h Outage</span>
             </button>
 
-            {/* 4. Toggle Narrative Expansion */}
+            {/* SECONDARY ACTION 3: Check Spares & Recovery */}
             <button
-              onClick={() => setShowAllStages(!showAllStages)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-[#30363d] bg-white dark:bg-[#161b22] hover:bg-slate-50 dark:hover:bg-[#21262d] text-slate-700 dark:text-[#8b949e] px-3 py-2 text-xs font-mono transition-colors cursor-pointer"
-              title={showAllStages ? "Collapse Causal Pipeline" : "Expand Full Causal Pipeline"}
+              onClick={() => handleRoute("/resources?tab=spares")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-[#383f52] bg-white dark:bg-[#181b24] hover:bg-slate-100 dark:hover:bg-[#222736] text-slate-800 dark:text-[#c9d1d9] px-3 py-2 text-xs font-mono font-medium transition-colors cursor-pointer shadow-2xs"
             >
-              <Database className="h-3.5 w-3.5 text-blue-500" />
-              <span>{showAllStages ? "Compact Pipeline" : "7-Stage Pipeline"}</span>
-              {showAllStages ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              <Wrench className="h-3.5 w-3.5 text-amber-500" />
+              <span>Check Spares &amp; Recovery</span>
             </button>
           </div>
         </div>
@@ -280,9 +274,20 @@ export function CriticalEvents({
             <span className="font-bold tracking-wider uppercase text-slate-700 dark:text-[#c9d1d9]">
               HERO CAUSAL CHAIN · WHAT CHANGED → WHAT NOW
             </span>
-            <span className="text-[10px] text-slate-400 dark:text-[#7a8194]">
-              Deterministic 7-Stage Traversal
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-400 dark:text-[#7a8194] hidden sm:inline">
+                Deterministic 7-Stage Traversal
+              </span>
+              <button
+                onClick={() => setShowAllStages(!showAllStages)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 dark:border-[#30363d] bg-white dark:bg-[#161b22] hover:bg-slate-50 dark:hover:bg-[#21262d] text-slate-700 dark:text-[#8b949e] px-2.5 py-1 text-[11px] font-mono transition-colors cursor-pointer"
+                title={showAllStages ? "Collapse Causal Pipeline Evidence" : "Expand Full Causal Pipeline Evidence"}
+              >
+                <Database className="h-3 w-3 text-blue-500" />
+                <span>{showAllStages ? "Compact Evidence" : "7-Stage Evidence"}</span>
+                {showAllStages ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
@@ -291,7 +296,7 @@ export function CriticalEvents({
               { key: "CONTEXT", label: "2. CONTEXT", sub: isCritical ? "Blizzard 42 kt / -28.5°C" : "Oasis Calm / 133d Fuel", sev: isCritical ? "WARNING" : "NOMINAL" },
               { key: "DEPENDENCY", label: "3. DEPENDENCY", sub: isCritical ? "Zone 2 Heating Cogeneration" : "N+1 Power Redundancy", sev: isCritical ? "CRITICAL" : "NOMINAL" },
               { key: "RISK", label: "4. RISK", sub: isCritical ? "91/100 · SK-402 Stockout" : "12/100 · 2 Spares", sev: isCritical ? "CRITICAL" : "NOMINAL" },
-              { key: "CONSEQUENCE", label: "5. CONSEQUENCE", sub: isCritical ? "N-0 Vulnerable Margin" : "+420 kW Reserve Headroom", sev: isCritical ? "CRITICAL" : "NOMINAL" },
+              { key: "CONSEQUENCE", label: "5. CONSEQUENCE", sub: isCritical ? "N-0 · No backup generator" : "+420 kW Reserve Headroom", sev: isCritical ? "CRITICAL" : "NOMINAL" },
               { key: "SCENARIO", label: "6. SCENARIO", sub: isCritical ? "72h Outage → 98.8 kW" : "Resupply Independence", sev: isCritical ? "CRITICAL" : "NOMINAL" },
               { key: "ACTION", label: "7. ACTION", sub: isCritical ? "Inspect / Preheat Boiler B-01" : "Cross-Station Readiness", sev: isCritical ? "WARNING" : "NOMINAL" },
             ].map((step, idx) => (

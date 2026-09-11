@@ -59,7 +59,7 @@ export default function App() {
     } else if (route.startsWith("/scenarios")) {
       navigateToView("SCENARIOS");
     } else if (route.startsWith("/resources")) {
-      navigateToView("RESOURCES");
+      navigateToView("RESOURCES", route);
     } else if (route.startsWith("/resilience")) {
       navigateToView("RESILIENCE");
     } else if (route.startsWith("/stations")) {
@@ -78,10 +78,11 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const navigateToView = (view: ViewMode) => {
+  const navigateToView = (view: ViewMode, customPath?: string) => {
     setActiveView(view);
     const path =
-      view === "RESOURCES"
+      customPath ||
+      (view === "RESOURCES"
         ? "/resources"
         : view === "SCENARIOS"
         ? "/scenarios"
@@ -93,7 +94,7 @@ export default function App() {
         ? "/privacy"
         : view === "TERMS"
         ? "/terms"
-        : "/";
+        : "/");
     window.history.pushState({}, "", path);
   };
 

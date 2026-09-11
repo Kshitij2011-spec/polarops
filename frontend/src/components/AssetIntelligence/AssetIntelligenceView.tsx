@@ -1,4 +1,4 @@
-import { Loader2, RefreshCw, ShieldAlert } from "lucide-react";
+import { ArrowRight, Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { useAssetDetail } from "../../hooks/useAssetDetail";
 import { useAssetDependencies } from "../../hooks/useAssetDependencies";
 import { useAssetRisk } from "../../hooks/useAssetRisk";
@@ -238,6 +238,49 @@ export function AssetIntelligenceView({ assetId, onBack, onOpenExplanation, onNa
         ) : (
           <TelemetryTrends telemetry={telemetry} />
         )}
+      </div>
+
+      {/* ── 7. Operational Decision Chain: Narrative Next Step (Step 2 of 4) ── */}
+      <div className="rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/40 dark:bg-[#131826] p-5 shadow-2xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="rounded-md bg-blue-100 dark:bg-blue-950/80 px-2.5 py-0.5 text-xs font-mono font-bold text-blue-700 dark:text-[#5b9cf5] border border-blue-300 dark:border-blue-800 tracking-wider">
+              STEP 2 OF 4
+            </span>
+            <span className="text-xs font-mono text-slate-500 dark:text-[#7a8194]">
+              OPERATIONAL DECISION CHAIN
+            </span>
+          </div>
+          <span className="text-[11px] font-mono text-slate-400 dark:text-[#646e85]">
+            Next: Spare &amp; Recovery Feasibility
+          </span>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+          <div className="space-y-1">
+            <h3 className="text-sm sm:text-base font-bold font-mono text-slate-900 dark:text-[#e4e8f0]">
+              We know why G-02 is at risk. Now check whether we can repair it.
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-[#9ca3b4] font-sans">
+              Evaluate warehouse critical spares stock, Maitri inter-station transfer readiness, and resupply vessel lead times.
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              if (onNavigate) {
+                onNavigate("/resources?tab=spares");
+              } else {
+                window.location.href = "/resources?tab=spares";
+              }
+            }}
+            data-testid="asset-next-step-spares-btn"
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 text-xs font-mono font-bold transition-all cursor-pointer shadow-sm hover:shadow-md shrink-0 self-start sm:self-center"
+          >
+            <span>Open Spare &amp; Recovery</span>
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

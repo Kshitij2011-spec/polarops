@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowLeft,
   Flame,
@@ -24,8 +24,45 @@ export interface ResourcesViewProps {
   onInspectAsset?: (assetId: string) => void;
 }
 
+function parseTabParam(): "energy-fuel" | "inventory" | "resupply" | "recovery" {
+  if (typeof window === "undefined") return "energy-fuel";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "spares" || tab === "inventory") return "inventory";
+    if (tab === "resupply") return "resupply";
+    if (tab === "recovery") return "recovery";
+    if (tab === "energy" || tab === "energy-fuel") return "energy-fuel";
+  } catch {
+    // Graceful fallback for invalid/malformed query string
+  }
+  return "energy-fuel";
+}
+
 export function ResourcesView({ stationId, onBack, onInspectAsset }: ResourcesViewProps) {
-  const [activeTab, setActiveTab] = useState<"energy-fuel" | "inventory" | "resupply" | "recovery">("energy-fuel");
+  const [activeTab, setActiveTab] = useState<"energy-fuel" | "inventory" | "resupply" | "recovery">(parseTabParam);
+
+  useEffect(() => {
+    const handleUrlSync = () => {
+      setActiveTab(parseTabParam());
+    };
+    window.addEventListener("popstate", handleUrlSync);
+    return () => window.removeEventListener("popstate", handleUrlSync);
+  }, []);
+
+  const handleSelectTab = (tab: "energy-fuel" | "inventory" | "resupply" | "recovery") => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      if (tab === "inventory") {
+        url.searchParams.set("tab", "spares");
+      } else {
+        url.searchParams.delete("tab");
+      }
+      const newQuery = url.searchParams.toString();
+      window.history.replaceState({}, "", url.pathname + (newQuery ? `?${newQuery}` : ""));
+    }
+  };
 
   const { data: fuel, isLoading: fuelLoading } = useFuelStatus(stationId);
   const { data: inventory, isLoading: invLoading } = useInventory(stationId);
@@ -51,7 +88,7 @@ export function ResourcesView({ stationId, onBack, onInspectAsset }: ResourcesVi
         <div className="flex items-center gap-2 text-xs font-mono">
           <span className="text-slate-500 dark:text-[#7a8194]">ROUTE:</span>
           <span className="rounded-md bg-white dark:bg-[#181b24] px-2 py-0.5 text-blue-600 dark:text-[#5b9cf5] border border-slate-200 dark:border-[#2a2f3e] shadow-2xs">
-            /resources
+            {activeTab === "inventory" ? "/resources?tab=spares" : "/resources"}
           </span>
           <TruthBadge type="DERIVED" />
         </div>
@@ -77,7 +114,7 @@ export function ResourcesView({ stationId, onBack, onInspectAsset }: ResourcesVi
 
           <div className="flex flex-wrap gap-1.5 p-1 rounded-md bg-slate-100 dark:bg-[#12141c] border border-slate-200 dark:border-[#2a2f3e]">
             <button
-              onClick={() => setActiveTab("energy-fuel")}
+              onClick={() => handleSelectTab("energy-fuel")}
               className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono font-medium border transition-colors cursor-pointer ${
                 activeTab === "energy-fuel"
                   ? "bg-white dark:bg-[#1e2230] border-slate-200 dark:border-[#3d4556] text-blue-700 dark:text-[#5b9cf5] shadow-2xs font-bold"
@@ -88,7 +125,7 @@ export function ResourcesView({ stationId, onBack, onInspectAsset }: ResourcesVi
               <span>Energy &amp; Fuel</span>
             </button>
             <button
-              onClick={() => setActiveTab("inventory")}
+              onClick={() => handleSelectTab("inventory")}
               className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono font-medium border transition-colors cursor-pointer ${
                 activeTab === "inventory"
                   ? "bg-white dark:bg-[#1e2230] border-slate-200 dark:border-[#3d4556] text-blue-700 dark:text-[#5b9cf5] shadow-2xs font-bold"
@@ -99,7 +136,7 @@ export function ResourcesView({ stationId, onBack, onInspectAsset }: ResourcesVi
               <span>Inventory &amp; Spares</span>
             </button>
             <button
-              onClick={() => setActiveTab("resupply")}
+              onClick={() => handleSelectTab("resupply")}
               className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono font-medium border transition-colors cursor-pointer ${
                 activeTab === "resupply"
                   ? "bg-white dark:bg-[#1e2230] border-slate-200 dark:border-[#3d4556] text-blue-700 dark:text-[#5b9cf5] shadow-2xs font-bold"
@@ -110,7 +147,7 @@ export function ResourcesView({ stationId, onBack, onInspectAsset }: ResourcesVi
               <span>Resupply Logistics</span>
             </button>
             <button
-              onClick={() => setActiveTab("recovery")}
+              onClick={() => handleSelectTab("recovery")}
               className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono font-medium border transition-colors cursor-pointer ${
                 activeTab === "recovery"
                   ? "bg-white dark:bg-[#1e2230] border-slate-200 dark:border-[#3d4556] text-blue-700 dark:text-[#5b9cf5] shadow-2xs font-bold"
