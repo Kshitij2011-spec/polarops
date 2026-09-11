@@ -109,61 +109,43 @@ export function CriticalEvents({
     >
       {/* ── LEVEL 1: IMMEDIATE SITUATION AWARENESS & PRIMARY ACTIONS ── */}
       <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-[#2a2f3e]">
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-          <div className="space-y-2 flex-1">
-            {/* Posture & Station Identity Tags */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold tracking-wider uppercase border shadow-2xs ${
-                  isCritical
-                    ? "bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-900"
-                    : "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-900"
-                }`}
-              >
-                {isCritical ? (
-                  <AlertTriangle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 animate-pulse" />
-                ) : (
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                )}
-                {isCritical
-                  ? "CRITICAL OPERATIONAL EVENT · NO POWER REDUNDANCY"
-                  : "NOMINAL OPERATIONAL POSTURE · FULL REDUNDANCY"}
-              </span>
+        {/* ROW 1: Posture & Station Identity Tags (Left) + Actions Bar (Right) */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-slate-200/80 dark:border-[#2a2f3e]/80">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold tracking-wider uppercase border shadow-2xs ${
+                isCritical
+                  ? "bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-900"
+                  : "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-900"
+              }`}
+            >
+              {isCritical ? (
+                <AlertTriangle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400 animate-pulse" />
+              ) : (
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              )}
+              {isCritical
+                ? "CRITICAL OPERATIONAL EVENT · NO POWER REDUNDANCY"
+                : "NOMINAL OPERATIONAL POSTURE · FULL REDUNDANCY"}
+            </span>
 
-              <span className="text-xs font-mono font-bold text-slate-700 dark:text-[#c9d1d9] px-2 py-0.5 rounded bg-slate-100 dark:bg-[#21262d] border border-slate-200 dark:border-[#30363d]">
-                {insight?.station_name ?? (isMaitri ? "Maitri Station" : "Bharati Station")}
-              </span>
+            <span className="text-xs font-mono font-bold text-slate-700 dark:text-[#c9d1d9] px-2 py-0.5 rounded bg-slate-100 dark:bg-[#21262d] border border-slate-200 dark:border-[#30363d]">
+              {insight?.station_name ?? (isMaitri ? "Maitri Station" : "Bharati Station")}
+            </span>
 
-              <span
-                className={`text-[11px] font-mono font-bold rounded px-2 py-0.5 border ${
-                  isCritical
-                    ? "bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-800"
-                    : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
-                }`}
-              >
-                {insight?.status_label ?? (isCritical ? "SINGLE FAULT VULNERABLE" : "FLEET NOMINAL")}
-              </span>
-            </div>
-
-            {/* Clear Plain-Language Operational Headline */}
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-[#f0f6fc] font-mono tracking-tight leading-snug pt-0.5">
-              {insight?.headline ??
-                (isCritical
-                  ? "Generator G-02 Bearing Vibration Anomaly Coupled with Blizzard Threatens Life Support Heating"
-                  : "Maitri Power Generation Fleet Operating at 100% Capacity with Zero Thermal Bottlenecks")}
-            </h2>
-
-            {/* Concise Human Summary */}
-            <p className="text-xs sm:text-sm text-slate-700 dark:text-[#9ca3b4] font-sans leading-relaxed max-w-4xl">
-              {insight?.summary ??
-                (isCritical
-                  ? "Primary generator G-02 exhibits mechanical degradation while approaching blizzard winds elevate habitat thermal load to 252.2 kW. Multi-hop BFS dependencies identify Life Support Zone 2 heating exposure."
-                  : "Maitri exhibits full dual-generator redundancy with 133.1 days fuel runway and 2x SK-402 seal kits in inventory.")}
-            </p>
+            <span
+              className={`text-[11px] font-mono font-bold rounded px-2 py-0.5 border ${
+                isCritical
+                  ? "bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border-amber-300 dark:border-amber-800"
+                  : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800"
+              }`}
+            >
+              {insight?.status_label ?? (isCritical ? "SINGLE FAULT VULNERABLE" : "FLEET NOMINAL")}
+            </span>
           </div>
 
           {/* Quick Actions Bar — Primary CTA + Subordinate Secondary Actions */}
-          <div className="flex flex-wrap items-center gap-2 lg:self-start pt-1">
+          <div className="flex flex-wrap items-center gap-2">
             {/* PRIMARY ACTION: Inspect Asset Intelligence (G-02) */}
             {isCritical && (
               <button
@@ -214,57 +196,77 @@ export function CriticalEvents({
           </div>
         </div>
 
-        {/* ── LEVEL 2: HUMAN BRIEFING (3 CORE OPERATIONAL QUESTIONS) ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-200 dark:border-[#2a2f3e]/80">
-          {/* Question 1: What is happening? */}
-          <div className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white/80 dark:bg-[#161922] p-3.5 space-y-1.5 shadow-2xs">
-            <div className="flex items-center gap-2 text-slate-800 dark:text-[#e4e8f0]">
-              <div className="p-1 rounded bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400">
-                <AlertTriangle className="h-3.5 w-3.5" />
-              </div>
-              <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-slate-500 dark:text-[#8b949e]">
-                1. What is happening?
-              </span>
-            </div>
-            <p className="text-xs text-slate-700 dark:text-[#c9d1d9] font-sans leading-relaxed">
-              {isCritical
-                ? "Primary generator G-02 bearing vibration has reached 4.8 mm/s, operating above warning threshold (4.5 mm/s)."
-                : "Primary generator fleet is operating at 100% capacity with all bearing vibrations below 1.8 mm/s."}
+        {/* ROW 2: Main Story (Left ~58%) & Supporting Operational Context (Right ~42%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-4 items-start">
+          {/* Main Operational Story */}
+          <div className="lg:col-span-7 space-y-3">
+            <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 dark:text-[#f0f6fc] font-mono tracking-tight leading-snug">
+              {insight?.headline ??
+                (isCritical
+                  ? "Generator G-02 Bearing Vibration Anomaly Coupled with Blizzard Threatens Life Support Heating"
+                  : "Maitri Power Generation Fleet Operating at 100% Capacity with Zero Thermal Bottlenecks")}
+            </h2>
+
+            <p className="text-xs sm:text-sm text-slate-700 dark:text-[#9ca3b4] font-sans leading-relaxed">
+              {insight?.summary ??
+                (isCritical
+                  ? "Primary generator G-02 exhibits mechanical degradation while approaching blizzard winds elevate habitat thermal load to 252.2 kW. Multi-hop BFS dependencies identify Life Support Zone 2 heating exposure."
+                  : "Maitri exhibits full dual-generator redundancy with 133.1 days fuel runway and 2x SK-402 seal kits in inventory.")}
             </p>
           </div>
 
-          {/* Question 2: Why does it matter? */}
-          <div className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white/80 dark:bg-[#161922] p-3.5 space-y-1.5 shadow-2xs">
-            <div className="flex items-center gap-2 text-slate-800 dark:text-[#e4e8f0]">
-              <div className="p-1 rounded bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400">
-                <Wind className="h-3.5 w-3.5" />
+          {/* Supporting Operational Context (Existing 3 Briefing Questions) */}
+          <div className="lg:col-span-5 space-y-2.5">
+            {/* Question 1: What is happening? */}
+            <div className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white/80 dark:bg-[#161922] p-3 space-y-1 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-slate-800 dark:text-[#e4e8f0]">
+                <div className="p-1 rounded bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400">
+                  <AlertTriangle className="h-3 w-3" />
+                </div>
+                <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-500 dark:text-[#8b949e]">
+                  1. What is happening?
+                </span>
               </div>
-              <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-slate-500 dark:text-[#8b949e]">
-                2. Why does it matter?
-              </span>
+              <p className="text-xs text-slate-700 dark:text-[#c9d1d9] font-sans leading-relaxed">
+                {isCritical
+                  ? "Primary generator G-02 bearing vibration has reached 4.8 mm/s, operating above warning threshold (4.5 mm/s)."
+                  : "Primary generator fleet is operating at 100% capacity with all bearing vibrations below 1.8 mm/s."}
+              </p>
             </div>
-            <p className="text-xs text-slate-700 dark:text-[#c9d1d9] font-sans leading-relaxed">
-              {isCritical
-                ? "Blizzard winds (42 kt) increase heating demand to 252.2 kW. Multi-hop dependencies show G-02 failure starves Life Support Zone 2."
-                : "Full dual-generator redundancy (N+1) with 133.1 days fuel runway in calm Oasis microclimate."}
-            </p>
-          </div>
 
-          {/* Question 3: What is blocking recovery? */}
-          <div className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white/80 dark:bg-[#161922] p-3.5 space-y-1.5 shadow-2xs">
-            <div className="flex items-center gap-2 text-slate-800 dark:text-[#e4e8f0]">
-              <div className="p-1 rounded bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
-                <Wrench className="h-3.5 w-3.5" />
+            {/* Question 2: Why does it matter? */}
+            <div className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white/80 dark:bg-[#161922] p-3 space-y-1 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-slate-800 dark:text-[#e4e8f0]">
+                <div className="p-1 rounded bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400">
+                  <Wind className="h-3 w-3" />
+                </div>
+                <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-500 dark:text-[#8b949e]">
+                  2. Why does it matter?
+                </span>
               </div>
-              <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-slate-500 dark:text-[#8b949e]">
-                3. What blocks recovery?
-              </span>
+              <p className="text-xs text-slate-700 dark:text-[#c9d1d9] font-sans leading-relaxed">
+                {isCritical
+                  ? "Blizzard winds (42 kt) increase heating demand to 252.2 kW. Multi-hop dependencies show G-02 failure starves Life Support Zone 2."
+                  : "Full dual-generator redundancy (N+1) with 133.1 days fuel runway in calm Oasis microclimate."}
+              </p>
             </div>
-            <p className="text-xs text-slate-700 dark:text-[#c9d1d9] font-sans leading-relaxed">
-              {isCritical
-                ? "Required seal kit SK-402 is out of stock at Bharati. Station risk is 91/100 until replacement arrives or backup preheats."
-                : "2x SK-402 seal kits stored in local inventory. Station holds surplus operational headroom."}
-            </p>
+
+            {/* Question 3: What is blocking recovery? */}
+            <div className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white/80 dark:bg-[#161922] p-3 space-y-1 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-slate-800 dark:text-[#e4e8f0]">
+                <div className="p-1 rounded bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
+                  <Wrench className="h-3 w-3" />
+                </div>
+                <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-slate-500 dark:text-[#8b949e]">
+                  3. What blocks recovery?
+                </span>
+              </div>
+              <p className="text-xs text-slate-700 dark:text-[#c9d1d9] font-sans leading-relaxed">
+                {isCritical
+                  ? "Required seal kit SK-402 is out of stock at Bharati. Station risk is 91/100 until replacement arrives or backup preheats."
+                  : "2x SK-402 seal kits stored in local inventory. Station holds surplus operational headroom."}
+              </p>
+            </div>
           </div>
         </div>
 
