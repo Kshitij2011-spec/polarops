@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
 
+    # --- Mailgun & Visitor Alerts ---
+    MAILGUN_API_KEY: str = ""
+    MAILGUN_DOMAIN: str = "sandboxd3ff4971473e4310b5ddc987a096bdd5.mailgun.org"
+    MAILGUN_RECIPIENT_EMAIL: str = ""
+    MAILGUN_FROM: str = "postmaster@sandboxd3ff4971473e4310b5ddc987a096bdd5.mailgun.org"
+    MAILGUN_API_URL: str = "https://api.mailgun.net/v3"
+
+    ALERT_COOLDOWN_MINUTES: int = 15
+    SESSION_TIMEOUT_MINUTES: int = 10
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @classmethod

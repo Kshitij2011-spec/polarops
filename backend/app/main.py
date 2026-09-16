@@ -16,6 +16,7 @@ from app.api.resources import router as resources_router
 from app.api.scenarios import router as scenarios_router
 from app.api.science import router as science_router
 from app.api.station import router as station_router
+from app.api.visitor import router as visitor_router
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
 from app.core.seed import seed_database
@@ -94,3 +95,4 @@ app.include_router(memory_router)
 app.include_router(events_router)
 app.include_router(explainability_router)
 app.include_router(intelligence_router)
+app.include_router(visitor_router)

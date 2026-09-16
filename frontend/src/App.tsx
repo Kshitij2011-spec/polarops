@@ -17,6 +17,7 @@ import { ActivityStream } from "./components/ActivityStream";
 import { ExplanationDrawer } from "./components/ExplanationDrawer";
 import { CrossStationContextCard } from "./components/CrossStationContextCard";
 import { StationsView } from "./components/Stations/StationsView";
+import { useVisitorSession } from "./hooks/useVisitorSession";
 
 function getViewFromPath(): ViewMode {
   if (typeof window === "undefined") return "COMMAND_CENTER";
@@ -43,6 +44,9 @@ export default function App() {
   const [activeView, setActiveView] = useState<ViewMode>(getViewFromPath);
   const [inspectedAssetId, setInspectedAssetId] = useState<string>(getAssetIdFromPath);
   const [isExplanationOpen, setIsExplanationOpen] = useState<boolean>(false);
+
+  // Mount anonymous visitor session notification hook
+  useVisitorSession(activeView);
   const [explanationDomain, setExplanationDomain] = useState<string>("ASSET");
   const [explanationEntityId, setExplanationEntityId] = useState<string>("G-02");
 
