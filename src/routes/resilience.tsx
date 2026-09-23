@@ -1,0 +1,2 @@
+import { createFileRoute } from "@tanstack/react-router"; import { ResiliencePage } from "@/components/polarops";
+export const Route=createFileRoute("/resilience")({head:()=>({meta:[{title:"Resilience — PolarOps"},{name:"description",content:"Bharati station operational resilience domains."},{property:"og:title",content:"PolarOps Resilience"},{property:"og:description",content:"Bharati station operational resilience domains."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:ResiliencePage});
