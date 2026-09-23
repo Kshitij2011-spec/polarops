@@ -1,0 +1,2 @@
+import { createFileRoute } from "@tanstack/react-router"; import { ResourcesPage } from "@/components/polarops";
+export const Route=createFileRoute("/resources")({head:()=>({meta:[{title:"Resources — PolarOps"},{name:"description",content:"Station resources and logistics status."},{property:"og:title",content:"PolarOps Resources"},{property:"og:description",content:"Station resources and logistics status."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:ResourcesPage});
