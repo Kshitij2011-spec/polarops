@@ -34,7 +34,7 @@ export const demoDependencies = [
   ["G-02", "POWER BUS A", "HABITAT"], ["G-02", "POWER BUS A", "SCIENCE LAB"], ["G-02", "POWER SYSTEM", "FUEL SYSTEM"],
 ];
 
-export const demoActivities = [
+export const demoActivities: Array<[string, string, string]> = [
   ["14:22", "Generator G-02 anomaly detected", "WARNING"], ["13:58", "SATCOM communication window opened", "NOMINAL"],
   ["13:30", "Fuel transfer completed", "NOMINAL"], ["12:48", "Science telemetry synchronized", "NOMINAL"],
 ];
@@ -55,7 +55,7 @@ export const demoResources = [
   ["MEDICAL", 91, "NOMINAL", "Stable", "180 days"], ["LOGISTICS", 61, "WATCH", "2 movements", "Next: 18 days"],
 ];
 
-export const demoScenarios = [
+export const demoScenarios: Array<[string, string, string, string]> = [
   ["GENERATOR FAILURE", "Loss of one primary diesel generator", "Power, Habitat, Science", "CRITICAL"],
   ["FUEL SHORTAGE", "Winter fuel falls below operational reserve", "Power, Heat, Logistics", "HIGH"],
   ["COMMUNICATION LOSS", "Primary SATCOM link unavailable", "Comms, Data sync", "MEDIUM"],
