@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as CommandCenterRouteImport } from './routes/command-center'
 import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
+import { Route as OfflineRouteImport } from './routes/offline'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ResilienceRouteImport } from './routes/resilience'
 import { Route as ResourcesRouteImport } from './routes/resources'
@@ -38,6 +39,11 @@ const CommandCenterRoute = CommandCenterRouteImport.update({
 const DigitalTwinRoute = DigitalTwinRouteImport.update({
   id: '/digital-twin',
   path: '/digital-twin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfflineRoute = OfflineRouteImport.update({
+  id: '/offline',
+  path: '/offline',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof AlertsRoute
   '/command-center': typeof CommandCenterRoute
   '/digital-twin': typeof DigitalTwinRoute
+  '/offline': typeof OfflineRoute
   '/reports': typeof ReportsRoute
   '/resilience': typeof ResilienceRoute
   '/resources': typeof ResourcesRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/alerts': typeof AlertsRoute
   '/command-center': typeof CommandCenterRoute
   '/digital-twin': typeof DigitalTwinRoute
+  '/offline': typeof OfflineRoute
   '/reports': typeof ReportsRoute
   '/resilience': typeof ResilienceRoute
   '/resources': typeof ResourcesRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/alerts': typeof AlertsRoute
   '/command-center': typeof CommandCenterRoute
   '/digital-twin': typeof DigitalTwinRoute
+  '/offline': typeof OfflineRoute
   '/reports': typeof ReportsRoute
   '/resilience': typeof ResilienceRoute
   '/resources': typeof ResourcesRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/command-center'
     | '/digital-twin'
+    | '/offline'
     | '/reports'
     | '/resilience'
     | '/resources'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/command-center'
     | '/digital-twin'
+    | '/offline'
     | '/reports'
     | '/resilience'
     | '/resources'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/command-center'
     | '/digital-twin'
+    | '/offline'
     | '/reports'
     | '/resilience'
     | '/resources'
@@ -152,6 +164,7 @@ export interface RootRouteChildren {
   AlertsRoute: typeof AlertsRoute
   CommandCenterRoute: typeof CommandCenterRoute
   DigitalTwinRoute: typeof DigitalTwinRoute
+  OfflineRoute: typeof OfflineRoute
   ReportsRoute: typeof ReportsRoute
   ResilienceRoute: typeof ResilienceRoute
   ResourcesRoute: typeof ResourcesRoute
@@ -188,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/digital-twin'
       fullPath: '/digital-twin'
       preLoaderRoute: typeof DigitalTwinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/offline': {
+      id: '/offline'
+      path: '/offline'
+      fullPath: '/offline'
+      preLoaderRoute: typeof OfflineRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -240,6 +260,7 @@ const rootRouteChildren: RootRouteChildren = {
   AlertsRoute: AlertsRoute,
   CommandCenterRoute: CommandCenterRoute,
   DigitalTwinRoute: DigitalTwinRoute,
+  OfflineRoute: OfflineRoute,
   ReportsRoute: ReportsRoute,
   ResilienceRoute: ResilienceRoute,
   ResourcesRoute: ResourcesRoute,
