@@ -18,11 +18,11 @@ This document tracks all 41 backend endpoints across 13 domains, their client bi
 | 3 | Station | GET | `/stations/compare` | `fetchStationComparison()` | `/stations` Portfolio Comparison | Phase 10 | 🟡 STAGED CLIENT |
 | 4 | Station | POST | `/stations/compare/evaluate` | `evaluateStationComparison()` | `/stations` Headroom Evaluation | Phase 10 | 🟡 STAGED CLIENT |
 | 5 | Station | POST | `/stations/compare/scenario` | `simulateCrossStationScenario()` | `/stations` Cross-Station Sim | Phase 10 | 🟡 STAGED CLIENT |
-| 6 | Assets | GET | `/stations/{id}/assets` | `fetchAssets()` | `/digital-twin` Asset Explorer | Phase 3 | 🟡 STAGED CLIENT |
-| 7 | Assets | GET | `/assets/{id}` | `fetchAssetDetail()` | `/digital-twin` Selected Asset Card | Phase 3 | 🟡 STAGED CLIENT |
-| 8 | Assets | GET | `/assets/{id}/dependencies` | `fetchAssetDependencies()` | `/digital-twin` Dependency Topology | Phase 4 | 🟡 STAGED CLIENT |
+| 6 | Assets | GET | `/assets?station_id={id}` | `fetchAssets()` | `/digital-twin` Asset Explorer | Phase 3 | ✅ ACTIVE REAL |
+| 7 | Assets | GET | `/assets/{id}` | `fetchAssetDetail()` | `/digital-twin` Selected Asset Card | Phase 3 | ✅ ACTIVE REAL |
+| 8 | Assets | GET | `/assets/{id}/dependencies` | `fetchAssetDependencies()` | `/digital-twin` Dependency Topology | Phase 3 | ✅ ACTIVE REAL |
 | 9 | Assets | GET | `/assets/{id}/telemetry` | `fetchAssetTelemetry()` | `/command-center` & `/digital-twin` | Phase 2 | ✅ ACTIVE REAL |
-| 10 | Assets | GET | `/assets/{id}/risk` | `fetchAssetRisk()` | `/digital-twin` 6-Factor Risk Card | Phase 3 | 🟡 STAGED CLIENT |
+| 10 | Assets | GET | `/assets/{id}/risk` | `fetchAssetRisk()` | `/digital-twin` 6-Factor Risk Card | Phase 3 | ✅ ACTIVE REAL |
 | 11 | Assets | GET | `/assets/{id}/recovery-exposure` | `fetchRecoveryExposure()` | `/resources` Spares & Recovery | Phase 5 | 🟡 STAGED CLIENT |
 | 12 | Resources | GET | `/resources/fuel` | `fetchFuelStatus()` | `/resources` Fuel Autonomy Gauges | Phase 5 | 🟡 STAGED CLIENT |
 | 13 | Resources | GET | `/resources/inventory` | `fetchInventory()` | `/resources` Warehouse & Spares | Phase 5 | 🟡 STAGED CLIENT |

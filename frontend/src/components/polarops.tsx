@@ -4,12 +4,13 @@ import { Activity, AlertTriangle, ArrowDown, ArrowRight, BarChart3, Bell, Boxes,
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { demoActivities, demoAlerts, demoCapabilities, demoDependencies, demoOfflineState, demoReports, demoResources, demoScenarios, demoStationData, demoSyncQueue, topologyNodes } from "@/lib/demo-data";
+import { demoActivities, demoAlerts, demoCapabilities, demoDependencies, demoOfflineState, demoReports, demoResources, demoScenarios, demoStationData, demoSyncQueue } from "@/lib/demo-data";
 import { useStationOverview } from "../hooks/useStationOverview";
 import { useOperationalIntelligence } from "../hooks/useOperationalIntelligence";
 import { useOperationalEvents } from "../hooks/useOperationalEvents";
 import { useAssetTelemetry } from "../hooks/useAssetTelemetry";
 import { useExplanation } from "../hooks/useExplanation";
+import { OperationalTopology } from "./OperationalTopology";
 
 const navGroups = [
   ["COMMAND", [["Overview", "/command-center", CircleGauge], ["Digital Twin", "/digital-twin", Boxes], ["Stations", "/stations", Radio]]],
@@ -115,15 +116,10 @@ export function PageHeader({ eyebrow, title, subtitle, status }: { eyebrow?: str
 export function Panel({ title, subtitle, children, className="", action }: { title: string; subtitle?: string; children: ReactNode; className?: string; action?: ReactNode }) { return <section className={`panel ${className}`}><div className="panel-head"><div><h2 className="panel-title">{title}</h2>{subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}</div>{action}</div><div className="p-5">{children}</div></section>; }
 
 export function Topology({ large=false, selected, onSelect }: { large?: boolean; selected?: string; onSelect?: (id:string)=>void }) {
- const active = selected || "power";
- return <div className={`topology ${large ? "h-[590px]" : "h-[430px]"}`}>
-   <svg className="absolute inset-0 w-full h-full" aria-hidden="true"><defs><pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M 28 0 L 0 0 0 28" className="grid-line" fill="none"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)"/>{[[20,49,45,49],[45,49,73,30],[45,49,77,71],[20,49,18,80],[45,49,47,82],[45,49,43,17]].map((l,i)=><line key={i} x1={`${l[0]}%`} y1={`${l[1]}%`} x2={`${l[2]}%`} y2={`${l[3]}%`} className={active==="power" ? "dep-line active" : "dep-line"}/>)}</svg>
-   {topologyNodes.map(n=><button key={n.id} onClick={()=>onSelect?.(n.id)} style={{left:`${n.x}%`,top:`${n.y}%`}} className={`twin-node ${active===n.id?"selected":""}`}><span className={`status-dot ${n.status==="CRITICAL"?"bg-critical":n.status==="WARNING"?"bg-warning":"bg-success"}`}/><span><strong>{n.name}</strong><small>{n.detail}</small></span></button>)}
-   <div className="absolute bottom-4 left-4 flex flex-wrap gap-3 text-[10px] font-bold tracking-wider"><span><i className="status-dot bg-success"/> NOMINAL</span><span><i className="status-dot bg-warning"/> WARNING</span><span><i className="status-dot bg-critical"/> CRITICAL</span><span className="text-muted-foreground">━ DEPENDENCY</span></div>
- </div>;
+  return <OperationalTopology large={large} selectedNodeId={selected} onSelectNode={(id) => onSelect?.(id)} />;
 }
 
-function ExplanationDrawer({
+export function ExplanationDrawer({
   open,
   setOpen,
   domain = "ASSET",
@@ -699,7 +695,7 @@ export function OverviewPage() {
   );
 }
 
-export function DigitalTwinPage(){ const search=useSearch({from:"/digital-twin"}); const [selected,setSelected]=useState(search.asset||"power"); const [zoom,setZoom]=useState(1); const node=topologyNodes.find(n=>n.id===selected)??topologyNodes[0]; if (!node) return null; return <><PageHeader eyebrow="AODT · DEMO OPERATIONAL MODEL" title="Station Digital Twin" subtitle="Interactive infrastructure topology, dependency paths and operational impact." status="SYNCHRONIZED"/><div className="grid xl:grid-cols-[1fr_330px] gap-6"><Panel title="BHARATI · OPERATIONAL TOPOLOGY" subtitle="Select an asset to trace its active dependency path" action={<div className="flex gap-1"><Button variant="outline" size="icon" onClick={()=>setZoom(Math.min(1.3,zoom+.1))} aria-label="Zoom in"><Plus/></Button><Button variant="outline" size="icon" onClick={()=>setZoom(Math.max(.8,zoom-.1))} aria-label="Zoom out"><Minus/></Button><Button variant="outline" size="icon" onClick={()=>setZoom(1)} aria-label="Reset view"><RotateCcw/></Button></div>}><div style={{transform:`scale(${zoom})`}} className="transition-transform origin-center"><Topology large selected={selected} onSelect={setSelected}/></div></Panel><Panel title="SELECTED ASSET" action={<StatusBadge value={node.status}/>}><div className="text-xl font-bold mb-5">{node.name}</div><div className="data-list">{[["Asset",node.name],["System",selected==="power"?"Power Generation":"Station Infrastructure"],["Status",node.status],["Dependencies",selected==="power"?"Power Bus A · Habitat · Lab":"Power · Data"],["Impact",selected==="power"?"Reduced generation redundancy":"Local degradation"],["Last update","14:32:04 UTC · DEMO"]].map(([a,b])=><div key={a}><span>{a}</span><strong>{b}</strong></div>)}</div><div className="notice mt-5">Selected dependency path is highlighted in the operational model.</div></Panel></div></> }
+export { DigitalTwinPage } from "./DigitalTwinPage";
 
 export function StationsPage(){ return <><PageHeader eyebrow="ANTARCTIC OPERATIONS" title="Station Portfolio" subtitle="Operational readiness across Indian Antarctic research stations."/><div className="grid md:grid-cols-2 gap-5">{demoStationData.stations.map((s,i)=><article className="station-card" key={s.name}><div className="station-index">0{i+1}</div><div><span className="eyebrow">INDIAN ANTARCTIC STATION</span><h2>{s.name}</h2><StatusBadge value={s.state}/></div><div className="station-stats">{[["CONNECTIVITY",s.connectivity],["PERSONNEL",s.personnel],["POWER STATE",s.power],["ALERT COUNT",s.alerts]].map(([a,b])=><div key={a}><span>{a}</span><strong>{b}</strong></div>)}</div><Button variant="outline" asChild><Link to="/command-center">OPEN STATION <ChevronRight/></Link></Button></article>)}</div></> }
 export function ResourcesPage(){ return <><PageHeader eyebrow="SUPPLY & SUSTAINMENT" title="Resource & Logistics" subtitle="Current station resources, consumption and operational reserves."/><div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">{demoResources.map(([n,v,s,c,r])=><div className="resource-card" key={n as string}><div className="flex justify-between"><h2>{n}</h2><StatusBadge value={s as string}/></div><div className="resource-number">{v}%</div><div className="resource-track"><i style={{width:`${v}%`}}/></div><div className="grid grid-cols-2 gap-3 mt-5 text-xs"><div><span>CONSUMPTION</span><strong>{c}</strong></div><div><span>RESERVE</span><strong>{r}</strong></div></div><div className="demo-label mt-5">UPDATED 14:30 UTC · DEMO</div></div>)}</div></> }
