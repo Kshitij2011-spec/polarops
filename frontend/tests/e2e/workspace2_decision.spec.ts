@@ -18,7 +18,7 @@ test.describe("Workspace 2: Incident + Decision Cockpit", () => {
     await expect(copTab).toBeVisible();
 
     // 2. Verify Incident Header and Metadata
-    await expect(page.locator("text=INC-2026-04")).toBeVisible();
+    await expect(page.locator("text=INC-2026-04").first()).toBeVisible();
     await expect(
       page.locator("h2:has-text('Generator G-02 High Vibration Anomaly')")
     ).toBeVisible();
