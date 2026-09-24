@@ -57,3 +57,5 @@ blob-report/
 *.log
 *.tmp
 *.bak
+brag-output/
+skills-lock.json
