@@ -70,3 +70,26 @@ export const demoAlerts = [
 ];
 
 export const demoReports = ["DAILY STATION REPORT", "RESOURCE STATUS REPORT", "INCIDENT REPORT", "RESILIENCE REPORT", "SCENARIO ANALYSIS"];
+
+export const demoOfflineState = {
+  lastSynchronized: "23 SEP 2026 · 14:22 UTC",
+  localEvents: 3,
+  pendingSync: 2,
+  lastAcknowledged: "14:22 UTC",
+  nextSync: "WHEN CONNECTIVITY AVAILABLE",
+};
+
+export const demoSyncQueue = [
+  { id: 1, event: "G-02 inspection reviewed", state: "PENDING SYNC", priority: "CRITICAL" },
+  { id: 2, event: "Resource status reviewed", state: "PENDING SYNC", priority: "ROUTINE" },
+  { id: 3, event: "Scenario T-12 evaluated", state: "PENDING SYNC", priority: "ROUTINE" },
+];
+
+export const demoCapabilities = [
+  ["DIGITAL TWIN", "Unified station topology and subsystem relationships."],
+  ["PREDICTIVE REASONING", "Understand operational consequences before action."],
+  ["RESOURCE INTELLIGENCE", "Monitor critical station resources."],
+  ["SCENARIO SIMULATION", "Evaluate possible operational outcomes."],
+  ["RESILIENCE", "Support operations under constrained connectivity."],
+  ["HUMAN-IN-THE-LOOP", "Keep operators in control of operational decisions."],
+] as const;

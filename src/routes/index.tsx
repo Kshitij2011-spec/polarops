@@ -1,3 +1,3 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { OverviewPage } from "@/components/polarops";
-export const Route = createFileRoute("/")({ head:()=>({meta:[{title:"Command Center — PolarOps"},{name:"description",content:"Bharati station operational command center."},{property:"og:title",content:"PolarOps Command Center"},{property:"og:description",content:"Bharati station operational command center."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}), component: OverviewPage });
+import { LandingPage } from "@/components/polarops";
+export const Route = createFileRoute("/")({ head:()=>({meta:[{title:"PolarOps — Antarctic Operational Digital Twin"},{name:"description",content:"Operational intelligence and resilient decision support for Antarctic missions."},{property:"og:title",content:"PolarOps — Antarctic Operational Digital Twin"},{property:"og:description",content:"Operational intelligence and resilient decision support for Antarctic missions."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}), component: LandingPage });
