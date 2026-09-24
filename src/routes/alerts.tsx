@@ -1,0 +1,2 @@
+import { createFileRoute } from "@tanstack/react-router"; import { AlertsPage } from "@/components/polarops";
+export const Route=createFileRoute("/alerts")({head:()=>({meta:[{title:"Alerts — PolarOps"},{name:"description",content:"Prioritized Antarctic station operational alerts."},{property:"og:title",content:"PolarOps Alerts"},{property:"og:description",content:"Prioritized Antarctic station operational alerts."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:AlertsPage});

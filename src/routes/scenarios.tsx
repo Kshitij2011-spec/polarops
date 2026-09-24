@@ -1,0 +1,2 @@
+import { createFileRoute } from "@tanstack/react-router"; import { ScenariosPage } from "@/components/polarops";
+export const Route=createFileRoute("/scenarios")({head:()=>({meta:[{title:"Scenarios — PolarOps"},{name:"description",content:"Antarctic operational scenario simulation."},{property:"og:title",content:"PolarOps Scenarios"},{property:"og:description",content:"Antarctic operational scenario simulation."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:ScenariosPage});
