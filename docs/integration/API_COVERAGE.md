@@ -23,11 +23,11 @@ This document tracks all 41 backend endpoints across 13 domains, their client bi
 | 8 | Assets | GET | `/assets/{id}/dependencies` | `fetchAssetDependencies()` | `/digital-twin` Dependency Topology | Phase 3 | ✅ ACTIVE REAL |
 | 9 | Assets | GET | `/assets/{id}/telemetry` | `fetchAssetTelemetry()` | `/command-center` & `/digital-twin` | Phase 2 | ✅ ACTIVE REAL |
 | 10 | Assets | GET | `/assets/{id}/risk` | `fetchAssetRisk()` | `/digital-twin` 6-Factor Risk Card | Phase 3 | ✅ ACTIVE REAL |
-| 11 | Assets | GET | `/assets/{id}/recovery-exposure` | `fetchRecoveryExposure()` | `/resources` Spares & Recovery | Phase 5 | 🟡 STAGED CLIENT |
-| 12 | Resources | GET | `/resources/fuel` | `fetchFuelStatus()` | `/resources` Fuel Autonomy Gauges | Phase 5 | 🟡 STAGED CLIENT |
-| 13 | Resources | GET | `/resources/inventory` | `fetchInventory()` | `/resources` Warehouse & Spares | Phase 5 | 🟡 STAGED CLIENT |
-| 14 | Resources | GET | `/resources/resupply` | `fetchResupply()` | `/resources` Supply Windows | Phase 5 | 🟡 STAGED CLIENT |
-| 15 | Resources | POST | `/resources/energy-model` | `fetchEnergyModel()` | `/resources` Thermal & Electrical Load | Phase 5 | 🟡 STAGED CLIENT |
+| 11 | Assets | GET | `/resources/recovery/{asset_id}` | `fetchRecoveryExposure()` | `/resources` Recovery Intelligence | Phase 4 | ✅ ACTIVE REAL |
+| 12 | Resources | GET | `/resources/fuel` | `fetchFuelStatus()` | `/resources` Fuel Autonomy & Runway | Phase 4 | ✅ ACTIVE REAL |
+| 13 | Resources | GET | `/resources/inventory` | `fetchInventory()` | `/resources` Warehouse Critical Spares | Phase 4 | ✅ ACTIVE REAL |
+| 14 | Resources | GET | `/resources/resupply` | `fetchResupply()` | `/resources` Maritime & Mutual Aid Logistics | Phase 4 | ✅ ACTIVE REAL |
+| 15 | Resources | GET | `/resources/energy` | `fetchEnergyModel()` | `/resources` Energy & Thermal Balance | Phase 4 | ✅ ACTIVE REAL |
 | 16 | Scenarios | POST | `/scenarios/simulate` | `simulateScenario()` | `/scenarios` Simulation Engine | Phase 6 | 🟡 STAGED CLIENT |
 | 17 | Explainability | GET | `/explain/asset/{id}` | `fetchExplanation("ASSET", id)` | `ExplanationDrawer` (5-step trace) | Phase 2 | ✅ ACTIVE REAL |
 | 18 | Explainability | GET | `/explain/incident/{id}` | `fetchExplanation("INCIDENT", id)` | `ExplanationDrawer` (5-step trace) | Phase 4 | 🟡 STAGED CLIENT |

@@ -520,6 +520,15 @@ export function DigitalTwinPage() {
                     {risk.recovery_exposure?.resupply_vessel_name || "Maitri Express"} (ETA {risk.recovery_exposure?.resupply_days ?? 38} days)
                   </strong>
                 </div>
+                <div className="pt-2">
+                  <button
+                    onClick={() => navigate({ to: "/resources", search: { asset: selectedAssetId } })}
+                    className="w-full py-1 px-2 bg-secondary text-foreground text-[10px] font-mono font-bold rounded border border-border hover:bg-secondary/80 flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <ExternalLink className="w-3 h-3 text-primary" />
+                    VIEW IN RESOURCES &amp; RECOVERY
+                  </button>
+                </div>
               </div>
             </div>
 
