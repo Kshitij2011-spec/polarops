@@ -10,6 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TwinRouteImport } from './routes/twin'
+import { Route as CockpitRouteImport } from './routes/cockpit'
+import { Route as ContinuityRouteImport } from './routes/continuity'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as CommandCenterRouteImport } from './routes/command-center'
 import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
@@ -24,6 +27,21 @@ import { Route as StationsRouteImport } from './routes/stations'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TwinRoute = TwinRouteImport.update({
+  id: '/twin',
+  path: '/twin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CockpitRoute = CockpitRouteImport.update({
+  id: '/cockpit',
+  path: '/cockpit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContinuityRoute = ContinuityRouteImport.update({
+  id: '/continuity',
+  path: '/continuity',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AlertsRoute = AlertsRouteImport.update({
@@ -79,6 +97,9 @@ const StationsRoute = StationsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/twin': typeof TwinRoute
+  '/cockpit': typeof CockpitRoute
+  '/continuity': typeof ContinuityRoute
   '/alerts': typeof AlertsRoute
   '/command-center': typeof CommandCenterRoute
   '/digital-twin': typeof DigitalTwinRoute
@@ -92,6 +113,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/twin': typeof TwinRoute
+  '/cockpit': typeof CockpitRoute
+  '/continuity': typeof ContinuityRoute
   '/alerts': typeof AlertsRoute
   '/command-center': typeof CommandCenterRoute
   '/digital-twin': typeof DigitalTwinRoute
@@ -106,6 +130,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/twin': typeof TwinRoute
+  '/cockpit': typeof CockpitRoute
+  '/continuity': typeof ContinuityRoute
   '/alerts': typeof AlertsRoute
   '/command-center': typeof CommandCenterRoute
   '/digital-twin': typeof DigitalTwinRoute
@@ -121,6 +148,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/twin'
+    | '/cockpit'
+    | '/continuity'
     | '/alerts'
     | '/command-center'
     | '/digital-twin'
@@ -134,6 +164,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/twin'
+    | '/cockpit'
+    | '/continuity'
     | '/alerts'
     | '/command-center'
     | '/digital-twin'
@@ -147,6 +180,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/twin'
+    | '/cockpit'
+    | '/continuity'
     | '/alerts'
     | '/command-center'
     | '/digital-twin'
@@ -161,6 +197,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  TwinRoute: typeof TwinRoute
+  CockpitRoute: typeof CockpitRoute
+  ContinuityRoute: typeof ContinuityRoute
   AlertsRoute: typeof AlertsRoute
   CommandCenterRoute: typeof CommandCenterRoute
   DigitalTwinRoute: typeof DigitalTwinRoute
@@ -180,6 +219,27 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/twin': {
+      id: '/twin'
+      path: '/twin'
+      fullPath: '/twin'
+      preLoaderRoute: typeof TwinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cockpit': {
+      id: '/cockpit'
+      path: '/cockpit'
+      fullPath: '/cockpit'
+      preLoaderRoute: typeof CockpitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/continuity': {
+      id: '/continuity'
+      path: '/continuity'
+      fullPath: '/continuity'
+      preLoaderRoute: typeof ContinuityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alerts': {
@@ -257,6 +317,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  TwinRoute: TwinRoute,
+  CockpitRoute: CockpitRoute,
+  ContinuityRoute: ContinuityRoute,
   AlertsRoute: AlertsRoute,
   CommandCenterRoute: CommandCenterRoute,
   DigitalTwinRoute: DigitalTwinRoute,

@@ -5,23 +5,32 @@ import {
   createRootRouteWithContext,
   useRouter,
 } from "@tanstack/react-router";
-import { AppShell, OperationsProvider, ThemeProvider } from "../components/polarops";
+import { OperationsProvider, ThemeProvider } from "../components/polarops";
+import { StationProvider } from "@/context/StationContext";
+import { AppShell } from "@/components/shell/AppShell";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
+    <div className="flex min-h-screen items-center justify-center bg-[#070B12] text-slate-100 px-4">
+      <div className="max-w-md text-center space-y-4">
+        <h1 className="text-7xl font-bold font-mono text-sky-400">404</h1>
+        <h2 className="text-xl font-semibold text-slate-200">Workspace View Not Found</h2>
+        <p className="text-sm text-slate-400">
+          The requested operational view does not exist or has been relocated in the three-macro-workspace architecture.
         </p>
-        <div className="mt-6">
+        <div className="pt-4 flex justify-center gap-3 font-mono text-xs">
+          <Link
+            to="/twin"
+            search={{ station: "STATION-BHARATI" }}
+            className="px-4 py-2 rounded bg-sky-950 text-sky-200 border border-sky-700 hover:bg-sky-900 font-bold uppercase transition-colors"
+          >
+            Go to Digital Twin
+          </Link>
           <Link
             to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="px-4 py-2 rounded bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800 uppercase transition-colors"
           >
-            Go home
+            Mission Gateway
           </Link>
         </div>
       </div>
@@ -34,29 +43,29 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+    <div className="flex min-h-screen items-center justify-center bg-[#070B12] text-slate-100 px-4">
+      <div className="max-w-md text-center space-y-4">
+        <h1 className="text-xl font-bold font-mono text-red-400 tracking-wide">
+          Operational System Fault
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+        <p className="text-sm text-slate-400">
+          The application encountered an unexpected boundary error. Operational state is quarantined.
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <div className="pt-4 flex justify-center gap-3 font-mono text-xs">
           <button
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="px-4 py-2 rounded bg-sky-950 text-sky-200 border border-sky-700 hover:bg-sky-900 font-bold uppercase cursor-pointer"
           >
-            Try again
+            Reset Fault
           </button>
           <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            href="/twin?station=STATION-BHARATI"
+            className="px-4 py-2 rounded bg-slate-900 text-slate-300 border border-slate-700 hover:bg-slate-800 uppercase"
           >
-            Go home
+            Return to Operations
           </a>
         </div>
       </div>
@@ -75,13 +84,15 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <OperationsProvider>
-          <AppShell>
-            <Outlet />
-          </AppShell>
-        </OperationsProvider>
-      </ThemeProvider>
+      <StationProvider>
+        <ThemeProvider>
+          <OperationsProvider>
+            <AppShell>
+              <Outlet />
+            </AppShell>
+          </OperationsProvider>
+        </ThemeProvider>
+      </StationProvider>
     </QueryClientProvider>
   );
 }
