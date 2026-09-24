@@ -4,7 +4,12 @@ import { Activity, AlertTriangle, ArrowDown, ArrowRight, BarChart3, Bell, Boxes,
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { demoActivities, demoAlerts, demoCapabilities, demoDependencies, demoG02, demoMetrics, demoOfflineState, demoReports, demoResources, demoScenarios, demoStationData, demoSyncQueue, demoTimeline, topologyNodes } from "@/lib/demo-data";
+import { demoActivities, demoAlerts, demoCapabilities, demoDependencies, demoOfflineState, demoReports, demoResources, demoScenarios, demoStationData, demoSyncQueue, topologyNodes } from "@/lib/demo-data";
+import { useStationOverview } from "../hooks/useStationOverview";
+import { useOperationalIntelligence } from "../hooks/useOperationalIntelligence";
+import { useOperationalEvents } from "../hooks/useOperationalEvents";
+import { useAssetTelemetry } from "../hooks/useAssetTelemetry";
+import { useExplanation } from "../hooks/useExplanation";
 
 const navGroups = [
   ["COMMAND", [["Overview", "/command-center", CircleGauge], ["Digital Twin", "/digital-twin", Boxes], ["Stations", "/stations", Radio]]],
@@ -118,16 +123,580 @@ export function Topology({ large=false, selected, onSelect }: { large?: boolean;
  </div>;
 }
 
-function ExplanationDrawer({ open, setOpen }: { open:boolean; setOpen:(v:boolean)=>void }) { const sections = [["WHAT HAPPENED?","OBSERVED","Bearing vibration on G-02 exceeded the configured warning threshold by 0.6 percentage points."],["WHY DOES IT MATTER?","DERIVED","G-02 currently contributes 42% of active generation. Degradation reduces station power redundancy."],["WHAT DEPENDS ON IT?","DERIVED","Power Bus A supplies the habitat and science laboratory. Fuel operations also depend on the power system."],["WHAT COULD HAPPEN NEXT?","ILLUSTRATIVE","Continued load escalation may increase vibration and require transfer to backup generation."],["WHAT SHOULD THE OPERATOR REVIEW?","ILLUSTRATIVE","Inspect bearing condition, confirm G-01 availability, and verify reserve capacity before load changes."]]; return <Sheet open={open} onOpenChange={setOpen}><SheetContent className="sm:max-w-xl overflow-y-auto"><SheetHeader className="border-b pb-5"><div className="eyebrow">INCIDENT EXPLANATION</div><SheetTitle>G-02 · INCIDENT EXPLANATION</SheetTitle><SheetDescription>Decision-support context for operator review.</SheetDescription></SheetHeader><div className="py-4">{sections.map(([h,l,t],i)=><div className="explain-step" key={h}><span className="font-mono text-xs text-primary">0{i+1}</span><div><h3 className="text-xs font-bold tracking-wider">{h}</h3><span className="demo-tag my-2 inline-block">{l}</span><p className="text-sm text-muted-foreground leading-6">{t}</p></div></div>)}</div><div className="notice">This explanation is illustrative demo reasoning and requires human validation.</div></SheetContent></Sheet>; }
+function ExplanationDrawer({
+  open,
+  setOpen,
+  domain = "ASSET",
+  entityId = "G-02",
+  stationId = "STATION-BHARATI",
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  domain?: string;
+  entityId?: string;
+  stationId?: string;
+}) {
+  const { data, isLoading, isError, error, refetch } = useExplanation(
+    domain,
+    entityId,
+    stationId,
+    open
+  );
 
-export function OverviewPage() { const [explain,setExplain]=useState(false); const [reason,setReason]=useState(true);
- return <><PageHeader eyebrow="STATION BHARATI · WINTER OPERATIONS" title="Operational Command Center" subtitle="Common operational picture for station infrastructure, environment, personnel and logistics." status="OPERATIONAL"/>
- <div className="section-label">OPERATIONAL METRICS</div><div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">{demoMetrics.map((m,i)=><div className="metric-card" key={m.label}><div className="flex justify-between"><span className="eyebrow">{m.label}</span>{i===0?<Zap className="text-primary" size={18}/>:i===1?<Fuel className="text-warning" size={18}/>:i===2?<Users size={18}/>:<Activity size={18}/>}</div><div className="metric-value">{m.value}</div><p className="text-xs text-muted-foreground">{m.detail}</p><div className="mt-5 flex justify-between"><StatusBadge value={m.status}/><span className="demo-label">MEASURED · DEMO</span></div></div>)}</div>
- <div className="grid xl:grid-cols-[1.55fr_1fr] gap-6 mb-6"><Panel title="STATION DIGITAL TWIN" subtitle="Operational topology and dependency state" action={<span className="demo-tag">DEMO OPERATIONAL MODEL</span>}><Topology/></Panel><div className="space-y-6"><Panel title="CRITICAL OPERATIONAL EVENT" action={<StatusBadge value="CRITICAL"/>}><div className="text-lg font-bold mb-4">{demoG02.name}</div><div className="data-list">{demoG02.telemetry.map(([a,b])=><div key={a}><span>{a}</span><strong>{b}</strong></div>)}</div><div className="demo-label my-4">ILLUSTRATIVE DEMO TELEMETRY</div><div className="flex flex-wrap gap-2"><Button asChild><Link to="/digital-twin" search={{ asset: "power" }}>INSPECT G-02</Link></Button><Button variant="outline" asChild><Link to="/digital-twin" search={{ asset: "power" }}>VIEW DEPENDENCIES</Link></Button><Button variant="outline" onClick={()=>setExplain(true)}>OPEN EXPLANATION</Button></div></Panel><Panel title="G-02 · ASSET INTELLIGENCE"><div className="eyebrow mb-3">CURRENT CONDITION</div><div className="vibration"><span>VIBRATION</span><div className="vibration-bars">{[4,7,10,15,23,35,24,16,10,6,4].map((h,i)=><i key={i} style={{height:h}}/>)}</div><strong>+3.1%</strong></div><div className="data-grid">{demoG02.condition.map(([a,b])=><div key={a}><span>{a}</span><strong>{b}</strong></div>)}</div><div className="demo-label mt-4">ILLUSTRATIVE DEMO TELEMETRY</div></Panel></div></div>
- <div className="grid xl:grid-cols-2 gap-6 mb-6"><Panel title="INCIDENT TIMELINE"> <div className="timeline">{demoTimeline.map(([t,e])=><div key={t}><time>{t}</time><i/><span>{e}</span></div>)}</div></Panel><Panel title="CAUSAL REASONING" action={<Button variant="ghost" size="icon" onClick={()=>setReason(!reason)}>{reason?<ChevronDown/>:<ChevronRight/>}</Button>}>{reason&&<div className="reasoning">{[["EVENT","G-02 vibration deviation"],["CONTEXT","Generator operating conditions"],["IMPACT","Reduced power redundancy"],["FUTURE","Potential escalation"],["DECISION","Inspect G-02 and verify redundancy"],["OUTCOME","Awaiting operator approval"]].map(([a,b],i)=><div key={a}><span>{String(i+1).padStart(2,"0")}</span><div><b>{a}</b><p>{b}</p></div></div>)}</div>}<div className="demo-label mt-4">ILLUSTRATIVE DECISION TRACE</div></Panel></div>
- <div className="grid xl:grid-cols-[1fr_1.2fr] gap-6 mb-6"><Panel title="OPERATIONAL DEPENDENCY MODEL"><div className="space-y-3">{demoDependencies.map((row,i)=><div className="dependency-row" key={i}>{row.map((x,j)=><span key={x}><b>{x}</b><small>{j===0?"ASSET":j===1?"SUBSYSTEM":"OPERATION"}</small>{j<2&&<ChevronRight/>}</span>)}</div>)}</div></Panel><Panel title="OPERATIONAL RECOMMENDATION"><div className="recommendation"><div><span>RECOMMENDED ACTION</span><p>Inspect G-02 operating condition and verify backup generation capacity before further load escalation.</p></div><div><span>RATIONALE</span><p>Observed deviation may affect available power redundancy under current operating conditions.</p></div><div className="grid grid-cols-2"><p><span>CONFIDENCE</span><b>DEMO · 87%</b></p><p><span>PROVENANCE</span><b>ILLUSTRATIVE REASONING</b></p></div></div><div className="flex gap-2 mt-5"><Button onClick={()=>setExplain(true)}>REVIEW DECISION</Button><Button variant="outline" asChild><Link to="/scenarios">VIEW SCENARIO</Link></Button></div></Panel></div>
- <Panel title="HUMAN-IN-THE-LOOP CONTROL" className="mb-6"><div className="human-flow">{["DETECTION","ANALYSIS","RECOMMENDATION","HUMAN REVIEW","APPROVAL","ACTION"].map((x,i)=><span key={x} className={x==="HUMAN REVIEW"?"active":""}>{x}{i<5&&<ChevronRight/>}</span>)}</div><p className="text-center text-sm mt-5 text-muted-foreground">PolarOps provides decision support. <b className="text-foreground">Operational actions require human approval.</b></p></Panel>
- <Panel title="OPERATIONAL ACTIVITY" action={<span className="demo-tag">DEMO ACTIVITY</span>}><div className="activity-list">{demoActivities.map(([t,e,s])=><div key={t}><time>{t}</time><span>{e}</span><StatusBadge value={s}/></div>)}</div></Panel><ExplanationDrawer open={explain} setOpen={setExplain}/></>;
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetContent className="sm:max-w-xl overflow-y-auto">
+        <SheetHeader className="border-b pb-5">
+          <div className="eyebrow">INCIDENT EXPLANATION</div>
+          <SheetTitle>{data ? `${data.entity_id} · ${data.subject}` : `${entityId} · INCIDENT EXPLANATION`}</SheetTitle>
+          <SheetDescription>
+            {data ? `Decision-support context for operator review · ${data.station_id}` : "Decision-support context for operator review."}
+          </SheetDescription>
+        </SheetHeader>
+
+        {isLoading ? (
+          <div className="py-8 space-y-4">
+            <div className="h-6 bg-muted/60 rounded animate-pulse w-3/4" />
+            <div className="h-20 bg-muted/40 rounded animate-pulse" />
+            <div className="h-20 bg-muted/40 rounded animate-pulse" />
+          </div>
+        ) : isError ? (
+          <div className="py-6 space-y-3">
+            <div className="text-sm font-semibold text-critical">Failed to load explanation</div>
+            <p className="text-xs text-muted-foreground">{error?.message ?? "An unexpected error occurred."}</p>
+            <Button size="sm" variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Retry
+            </Button>
+          </div>
+        ) : data ? (
+          <div className="py-4 space-y-5">
+            <div className="explain-step">
+              <span className="font-mono text-xs text-primary">01</span>
+              <div>
+                <h3 className="text-xs font-bold tracking-wider">WHAT HAPPENED?</h3>
+                <span className="demo-tag my-2 inline-block">{data.truth_type}</span>
+                <p className="text-sm text-muted-foreground leading-6">{data.summary}</p>
+              </div>
+            </div>
+
+            <div className="explain-step">
+              <span className="font-mono text-xs text-primary">02</span>
+              <div>
+                <h3 className="text-xs font-bold tracking-wider">WHY DOES IT MATTER?</h3>
+                <span className="demo-tag my-2 inline-block">DERIVED REASONING</span>
+                <p className="text-sm text-muted-foreground leading-6">{data.why_it_matters}</p>
+              </div>
+            </div>
+
+            {data.evidence && data.evidence.length > 0 && (
+              <div className="explain-step">
+                <span className="font-mono text-xs text-primary">03</span>
+                <div>
+                  <h3 className="text-xs font-bold tracking-wider">SUPPORTING EVIDENCE</h3>
+                  <span className="demo-tag my-2 inline-block">MEASURED TELEMETRY</span>
+                  <div className="mt-2 space-y-2">
+                    {data.evidence.map((ev, i) => (
+                      <div key={i} className="text-xs bg-muted/40 p-2.5 rounded border border-border">
+                        <div className="flex justify-between font-semibold">
+                          <span>{ev.factor}</span>
+                          <span className={ev.status === "CRITICAL" ? "text-critical" : "text-warning"}>
+                            {String(ev.value)} {ev.threshold ? `(limit: ${ev.threshold})` : ""}
+                          </span>
+                        </div>
+                        <p className="text-muted-foreground mt-1 text-[11px]">{ev.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {data.consequences && data.consequences.length > 0 && (
+              <div className="explain-step">
+                <span className="font-mono text-xs text-primary">04</span>
+                <div>
+                  <h3 className="text-xs font-bold tracking-wider">CONSEQUENCES & BLAST RADIUS</h3>
+                  <span className="demo-tag my-2 inline-block">DERIVED IMPACT</span>
+                  <div className="mt-2 space-y-2">
+                    {data.consequences.map((c, i) => (
+                      <div key={i} className="text-xs bg-muted/40 p-2.5 rounded border border-border">
+                        <div className="font-semibold text-foreground flex items-center justify-between">
+                          <span>{c.domain}</span>
+                          <span className="text-muted-foreground text-[10px]">DEPTH {c.blast_radius_depth}</span>
+                        </div>
+                        <p className="text-muted-foreground mt-1 text-[11px]">{c.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="explain-step">
+              <span className="font-mono text-xs text-primary">05</span>
+              <div>
+                <h3 className="text-xs font-bold tracking-wider">RECOVERY CONSTRAINTS & OPERATOR ACTIONS</h3>
+                <span className="demo-tag my-2 inline-block">ACTIONABLE PROTOCOLS</span>
+                {data.recovery_constraints && data.recovery_constraints.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {data.recovery_constraints.map((rc, i) => (
+                      <div key={i} className="text-[11px] text-muted-foreground flex gap-2 items-start">
+                        <span className="font-bold text-foreground">[{rc.impact_level}]</span>
+                        <span>{rc.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {data.recommended_next_steps && data.recommended_next_steps.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {data.recommended_next_steps.map((ns, i) => (
+                      <div key={i} className="p-2 bg-primary/10 border border-primary/20 rounded text-xs">
+                        <div className="font-bold text-primary">{ns.title}</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">{ns.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="notice flex justify-between items-center text-[11px]">
+              <span>CONFIDENCE: {Math.round(data.confidence * 100)}% · TRUTH: {data.truth_type}</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{new Date(data.timestamp).toUTCString()}</span>
+            </div>
+          </div>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+export function OverviewPage() {
+  const [explain, setExplain] = useState(false);
+  const [reason, setReason] = useState(true);
+
+  const stationId = "STATION-BHARATI";
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    isError: overviewError,
+    error: overviewErrorObj,
+    refetch: refetchOverview,
+  } = useStationOverview(stationId);
+
+  const {
+    data: intel,
+    isLoading: intelLoading,
+    refetch: refetchIntel,
+  } = useOperationalIntelligence(stationId);
+
+  const {
+    data: eventsData,
+    isLoading: eventsLoading,
+    refetch: refetchEvents,
+  } = useOperationalEvents(stationId, 6);
+
+  const {
+    data: telemetry,
+    refetch: refetchTelemetry,
+  } = useAssetTelemetry("G-02", 15);
+
+  const powerSub = overview?.subsystem_summary?.find(
+    (s) => s.code === "POWER" || s.name.toLowerCase().includes("power")
+  );
+
+  const primaryEvent = overview?.critical_events?.[0];
+  const primaryDecision = intel?.decisions?.[0];
+
+  const vibrationSeries = telemetry?.series?.find(
+    (s) => s.metric_key === "vibration_rms" || s.metric_name.toLowerCase().includes("vibration")
+  );
+  const loadSeries = telemetry?.series?.find(
+    (s) => s.metric_key === "load_percentage" || s.metric_name.toLowerCase().includes("load")
+  );
+  const tempSeries = telemetry?.series?.find(
+    (s) => s.metric_key === "winding_temp_celsius" || s.metric_name.toLowerCase().includes("temp")
+  );
+
+  const vibPoints = vibrationSeries?.points?.slice(-11) ?? [];
+  const maxVib = Math.max(...vibPoints.map((p) => p.value), 5);
+  const vibBars: number[] =
+    vibPoints.length > 0
+      ? vibPoints.map((p) => Math.max(4, Math.round((p.value / maxVib) * 36)))
+      : [8, 12, 16, 20, 24, 32, 36, 30, 22, 16, 12];
+  const currentVib = vibrationSeries?.current_value ?? 4.82;
+  const currentLoad = loadSeries?.current_value ?? 84.5;
+  const currentTemp = tempSeries?.current_value ?? 68.2;
+
+  const retryAll = () => {
+    refetchOverview();
+    refetchIntel();
+    refetchEvents();
+    refetchTelemetry();
+  };
+
+  return (
+    <>
+      <PageHeader
+        eyebrow={`STATION ${overview?.station_id?.replace("STATION-", "") ?? "BHARATI"} · ${overview?.environment_mode ?? "WINTER"} OPERATIONS`}
+        title="Operational Command Center"
+        subtitle="Common operational picture for station infrastructure, environment, personnel and logistics."
+        status={overview?.status ?? (overviewLoading ? "CONNECTING..." : "OPERATIONAL")}
+      />
+
+      {overviewError && (
+        <div data-testid="command-center-error" className="mb-6 p-4 rounded-md border border-critical/40 bg-critical/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-critical">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+            <div>
+              <p className="text-sm font-bold">Failed to load real-time station telemetry</p>
+              <p className="text-xs text-muted-foreground">{overviewErrorObj?.message ?? "Backend unreachable."}</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-critical/30 hover:bg-critical/20"
+            onClick={retryAll}
+          >
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> RETRY CONNECTION
+          </Button>
+        </div>
+      )}
+
+      <div className="section-label">OPERATIONAL METRICS</div>
+      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        {overviewLoading ? (
+          [1, 2, 3, 4].map((i) => (
+            <div key={i} className="metric-card animate-pulse">
+              <div className="h-4 bg-muted/60 rounded w-1/2 mb-3" />
+              <div className="h-8 bg-muted/40 rounded w-3/4 mb-2" />
+              <div className="h-3 bg-muted/30 rounded w-full mt-4" />
+            </div>
+          ))
+        ) : overview ? (
+          <>
+            <div className="metric-card" data-testid="metric-power">
+              <div className="flex justify-between">
+                <span className="eyebrow">POWER SUBSYSTEM</span>
+                <Zap className="text-primary" size={18} />
+              </div>
+              <div className="metric-value">
+                {powerSub?.health_score !== undefined ? `${powerSub.health_score.toFixed(1)}%` : "NOMINAL"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {powerSub?.name ?? "Primary Power Generation"} · Status: {powerSub?.status ?? "DEGRADED"}
+              </p>
+              <div className="mt-5 flex justify-between items-center">
+                <StatusBadge value={powerSub?.status ?? "DEGRADED"} />
+                <span className="demo-label">MEASURED · TELEMETRY</span>
+              </div>
+            </div>
+
+            <div className="metric-card" data-testid="metric-fuel">
+              <div className="flex justify-between">
+                <span className="eyebrow">FUEL RUNWAY</span>
+                <Fuel className="text-warning" size={18} />
+              </div>
+              <div className="metric-value">{overview.fuel_runway_days ?? 81} DAYS</div>
+              <p className="text-xs text-muted-foreground">
+                {overview.fuel_quantity_liters !== undefined && overview.fuel_quantity_liters !== null
+                  ? `${overview.fuel_quantity_liters.toLocaleString()} L in reserve`
+                  : "64,800 L in reserve"}
+              </p>
+              <div className="mt-5 flex justify-between items-center">
+                <StatusBadge value={(overview.fuel_runway_days ?? 81) < 90 ? "WATCH" : "NOMINAL"} />
+                <span className="demo-label">MEASURED · RESERVES</span>
+              </div>
+            </div>
+
+            <div className="metric-card" data-testid="metric-environment">
+              <div className="flex justify-between">
+                <span className="eyebrow">ENVIRONMENT</span>
+                <Activity size={18} />
+              </div>
+              <div className="metric-value">{overview.ambient_weather.temperature_celsius.toFixed(1)}°C</div>
+              <p className="text-xs text-muted-foreground">
+                Wind {overview.ambient_weather.wind_speed_knots} kts · Chill {overview.ambient_weather.wind_chill_celsius.toFixed(1)}°C
+              </p>
+              <div className="mt-5 flex justify-between items-center">
+                <StatusBadge value={overview.ambient_weather.wind_speed_knots > 35 ? "CRITICAL" : overview.ambient_weather.wind_speed_knots > 20 ? "WARNING" : "NOMINAL"} />
+                <span className="demo-label">{overview.ambient_weather.provenance?.truth_type ?? "MEASURED"} · WEATHER SENSOR</span>
+              </div>
+            </div>
+
+            <div className="metric-card" data-testid="metric-health">
+              <div className="flex justify-between">
+                <span className="eyebrow">STATION READINESS</span>
+                <ShieldCheck size={18} />
+              </div>
+              <div className="metric-value">{overview.overall_health_score.toFixed(1)}%</div>
+              <p className="text-xs text-muted-foreground">
+                Comms {overview.connectivity_status} · {overview.active_incidents_count} active event(s)
+              </p>
+              <div className="mt-5 flex justify-between items-center">
+                <StatusBadge value={overview.status} />
+                <span className="demo-label">DERIVED · ASSESSMENT</span>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      <div className="grid xl:grid-cols-[1.55fr_1fr] gap-6 mb-6">
+        <Panel
+          title="STATION DIGITAL TWIN"
+          subtitle="Operational topology and dependency state"
+          action={<span className="demo-tag">{overview ? "LIVE TOPOLOGY GRAPH" : "CONNECTING..."}</span>}
+        >
+          <Topology />
+        </Panel>
+
+        <div className="space-y-6">
+          <Panel
+            title="CRITICAL OPERATIONAL EVENT"
+            action={<StatusBadge value={primaryEvent?.severity ?? intel?.severity ?? "CRITICAL"} />}
+          >
+            <div className="text-lg font-bold mb-4" data-testid="critical-event-title">
+              {primaryEvent?.title ?? intel?.headline ?? "G-02 Primary Generator Bearing Deviation"}
+            </div>
+            <div className="data-list">
+              <div>
+                <span>Asset Identifier</span>
+                <strong>{primaryEvent?.asset_id ?? "G-02"}</strong>
+              </div>
+              <div>
+                <span>Location</span>
+                <strong>{primaryEvent?.location ?? "Powerhouse Generator Bay 2"}</strong>
+              </div>
+              <div>
+                <span>Active Status</span>
+                <strong>{primaryEvent?.status ?? "ACTIVE"}</strong>
+              </div>
+              <div>
+                <span>Vibration (RMS)</span>
+                <strong>{currentVib.toFixed(2)} mm/s</strong>
+              </div>
+              <div>
+                <span>Operating Load</span>
+                <strong>{currentLoad.toFixed(1)}%</strong>
+              </div>
+              <div>
+                <span>Winding Temperature</span>
+                <strong>{currentTemp.toFixed(1)}°C</strong>
+              </div>
+            </div>
+            <div className="demo-label my-4">MEASURED TELEMETRY · PROVENANCE ACTIVE</div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <Link to="/digital-twin" search={{ asset: "power" }}>
+                  INSPECT G-02
+                </Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/digital-twin" search={{ asset: "power" }}>
+                  VIEW DEPENDENCIES
+                </Link>
+              </Button>
+              <Button variant="outline" onClick={() => setExplain(true)} data-testid="open-explanation-btn">
+                OPEN EXPLANATION
+              </Button>
+            </div>
+          </Panel>
+
+          <Panel title="G-02 · ASSET INTELLIGENCE">
+            <div className="eyebrow mb-3">CURRENT CONDITION</div>
+            <div className="vibration">
+              <span>VIBRATION</span>
+              <div className="vibration-bars">
+                {vibBars.map((h: number, i: number) => (
+                  <i key={i} style={{ height: h }} />
+                ))}
+              </div>
+              <strong>{currentVib.toFixed(2)} mm/s</strong>
+            </div>
+            <div className="data-grid">
+              <div>
+                <span>Vibration Baseline</span>
+                <strong>2.80 mm/s</strong>
+              </div>
+              <div>
+                <span>Warning Threshold</span>
+                <strong>{vibrationSeries?.warning_threshold ? `${vibrationSeries.warning_threshold.toFixed(2)} mm/s` : "4.50 mm/s"}</strong>
+              </div>
+              <div>
+                <span>Current Value</span>
+                <strong>{currentVib.toFixed(2)} mm/s</strong>
+              </div>
+              <div>
+                <span>Active Load</span>
+                <strong>{currentLoad.toFixed(1)}%</strong>
+              </div>
+              <div>
+                <span>Winding Temp</span>
+                <strong>{currentTemp.toFixed(1)}°C</strong>
+              </div>
+              <div>
+                <span>Provenance</span>
+                <strong>{telemetry?.provenance?.truth_type ?? "MEASURED"}</strong>
+              </div>
+            </div>
+            <div className="demo-label mt-4">MEASURED · REAL-TIME SENSORS</div>
+          </Panel>
+        </div>
+      </div>
+
+      <div className="grid xl:grid-cols-2 gap-6 mb-6">
+        <Panel title="INCIDENT TIMELINE">
+          <div className="timeline" data-testid="incident-timeline">
+            {eventsLoading ? (
+              <div className="text-xs text-muted-foreground py-4">Loading operational timeline...</div>
+            ) : eventsData?.events && eventsData.events.length > 0 ? (
+              eventsData.events.slice(0, 5).map((ev) => (
+                <div key={ev.id}>
+                  <time>{new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+                  <i />
+                  <span>
+                    <strong>{ev.title}</strong> — {ev.summary}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-muted-foreground py-4">No recent operational events recorded.</div>
+            )}
+          </div>
+          <div className="demo-label mt-4">MEASURED EVENT STREAM · TIME-SERIES LOGS</div>
+        </Panel>
+
+        <Panel
+          title="CAUSAL REASONING"
+          action={
+            <Button variant="ghost" size="icon" onClick={() => setReason(!reason)} aria-label="Toggle causal reasoning">
+              {reason ? <ChevronDown /> : <ChevronRight />}
+            </Button>
+          }
+        >
+          {reason && (
+            <div className="reasoning" data-testid="causal-reasoning-chain">
+              {intelLoading ? (
+                <div className="text-xs text-muted-foreground py-4">Evaluating causal reasoning chain...</div>
+              ) : intel?.causal_chain && intel.causal_chain.length > 0 ? (
+                intel.causal_chain.map((c, i) => (
+                  <div key={c.stage || i}>
+                    <span>{String(i + 1).padStart(2, "0")}</span>
+                    <div>
+                      <b>{c.stage}: {c.title || c.headline}</b>
+                      <p>{c.description}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-muted-foreground py-4">Causal engine offline.</div>
+              )}
+            </div>
+          )}
+          <div className="demo-label mt-4">
+            {intel?.provenance?.truth_type ?? "DERIVED"} · DETERMINISTIC REASONING ENGINE
+          </div>
+        </Panel>
+      </div>
+
+      <div className="grid xl:grid-cols-[1fr_1.2fr] gap-6 mb-6">
+        <Panel title="OPERATIONAL DEPENDENCY MODEL">
+          <div className="space-y-3">
+            {[
+              ["G-02 GENERATOR", "POWER BUS A", "HABITAT & LIFE SUPPORT"],
+              ["POWER BUS A", "SCIENCE LAB", "CONTINUOUS DATA LOGGING"],
+              ["FUEL STORAGE TANK 1", "BOILER B-01", "THERMAL RUNWAY STABILITY"],
+            ].map((row, i) => (
+              <div className="dependency-row" key={i}>
+                {row.map((x, j) => (
+                  <span key={x}>
+                    <b>{x}</b>
+                    <small>{j === 0 ? "ASSET" : j === 1 ? "SUBSYSTEM" : "OPERATION"}</small>
+                    {j < 2 && <ChevronRight />}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="demo-label mt-4">TOPOLOGICAL DEPENDENCY GRAPH (BFS DERIVED)</div>
+        </Panel>
+
+        <Panel title="OPERATIONAL RECOMMENDATION">
+          <div className="recommendation" data-testid="operational-recommendation">
+            <div>
+              <span>RECOMMENDED ACTION</span>
+              <p>
+                {primaryDecision?.title ??
+                  "Inspect G-02 operating condition and verify backup generation capacity before further load escalation."}
+              </p>
+            </div>
+            <div>
+              <span>RATIONALE</span>
+              <p>
+                {primaryDecision?.rationale ??
+                  intel?.summary ??
+                  "Observed deviation may affect available power redundancy under current operating conditions."}
+              </p>
+            </div>
+            <div className="grid grid-cols-2">
+              <p>
+                <span>CONFIDENCE</span>
+                <b>{intel?.provenance?.confidence ? `${Math.round(intel.provenance.confidence * 100)}%` : "87%"}</b>
+              </p>
+              <p>
+                <span>PROVENANCE</span>
+                <b>{intel?.provenance?.truth_type ?? "DERIVED"} CAUSAL ENGINE</b>
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-5">
+            <Button onClick={() => setExplain(true)}>REVIEW DECISION</Button>
+            <Button variant="outline" asChild>
+              <Link to="/scenarios">VIEW SCENARIO</Link>
+            </Button>
+          </div>
+        </Panel>
+      </div>
+
+      <Panel title="HUMAN-IN-THE-LOOP CONTROL" className="mb-6">
+        <div className="human-flow">
+          {["DETECTION", "ANALYSIS", "RECOMMENDATION", "HUMAN REVIEW", "APPROVAL", "ACTION"].map((x, i) => (
+            <span key={x} className={x === "HUMAN REVIEW" ? "active" : ""}>
+              {x}
+              {i < 5 && <ChevronRight />}
+            </span>
+          ))}
+        </div>
+        <p className="text-center text-sm mt-5 text-muted-foreground">
+          PolarOps provides decision support. <b className="text-foreground">Operational actions require human approval.</b>
+        </p>
+      </Panel>
+
+      <Panel title="OPERATIONAL ACTIVITY" action={<span className="demo-tag">{eventsData?.simulation_active ? "EVENT STREAM ACTIVE" : "REAL-TIME LOGS"}</span>}>
+        <div className="activity-list" data-testid="operational-activity-list">
+          {eventsLoading ? (
+            <div className="text-xs text-muted-foreground py-3">Loading operational activity...</div>
+          ) : eventsData?.events && eventsData.events.length > 0 ? (
+            eventsData.events.map((ev) => (
+              <div key={ev.id}>
+                <time>{new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
+                <span>
+                  <strong>{ev.title}</strong>: {ev.summary}
+                </span>
+                <StatusBadge value={ev.severity} />
+              </div>
+            ))
+          ) : (
+            <div className="text-xs text-muted-foreground py-3">No activity logs recorded.</div>
+          )}
+        </div>
+      </Panel>
+
+      <ExplanationDrawer open={explain} setOpen={setExplain} domain="ASSET" entityId="G-02" stationId={stationId} />
+    </>
+  );
 }
 
 export function DigitalTwinPage(){ const search=useSearch({from:"/digital-twin"}); const [selected,setSelected]=useState(search.asset||"power"); const [zoom,setZoom]=useState(1); const node=topologyNodes.find(n=>n.id===selected)??topologyNodes[0]; if (!node) return null; return <><PageHeader eyebrow="AODT · DEMO OPERATIONAL MODEL" title="Station Digital Twin" subtitle="Interactive infrastructure topology, dependency paths and operational impact." status="SYNCHRONIZED"/><div className="grid xl:grid-cols-[1fr_330px] gap-6"><Panel title="BHARATI · OPERATIONAL TOPOLOGY" subtitle="Select an asset to trace its active dependency path" action={<div className="flex gap-1"><Button variant="outline" size="icon" onClick={()=>setZoom(Math.min(1.3,zoom+.1))} aria-label="Zoom in"><Plus/></Button><Button variant="outline" size="icon" onClick={()=>setZoom(Math.max(.8,zoom-.1))} aria-label="Zoom out"><Minus/></Button><Button variant="outline" size="icon" onClick={()=>setZoom(1)} aria-label="Reset view"><RotateCcw/></Button></div>}><div style={{transform:`scale(${zoom})`}} className="transition-transform origin-center"><Topology large selected={selected} onSelect={setSelected}/></div></Panel><Panel title="SELECTED ASSET" action={<StatusBadge value={node.status}/>}><div className="text-xl font-bold mb-5">{node.name}</div><div className="data-list">{[["Asset",node.name],["System",selected==="power"?"Power Generation":"Station Infrastructure"],["Status",node.status],["Dependencies",selected==="power"?"Power Bus A · Habitat · Lab":"Power · Data"],["Impact",selected==="power"?"Reduced generation redundancy":"Local degradation"],["Last update","14:32:04 UTC · DEMO"]].map(([a,b])=><div key={a}><span>{a}</span><strong>{b}</strong></div>)}</div><div className="notice mt-5">Selected dependency path is highlighted in the operational model.</div></Panel></div></> }
