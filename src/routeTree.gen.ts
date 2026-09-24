@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlertsRouteImport } from './routes/alerts'
+import { Route as CommandCenterRouteImport } from './routes/command-center'
 import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ResilienceRouteImport } from './routes/resilience'
@@ -27,6 +28,11 @@ const IndexRoute = IndexRouteImport.update({
 const AlertsRoute = AlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommandCenterRoute = CommandCenterRouteImport.update({
+  id: '/command-center',
+  path: '/command-center',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DigitalTwinRoute = DigitalTwinRouteImport.update({
@@ -68,6 +74,7 @@ const StationsRoute = StationsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/command-center': typeof CommandCenterRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/reports': typeof ReportsRoute
   '/resilience': typeof ResilienceRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/command-center': typeof CommandCenterRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/reports': typeof ReportsRoute
   '/resilience': typeof ResilienceRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alerts': typeof AlertsRoute
+  '/command-center': typeof CommandCenterRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/reports': typeof ReportsRoute
   '/resilience': typeof ResilienceRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/alerts'
+    | '/command-center'
     | '/digital-twin'
     | '/reports'
     | '/resilience'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/alerts'
+    | '/command-center'
     | '/digital-twin'
     | '/reports'
     | '/resilience'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/alerts'
+    | '/command-center'
     | '/digital-twin'
     | '/reports'
     | '/resilience'
@@ -138,6 +150,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlertsRoute: typeof AlertsRoute
+  CommandCenterRoute: typeof CommandCenterRoute
   DigitalTwinRoute: typeof DigitalTwinRoute
   ReportsRoute: typeof ReportsRoute
   ResilienceRoute: typeof ResilienceRoute
@@ -161,6 +174,13 @@ declare module '@tanstack/react-router' {
       path: '/alerts'
       fullPath: '/alerts'
       preLoaderRoute: typeof AlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/command-center': {
+      id: '/command-center'
+      path: '/command-center'
+      fullPath: '/command-center'
+      preLoaderRoute: typeof CommandCenterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/digital-twin': {
@@ -218,6 +238,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlertsRoute: AlertsRoute,
+  CommandCenterRoute: CommandCenterRoute,
   DigitalTwinRoute: DigitalTwinRoute,
   ReportsRoute: ReportsRoute,
   ResilienceRoute: ResilienceRoute,
