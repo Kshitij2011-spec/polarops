@@ -11,7 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AppShell, ThemeProvider } from "../components/polarops";
+import { AppShell, OperationsProvider, ThemeProvider } from "../components/polarops";
 
 function NotFoundComponent() {
   return (
@@ -123,7 +123,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider><AppShell><Outlet /></AppShell></ThemeProvider>
+      <ThemeProvider><OperationsProvider><AppShell><Outlet /></AppShell></OperationsProvider></ThemeProvider>
     </QueryClientProvider>
   );
 }

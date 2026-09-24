@@ -1,16 +1,25 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, AlertTriangle, Archive, BarChart3, Bell, Boxes, ChevronDown, ChevronRight, CircleGauge, ClipboardCheck, Download, FileText, Fuel, Grid3X3, Menu, Minus, Moon, Plus, Radio, RotateCcw, Settings, ShieldCheck, Sun, UserRound, Users, X, Zap } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDown, ArrowRight, BarChart3, Bell, Boxes, ChevronDown, ChevronRight, CircleGauge, ClipboardCheck, CloudOff, Database, Download, FileText, Fuel, Grid3X3, Menu, Minus, Moon, Plus, Radio, RefreshCw, RotateCcw, Satellite, Settings, ShieldCheck, Sun, UserRound, Users, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { demoActivities, demoAlerts, demoDependencies, demoG02, demoMetrics, demoReports, demoResources, demoScenarios, demoStationData, demoTimeline, topologyNodes, type Status } from "@/lib/demo-data";
+import { demoActivities, demoAlerts, demoCapabilities, demoDependencies, demoG02, demoMetrics, demoOfflineState, demoReports, demoResources, demoScenarios, demoStationData, demoSyncQueue, demoTimeline, topologyNodes } from "@/lib/demo-data";
 
 const navGroups = [
-  ["COMMAND", [["Overview", "/", CircleGauge], ["Digital Twin", "/digital-twin", Boxes], ["Stations", "/stations", Radio]]],
+  ["COMMAND", [["Overview", "/command-center", CircleGauge], ["Digital Twin", "/digital-twin", Boxes], ["Stations", "/stations", Radio]]],
   ["OPERATIONS", [["Resources", "/resources", Fuel], ["Scenarios", "/scenarios", Activity], ["Resilience", "/resilience", ShieldCheck], ["Alerts", "/alerts", Bell]]],
-  ["REPORTING", [["Reports", "/reports", FileText]]], ["SYSTEM", [["Settings", "/settings", Settings]]],
+  ["REPORTING", [["Reports", "/reports", FileText]]], ["SYSTEM", [["Offline Analog", "/offline", CloudOff], ["Settings", "/settings", Settings]]],
 ] as const;
+
+type OperationsMode = "online" | "offline";
+const OperationsContext = createContext({ mode: "online" as OperationsMode, setMode: (_mode: OperationsMode) => {} });
+export function OperationsProvider({ children }: { children: ReactNode }) {
+  const [mode, setModeState] = useState<OperationsMode>("online");
+  useEffect(() => { if (localStorage.getItem("polarops-mode") === "offline") setModeState("offline"); }, []);
+  const setMode = (next: OperationsMode) => { setModeState(next); localStorage.setItem("polarops-mode", next); };
+  return <OperationsContext.Provider value={{ mode, setMode }}>{children}</OperationsContext.Provider>;
+}
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [dark, setDark] = useState(false);
@@ -31,9 +40,22 @@ function Sidebar({ mobile = false, close }: { mobile?: boolean; close?: () => vo
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { dark, toggle } = useContext(ThemeContext); const [menu, setMenu] = useState(false);
-  return <div className="min-h-screen bg-background text-foreground"><Sidebar/><div className="lg:pl-60"><header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur border-b flex items-center px-4 lg:px-7 gap-4"><Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMenu(true)} aria-label="Open navigation"><Menu/></Button><div className="hidden md:flex items-center gap-7 flex-1">{[["STATION","BHARATI"],["STATE","WINTER"],["CONNECTIVITY","CONNECTED"],["SYNC","SYNCHRONIZED"]].map(([a,b])=><div key={a}><div className="command-label">{a}</div><div className="text-xs font-bold flex items-center gap-1.5">{a === "CONNECTIVITY" && <span className="status-dot bg-success"/>}{b}</div></div>)}</div><span className="demo-tag ml-auto md:ml-0">DEMO DATA</span><div className="hidden sm:block"><div className="command-label">TIME</div><div className="font-mono text-xs font-semibold">14:32:08 UTC</div></div><Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">{dark ? <Sun/> : <Moon/>}</Button><Button variant="outline" size="icon" aria-label="System user"><UserRound/></Button></header><main className="p-4 sm:p-6 xl:p-8 max-w-[1680px] mx-auto">{children}</main></div>
+  const { dark, toggle } = useContext(ThemeContext); const { mode } = useContext(OperationsContext); const [menu, setMenu] = useState(false); const path = useRouterState({ select: s => s.location.pathname });
+  if (path === "/") return <div className="min-h-screen bg-background text-foreground"><header className="landing-nav"><Link to="/" className="flex items-center gap-3"><span className="brand-mark"><Grid3X3 size={18}/></span><span><b>POLAROPS</b><small>ANTARCTIC DIGITAL TWIN</small></span></Link><div className="flex items-center gap-2"><Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">{dark ? <Sun/> : <Moon/>}</Button><Button asChild><Link to="/command-center">ENTER SYSTEM <ArrowRight/></Link></Button></div></header>{children}</div>;
+  const offline = mode === "offline";
+  return <div className="min-h-screen bg-background text-foreground"><Sidebar/><div className="lg:pl-60"><header className="sticky top-0 z-30 min-h-16 bg-background/95 backdrop-blur border-b flex items-center px-4 lg:px-7 gap-4"><Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMenu(true)} aria-label="Open navigation"><Menu/></Button><div className="hidden md:flex items-center gap-7 flex-1">{[["STATION","BHARATI"],["STATE","WINTER"],["CONNECTIVITY",offline?"OFFLINE MODE":"CONNECTED"],["SYNC",offline?"LOCAL OPERATION ACTIVE":"SYNCHRONIZED"]].map(([a,b])=><div key={a}><div className="command-label">{a}</div><div className={`text-xs font-bold flex items-center gap-1.5 ${offline && (a==="CONNECTIVITY"||a==="SYNC") ? "text-warning" : ""}`}>{a === "CONNECTIVITY" && <span className={`status-dot ${offline ? "bg-warning" : "bg-success"}`}/>{b}</div></div>)}</div><span className="demo-tag ml-auto md:ml-0">{offline ? "LOCAL SNAPSHOT" : "DEMO DATA"}</span><div className="hidden sm:block"><div className="command-label">TIME</div><div className="font-mono text-xs font-semibold">14:32:08 UTC</div></div><Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">{dark ? <Sun/> : <Moon/>}</Button><Button variant="outline" size="icon" aria-label="System user"><UserRound/></Button></header><main className="p-4 sm:p-6 xl:p-8 max-w-[1680px] mx-auto">{offline && <div className="offline-strip"><CloudOff size={15}/> OFFLINE ANALOG · LOCAL OPERATION ACTIVE <span>LAST SYNC {demoOfflineState.lastSynchronized}</span></div>}{children}</main></div>
   {menu && <div className="fixed inset-0 z-50 bg-foreground/40 lg:hidden"><div className="w-72 h-full"><Sidebar mobile close={() => setMenu(false)}/></div><Button size="icon" variant="secondary" className="absolute left-[18.5rem] top-4" onClick={()=>setMenu(false)}><X/></Button></div>}</div>;
+}
+
+export function LandingPage() {
+  const flow = ["STATION","INFRASTRUCTURE","ENVIRONMENT","RESOURCES","INTELLIGENCE","DECISION"];
+  const decision = ["DATA","CONTEXT","IMPACT","PREDICTION","DECISION","HUMAN APPROVAL","ACTION"];
+  return <main className="landing-shell"><section className="landing-hero"><div className="landing-grid"/><div className="landing-kicker"><span/> SMART INDIA HACKATHON 2026 · AODT</div><p className="eyebrow">ANTARCTIC OPERATIONAL DIGITAL TWIN</p><h1>POLAROPS</h1><h2>Operational intelligence for Antarctic missions.</h2><p className="landing-copy">A resilient digital twin platform connecting station state, operational context, scenario reasoning and human decision-making into one common operational picture.</p><div className="flex flex-wrap gap-3"><Button size="lg" asChild><Link to="/command-center">ENTER COMMAND CENTER <ArrowRight/></Link></Button><Button size="lg" variant="outline" asChild><Link to="/digital-twin">EXPLORE DIGITAL TWIN</Link></Button></div><div className="landing-flow">{flow.map((item,i)=><span key={item}>{item}{i<flow.length-1&&<ArrowRight/>}</span>)}</div></section>
+  <section className="landing-section"><div><p className="eyebrow">OPERATIONAL LOGIC</p><h2>FROM DATA TO DECISION</h2></div><div className="decision-chain">{decision.map((item,i)=><span key={item} className={item==="HUMAN APPROVAL"?"active":""}>{item}{i<decision.length-1&&<ArrowDown/>}</span>)}</div></section>
+  <section className="landing-band"><div className="landing-section"><div><p className="eyebrow">SYSTEM CAPABILITY</p><h2>OPERATIONAL CAPABILITIES</h2></div><div className="capability-grid">{demoCapabilities.map(([title,text],i)=><article key={title}><span>0{i+1}</span><h3>{title}</h3><p>{text}</p></article>)}</div></div></section>
+  <section className="landing-section reality"><div><p className="eyebrow">RESILIENT BY DESIGN</p><h2>DESIGNED FOR ANTARCTIC REALITY</h2><p>Connectivity loss does not equal operational context loss.</p></div><div className="reality-grid">{[["LIMITED CONNECTIVITY","LOCAL-FIRST"],["LOCAL OPERATION","STORE & FORWARD"],["DATA TRANSFER","SYNC WHEN AVAILABLE"],["TRUSTED STATE","ACKNOWLEDGEMENT & RECONCILIATION"]].map(([a,b])=><div key={a}><Satellite/><span>{a}</span><b>{b}</b></div>)}</div></section>
+  <section className="landing-band"><div className="landing-section operator"><div><p className="eyebrow">HUMAN-IN-THE-LOOP</p><h2>BUILT FOR OPERATORS</h2></div><div className="operator-flow">{["OBSERVE","UNDERSTAND","SIMULATE","DECIDE","APPROVE","ACT"].map((x,i)=><span key={x}>{x}{i<5&&<ArrowRight/>}</span>)}</div><p>PolarOps supports operators. It does not autonomously execute operational decisions.</p></div></section>
+  <section className="landing-cta"><p className="eyebrow">READY FOR THE OPERATIONAL PICTURE?</p><h2>ENTER POLAROPS</h2><div className="flex justify-center gap-3"><Button size="lg" asChild><Link to="/command-center">ENTER POLAROPS</Link></Button><Button size="lg" variant="outline" asChild><Link to="/digital-twin">VIEW DIGITAL TWIN</Link></Button></div></section></main>;
 }
 
 export function StatusBadge({ value }: { value: string }) { const k = value.toLowerCase(); return <span className={`status-badge status-${k}`}>{value}</span>; }
