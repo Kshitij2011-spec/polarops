@@ -29,13 +29,15 @@ import { useAssets } from "@/hooks/useAssets";
 import { TruthBadge } from "./TruthBadge";
 import { StatusBadge, PageHeader, Panel } from "./polarops";
 import type { InventorySpareItem } from "@/lib/api";
+import { useStation } from "@/context/StationContext";
 
 export function ResourcesPage() {
   const search = useSearch({ strict: false }) as { asset?: string };
   const navigate = useNavigate();
 
-  const stationId = "STATION-BHARATI";
-  const comparisonStationId = "STATION-MAITRI";
+  const stationCtx = useStation();
+  const stationId = stationCtx?.activeStationId || "STATION-BHARATI";
+  const comparisonStationId = stationId === "STATION-BHARATI" ? "STATION-MAITRI" : "STATION-BHARATI";
 
   // Pre-select asset from query param or default to G-02
   const initialAsset = search.asset || "G-02";

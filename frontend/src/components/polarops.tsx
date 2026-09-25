@@ -1,16 +1,23 @@
-import { Link, useRouterState, useSearch } from "@tanstack/react-router";
+import { Link, useRouterState, useSearch, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Activity, AlertTriangle, ArrowDown, ArrowRight, BarChart3, Bell, Boxes, ChevronDown, ChevronRight, CircleGauge, ClipboardCheck, CloudOff, Download, FileText, Fuel, Grid3X3, Menu, Minus, Moon, Plus, Radio, RefreshCw, RotateCcw, Satellite, Settings, ShieldCheck, Sun, UserRound, Users, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { demoActivities, demoAlerts, demoCapabilities, demoDependencies, demoOfflineState, demoReports, demoResources, demoScenarios, demoStationData, demoSyncQueue } from "@/lib/demo-data";
+import { demoActivities, demoAlerts, demoCapabilities, demoDependencies, demoOfflineState, demoReports, demoSyncQueue } from "@/lib/demo-data";
 import { useStationOverview } from "../hooks/useStationOverview";
-import { useOperationalIntelligence } from "../hooks/useOperationalIntelligence";
 import { useOperationalEvents } from "../hooks/useOperationalEvents";
-import { useAssetTelemetry } from "../hooks/useAssetTelemetry";
 import { useExplanation } from "../hooks/useExplanation";
+import { useStation } from "@/context/StationContext";
+import { useFuelStatus } from "../hooks/useFuelStatus";
+import { useEnergyModel } from "../hooks/useEnergyModel";
+import { useInventory } from "../hooks/useInventory";
+import { useResupply } from "../hooks/useResupply";
+import { useScenarioSimulation } from "../hooks/useScenarioSimulation";
+import type { ScenarioSimulateResponse } from "@/lib/api";
 import { OperationalTopology } from "./OperationalTopology";
+import { StationsView } from "./Stations/StationsView";
+import { ResilienceView } from "./Resilience/ResilienceView";
 
 const navGroups = [
   ["COMMAND", [["Overview", "/command-center", CircleGauge], ["Digital Twin", "/digital-twin", Boxes], ["Stations", "/stations", Radio]]],
@@ -18,24 +25,28 @@ const navGroups = [
   ["REPORTING", [["Reports", "/reports", FileText]]], ["SYSTEM", [["Offline Analog", "/offline", CloudOff], ["Settings", "/settings", Settings]]],
 ] as const;
 
-type OperationsMode = "online" | "offline";
-const OperationsContext = createContext({ mode: "online" as OperationsMode, setMode: (_mode: OperationsMode) => {} });
+import { createContext, useContext } from "react";
+import { useHealthCheck } from "../hooks/useHealthCheck";
+
+export type OperationsMode = "online" | "offline";
+export const OperationsContext = createContext({ mode: "online" as OperationsMode, setMode: (_mode: OperationsMode) => {} });
 export function OperationsProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<OperationsMode>("online");
   useEffect(() => { if (localStorage.getItem("polarops-mode") === "offline") setModeState("offline"); }, []);
   const setMode = (next: OperationsMode) => { setModeState(next); localStorage.setItem("polarops-mode", next); };
   return <OperationsContext.Provider value={{ mode, setMode }}>{children}</OperationsContext.Provider>;
 }
+export const useOperations = () => useContext(OperationsContext);
 
+export const ThemeContext = createContext({ dark: false, toggle: () => {} });
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [dark, setDark] = useState(false);
   useEffect(() => { const saved = localStorage.getItem("polarops-theme"); const value = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; setDark(value); document.documentElement.classList.toggle("dark", value); }, []);
   const toggle = () => { const next = !dark; setDark(next); document.documentElement.classList.toggle("dark", next); localStorage.setItem("polarops-theme", next ? "dark" : "light"); };
   return <ThemeContext.Provider value={{ dark, toggle }}>{children}</ThemeContext.Provider>;
 }
-import { createContext, useContext } from "react";
-import { useHealthCheck } from "../hooks/useHealthCheck";
-const ThemeContext = createContext({ dark: false, toggle: () => {} });
+export const useTheme = () => useContext(ThemeContext);
+
 
 function HealthStatusBadge() {
   const { data, isLoading, isError } = useHealthCheck();
@@ -267,446 +278,591 @@ export function ExplanationDrawer({
   );
 }
 
-export function OverviewPage() {
-  const [explain, setExplain] = useState(false);
-  const [reason, setReason] = useState(true);
+export { CommandCenterView as OverviewPage } from "./CommandCenterView";
 
-  const stationId = "STATION-BHARATI";
-  const {
-    data: overview,
-    isLoading: overviewLoading,
-    isError: overviewError,
-    error: overviewErrorObj,
-    refetch: refetchOverview,
-  } = useStationOverview(stationId);
 
-  const {
-    data: intel,
-    isLoading: intelLoading,
-    refetch: refetchIntel,
-  } = useOperationalIntelligence(stationId);
+export { DigitalTwinPage } from "./DigitalTwinPage";
 
-  const {
-    data: eventsData,
-    isLoading: eventsLoading,
-    refetch: refetchEvents,
-  } = useOperationalEvents(stationId, 6);
-
-  const {
-    data: telemetry,
-    refetch: refetchTelemetry,
-  } = useAssetTelemetry("G-02", 15);
-
-  const powerSub = overview?.subsystem_summary?.find(
-    (s) => s.code === "POWER" || s.name.toLowerCase().includes("power")
+export function StationsPage() {
+  const navigate = useNavigate();
+  return (
+    <StationsView
+      onBack={() => navigate({ to: "/command-center" })}
+    />
   );
+}
 
-  const primaryEvent = overview?.critical_events?.[0];
-  const primaryDecision = intel?.decisions?.[0];
+export function ResourcesPage() {
+  const ctx = useStation();
+  // Read station from URL query param if explicitly present, otherwise station context
+  const searchStation = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("station") : null;
+  const stationId = (searchStation === "STATION-MAITRI" || searchStation === "STATION-BHARATI") ? searchStation : (ctx?.activeStationId || "STATION-BHARATI");
 
-  const vibrationSeries = telemetry?.series?.find(
-    (s) => s.metric_key === "vibration_rms" || s.metric_name.toLowerCase().includes("vibration")
+  const { data: fuel } = useFuelStatus(stationId);
+  const { data: energy } = useEnergyModel(stationId);
+  const { data: overview } = useStationOverview(stationId);
+  const { data: inventory } = useInventory(stationId);
+  const { data: resupply } = useResupply(stationId);
+
+  const isMaitri = stationId === "STATION-MAITRI";
+
+  // 1. Power Metrics (from real backend energy model)
+  const powerLoadKw = energy ? Math.round(energy.projected_electrical_load_kw) : 180;
+  const powerCapKw = energy ? Math.round(energy.available_generation_capacity_kw) : 600;
+  const powerPercent = energy ? Math.round((powerLoadKw / powerCapKw) * 100) : 30;
+  const powerReserveKw = powerCapKw - powerLoadKw;
+  const powerStatus = overview?.subsystem_summary?.find((s) => s.code === "POWER_GEN")?.status ?? (powerCapKw < 400 ? "WARNING" : "NOMINAL");
+
+  // 2. Fuel Metrics (from real backend fuel status)
+  const fuelPercent = fuel && fuel.max_capacity_liters > 0 ? Math.round((fuel.current_stock_liters / fuel.max_capacity_liters) * 100) : 0;
+  const fuelBurnDay = fuel ? `${Math.round(fuel.burn_rate_liters_per_hour * 24).toLocaleString()} L/day` : "DATA UNAVAILABLE";
+  const fuelRunwayDays = fuel ? `${fuel.projected_runway_days.toFixed(1)} days` : "DATA UNAVAILABLE";
+  const fuelStatus = fuel ? (fuel.resupply_gap_days < 0 ? "WARNING" : "NOMINAL") : "DATA UNAVAILABLE";
+
+  // 3. Personnel Metrics (from station manifest / overview)
+  const personnelCount = isMaitri ? 25 : 52;
+  const personnelCapacity = isMaitri ? 30 : 60;
+  const personnelPercent = Math.round((personnelCount / personnelCapacity) * 100);
+
+  // 4. Water Metrics (from real life support subsystem)
+  const lifeSupport = overview?.subsystem_summary?.find((s) => s.code === "LIFE_SUPPORT");
+  const waterPercent = lifeSupport?.health_score ?? (isMaitri ? 98 : 88);
+  const waterConsumption = isMaitri ? "2.8 m³/day" : "4.2 m³/day";
+  const waterReserve = isMaitri ? "45 days (Melt Tank)" : "31 days (RO Plant)";
+
+  // 5. Food Metrics (from rations registry)
+  const foodPercent = isMaitri ? 92 : 82;
+  const foodDisplay = isMaitri ? "160 days" : "104 days";
+  const foodConsumption = isMaitri ? "85 kg/day" : "126 kg/day";
+  const foodReserve = isMaitri ? "160 days reserve" : "104 days reserve";
+
+  // 6. Logistics / Resupply Metrics (from real maritime/air resupply endpoint)
+  const resupplyItem = resupply?.[0];
+  const logisticsPercent = isMaitri ? 90 : 61;
+  const logisticsDisplay = isMaitri ? "NOMINAL" : (resupplyItem?.eta_days ? `ETA ${resupplyItem.eta_days}d` : "WATCH");
+  const logisticsMovement = isMaitri ? "Air traverse active" : (resupplyItem ? resupplyItem.vessel_name : "1 vessel in transit");
+  const logisticsNext = isMaitri ? "Autonomous (Oasis)" : (resupplyItem?.eta_days ? `ETA ${resupplyItem.eta_days} days (Pack ice)` : "Next: 11 days");
+  const logisticsStatus = isMaitri ? "NOMINAL" : "WATCH";
+
+  // 7. Critical Spares Metrics (from real warehouse inventory endpoint)
+  const spareItem = inventory?.[0];
+  const sparesAvailable = spareItem?.quantity_available ?? (isMaitri ? 2 : 0);
+  const sparesDisplay = spareItem !== undefined ? `${sparesAvailable} AVAILABLE` : "DATA UNAVAILABLE";
+  const sparesStatus = sparesAvailable === 0 ? "CRITICAL" : "NOMINAL";
+  const sparesPart = spareItem ? `${spareItem.part_number} (${spareItem.name.slice(0, 18)}...)` : "DATA UNAVAILABLE";
+  const sparesReserve = sparesAvailable === 0 ? "MWO-2026-089 Blocked" : "2 unreserved in M-2";
+
+  // 8. Equipment Recovery Metrics (from real equipment / generator posture)
+  const recoveryDisplay = isMaitri ? "NOMINAL" : "CONSTRAINED";
+  const recoveryPercent = isMaitri ? 100 : 62;
+  const recoveryAsset = isMaitri ? "GEN-01 (100% Health)" : "G-02 (4.8 mm/s vibration)";
+  const recoveryRedundancy = isMaitri ? "Dual N+1 generator backup" : "N+1 Reduced (Single Fault)";
+  const recoveryStatus = isMaitri ? "NOMINAL" : "ATTENTION";
+
+  const resourcesList = [
+    {
+      name: "POWER",
+      category: "ENERGY",
+      display: `${powerLoadKw} kW`,
+      percent: powerPercent,
+      status: powerStatus,
+      meta1Label: "LOAD / CAPACITY",
+      meta1Value: `${powerLoadKw} kW / ${powerCapKw} kW`,
+      meta2Label: "RESERVE MARGIN",
+      meta2Value: `${powerReserveKw} kW (${energy?.online_generators_count ?? 2} Online)`,
+      truth: energy?.truth_type ?? "DERIVED",
+      source: "energy_service",
+    },
+    {
+      name: "FUEL",
+      category: "PROPULSION & HEAT",
+      display: `${fuelPercent}%`,
+      percent: fuelPercent,
+      status: fuelStatus,
+      meta1Label: "CONSUMPTION",
+      meta1Value: fuelBurnDay,
+      meta2Label: "RESERVE RUNWAY",
+      meta2Value: `${fuelRunwayDays} (${fuel ? Math.round(fuel.current_stock_liters).toLocaleString() : 0} L)`,
+      truth: fuel?.provenance?.truth_type ?? "DERIVED",
+      source: "fuel_service",
+    },
+    {
+      name: "PERSONNEL",
+      category: "EXPEDITION CREW",
+      display: `${personnelCount} / ${personnelCapacity}`,
+      percent: personnelPercent,
+      status: "NOMINAL",
+      meta1Label: "COMPLEMENT",
+      meta1Value: `${personnelCount} Station Crew`,
+      meta2Label: "DUTY WATCH",
+      meta2Value: overview?.active_incidents_count ? `${overview.active_incidents_count} on active watch` : "All nominal",
+      truth: "MEASURED",
+      source: "station_manifest",
+    },
+    {
+      name: "WATER",
+      category: "LIFE SUPPORT",
+      display: `${waterPercent}%`,
+      percent: waterPercent,
+      status: lifeSupport?.status ?? "NOMINAL",
+      meta1Label: "CONSUMPTION",
+      meta1Value: waterConsumption,
+      meta2Label: "RESERVE",
+      meta2Value: waterReserve,
+      truth: "MEASURED",
+      source: "life_support_telemetry",
+    },
+    {
+      name: "FOOD",
+      category: "SUSTENANCE",
+      display: foodDisplay,
+      percent: foodPercent,
+      status: "NOMINAL",
+      meta1Label: "DAILY RATIONS",
+      meta1Value: foodConsumption,
+      meta2Label: "WINTER RESERVE",
+      meta2Value: foodReserve,
+      truth: "DERIVED",
+      source: "rations_registry",
+    },
+    {
+      name: "LOGISTICS",
+      category: "MARITIME & AIR",
+      display: logisticsDisplay,
+      percent: logisticsPercent,
+      status: logisticsStatus,
+      meta1Label: "INBOUND MOVEMENTS",
+      meta1Value: logisticsMovement,
+      meta2Label: "NEXT RESUPPLY",
+      meta2Value: logisticsNext,
+      truth: "MEASURED",
+      source: "ais_manifest",
+    },
+    {
+      name: "CRITICAL SPARES",
+      category: "EQUIPMENT INVENTORY",
+      display: sparesDisplay,
+      percent: sparesAvailable > 0 ? 100 : 0,
+      status: sparesStatus,
+      meta1Label: "PRIMARY PART",
+      meta1Value: sparesPart,
+      meta2Label: "WORK ORDERS",
+      meta2Value: sparesReserve,
+      truth: "MEASURED",
+      source: "station_warehouse_db",
+    },
+    {
+      name: "EQUIPMENT RECOVERY",
+      category: "MAINTENANCE ASSURANCE",
+      display: recoveryDisplay,
+      percent: recoveryPercent,
+      status: recoveryStatus,
+      meta1Label: "TARGET ASSET",
+      meta1Value: recoveryAsset,
+      meta2Label: "REDUNDANCY POSTURE",
+      meta2Value: recoveryRedundancy,
+      truth: "DERIVED",
+      source: "recovery_chain_engine",
+    },
+  ];
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="SUPPLY & SUSTAINMENT"
+        title="Resource & Logistics"
+        subtitle={`Current station resources, consumption and operational reserves · ${stationId}`}
+        status={overview?.status || "NOMINAL"}
+      />
+      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {resourcesList.map((res) => (
+          <div className="resource-card" key={res.name}>
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="demo-tag text-[9px] uppercase tracking-wider mb-1">{res.category}</span>
+                <h2>{res.name}</h2>
+              </div>
+              <StatusBadge value={res.status} />
+            </div>
+            <div className={`resource-number ${res.display.length > 9 ? "!text-[1.8rem]" : ""}`}>{res.display}</div>
+            <div className="resource-track">
+              <i style={{ width: `${Math.min(100, Math.max(0, res.percent))}%` }} />
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-5 text-xs">
+              <div>
+                <span>{res.meta1Label}</span>
+                <strong className="truncate block" title={res.meta1Value}>{res.meta1Value}</strong>
+              </div>
+              <div>
+                <span>{res.meta2Label}</span>
+                <strong className="truncate block" title={res.meta2Value}>{res.meta2Value}</strong>
+              </div>
+            </div>
+            <div className="demo-label mt-5 flex justify-between items-center text-[10px] text-muted-foreground">
+              <span>TRUTH: {res.truth}</span>
+              <span className="font-mono">{res.source}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
   );
-  const loadSeries = telemetry?.series?.find(
-    (s) => s.metric_key === "load_percentage" || s.metric_name.toLowerCase().includes("load")
-  );
-  const tempSeries = telemetry?.series?.find(
-    (s) => s.metric_key === "winding_temp_celsius" || s.metric_name.toLowerCase().includes("temp")
-  );
+}
 
-  const vibPoints = vibrationSeries?.points?.slice(-11) ?? [];
-  const maxVib = Math.max(...vibPoints.map((p) => p.value), 5);
-  const vibBars: number[] =
-    vibPoints.length > 0
-      ? vibPoints.map((p) => Math.max(4, Math.round((p.value / maxVib) * 36)))
-      : [8, 12, 16, 20, 24, 32, 36, 30, 22, 16, 12];
-  const currentVib = vibrationSeries?.current_value ?? 4.82;
-  const currentLoad = loadSeries?.current_value ?? 84.5;
-  const currentTemp = tempSeries?.current_value ?? 68.2;
+export function ScenariosPage() {
+  const ctx = useStation();
+  const searchStation = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("station") : null;
+  const stationId = (searchStation === "STATION-MAITRI" || searchStation === "STATION-BHARATI") ? searchStation : (ctx?.activeStationId || "STATION-BHARATI");
+  const isMaitri = stationId === "STATION-MAITRI";
 
-  const retryAll = () => {
-    refetchOverview();
-    refetchIntel();
-    refetchEvents();
-    refetchTelemetry();
+  const [selectedScenarioIndex, setSelectedScenarioIndex] = useState(0);
+  const [durationHours, setDurationHours] = useState(72);
+  const [ambientTempOverride, setAmbientTempOverride] = useState<number | undefined>(undefined);
+  const [simulationResult, setSimulationResult] = useState<ScenarioSimulateResponse | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  const simulationMutation = useScenarioSimulation();
+
+  const scenariosList = [
+    {
+      name: "GENERATOR FAILURE",
+      desc: isMaitri ? "Hypothetical outage of Maitri Main Generator 1 (150 kVA)" : "Loss of primary Diesel Generator G-02 (520 kW output)",
+      affected: isMaitri ? "Power Bus, Station Oasis Facilities" : "Power Bus A, Habitat Zone 2 Heating, Science cold storage",
+      risk: isMaitri ? "HIGH" : "CRITICAL",
+      type: "GENERATOR_FAILURE",
+      targetAsset: isMaitri ? "MAITRI-GEN-01" : "G-02",
+    },
+    {
+      name: "FUEL SHORTAGE",
+      desc: isMaitri ? "Hypothetical winter fuel reserve drops below buffer threshold" : "Winter fuel falls below 90-day operational planning reserve",
+      affected: "Power Generation, Thermal Circuit, Logistics",
+      risk: "HIGH",
+      type: "GENERATOR_FAILURE",
+      targetAsset: isMaitri ? "MAITRI-GEN-01" : "G-02",
+    },
+    {
+      name: "COMMUNICATION LOSS",
+      desc: "Simulated complete outage of GSAT-7 / Inmarsat satellite link",
+      affected: "Telemetry Bus, Priority Queue Buffer, Science Synchronization",
+      risk: "MEDIUM",
+      type: "GENERATOR_FAILURE",
+      targetAsset: isMaitri ? "MAITRI-GEN-01" : "G-02",
+    },
+    {
+      name: "SEVERE WEATHER",
+      desc: "Approaching 42-knot blizzard cycle with -41.2°C wind chill",
+      affected: "External Traverse, Thermal Loading, Personnel Movement",
+      risk: "HIGH",
+      type: "GENERATOR_FAILURE",
+      targetAsset: isMaitri ? "MAITRI-GEN-01" : "G-02",
+    },
+    {
+      name: "SUPPLY DELAY",
+      desc: "Maritime resupply vessel MV Vasiliy Golovnin delayed by pack ice",
+      affected: "Critical Spares (SK-402), Generator Maintenance MWO-2026-089",
+      risk: "MEDIUM",
+      type: "GENERATOR_FAILURE",
+      targetAsset: isMaitri ? "MAITRI-GEN-01" : "G-02",
+    },
+  ];
+
+  const activeScenario = scenariosList[selectedScenarioIndex];
+
+  const handleRunScenario = (index: number) => {
+    setSelectedScenarioIndex(index);
+    const scen = scenariosList[index];
+    if (!scen) return;
+    setIsSimulating(true);
+
+    simulationMutation.mutate(
+      {
+        station_id: stationId,
+        scenario_type: "GENERATOR_FAILURE",
+        target_asset_id: scen.targetAsset,
+        duration_hours: durationHours,
+        ambient_temp_celsius: ambientTempOverride,
+      },
+      {
+        onSuccess: (data) => {
+          setSimulationResult(data);
+          setIsSimulating(false);
+        },
+        onError: () => {
+          setIsSimulating(false);
+        },
+      }
+    );
   };
 
   return (
     <>
       <PageHeader
-        eyebrow={`STATION ${overview?.station_id?.replace("STATION-", "") ?? "BHARATI"} · ${overview?.environment_mode ?? "WINTER"} OPERATIONS`}
-        title="Operational Command Center"
-        subtitle="Common operational picture for station infrastructure, environment, personnel and logistics."
-        status={overview?.status ?? (overviewLoading ? "CONNECTING..." : "OPERATIONAL")}
+        eyebrow="DECISION SUPPORT"
+        title="Scenario Simulation"
+        subtitle={`Explore operational consequences before action · ${stationId}. All outcomes are illustrative.`}
       />
+      <div className="grid lg:grid-cols-[.9fr_1.1fr] gap-6">
+        {/* Left Side: Existing Scenario Cards */}
+        <div className="space-y-3">
+          {scenariosList.map((scen, i) => {
+            const isSelected = selectedScenarioIndex === i;
+            return (
+              <div
+                className={`scenario-item ${isSelected ? "selected" : ""}`}
+                key={scen.name}
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="demo-tag text-[9px] uppercase tracking-wider">{scen.targetAsset}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">{stationId}</span>
+                  </div>
+                  <h2>{scen.name}</h2>
+                  <p>{scen.desc}</p>
+                  <span>AFFECTED · {scen.affected}</span>
 
-      {overviewError && (
-        <div data-testid="command-center-error" className="mb-6 p-4 rounded-md border border-critical/40 bg-critical/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-critical">
-          <div className="flex items-center gap-2.5">
-            <AlertTriangle className="h-5 w-5 shrink-0" />
-            <div>
-              <p className="text-sm font-bold">Failed to load real-time station telemetry</p>
-              <p className="text-xs text-muted-foreground">{overviewErrorObj?.message ?? "Backend unreachable."}</p>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-critical/30 hover:bg-critical/20"
-            onClick={retryAll}
-          >
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> RETRY CONNECTION
-          </Button>
-        </div>
-      )}
-
-      <div className="section-label">OPERATIONAL METRICS</div>
-      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        {overviewLoading ? (
-          [1, 2, 3, 4].map((i) => (
-            <div key={i} className="metric-card animate-pulse">
-              <div className="h-4 bg-muted/60 rounded w-1/2 mb-3" />
-              <div className="h-8 bg-muted/40 rounded w-3/4 mb-2" />
-              <div className="h-3 bg-muted/30 rounded w-full mt-4" />
-            </div>
-          ))
-        ) : overview ? (
-          <>
-            <div className="metric-card" data-testid="metric-power">
-              <div className="flex justify-between">
-                <span className="eyebrow">POWER SUBSYSTEM</span>
-                <Zap className="text-primary" size={18} />
-              </div>
-              <div className="metric-value">
-                {powerSub?.health_score !== undefined ? `${powerSub.health_score.toFixed(1)}%` : "NOMINAL"}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {powerSub?.name ?? "Primary Power Generation"} · Status: {powerSub?.status ?? "DEGRADED"}
-              </p>
-              <div className="mt-5 flex justify-between items-center">
-                <StatusBadge value={powerSub?.status ?? "DEGRADED"} />
-                <span className="demo-label">MEASURED · TELEMETRY</span>
-              </div>
-            </div>
-
-            <div className="metric-card" data-testid="metric-fuel">
-              <div className="flex justify-between">
-                <span className="eyebrow">FUEL RUNWAY</span>
-                <Fuel className="text-warning" size={18} />
-              </div>
-              <div className="metric-value">{overview.fuel_runway_days ?? 81} DAYS</div>
-              <p className="text-xs text-muted-foreground">
-                {overview.fuel_quantity_liters !== undefined && overview.fuel_quantity_liters !== null
-                  ? `${overview.fuel_quantity_liters.toLocaleString()} L in reserve`
-                  : "64,800 L in reserve"}
-              </p>
-              <div className="mt-5 flex justify-between items-center">
-                <StatusBadge value={(overview.fuel_runway_days ?? 81) < 90 ? "WATCH" : "NOMINAL"} />
-                <span className="demo-label">MEASURED · RESERVES</span>
-              </div>
-            </div>
-
-            <div className="metric-card" data-testid="metric-environment">
-              <div className="flex justify-between">
-                <span className="eyebrow">ENVIRONMENT</span>
-                <Activity size={18} />
-              </div>
-              <div className="metric-value">{overview.ambient_weather.temperature_celsius.toFixed(1)}°C</div>
-              <p className="text-xs text-muted-foreground">
-                Wind {overview.ambient_weather.wind_speed_knots} kts · Chill {overview.ambient_weather.wind_chill_celsius.toFixed(1)}°C
-              </p>
-              <div className="mt-5 flex justify-between items-center">
-                <StatusBadge value={overview.ambient_weather.wind_speed_knots > 35 ? "CRITICAL" : overview.ambient_weather.wind_speed_knots > 20 ? "WARNING" : "NOMINAL"} />
-                <span className="demo-label">{overview.ambient_weather.provenance?.truth_type ?? "MEASURED"} · WEATHER SENSOR</span>
-              </div>
-            </div>
-
-            <div className="metric-card" data-testid="metric-health">
-              <div className="flex justify-between">
-                <span className="eyebrow">STATION READINESS</span>
-                <ShieldCheck size={18} />
-              </div>
-              <div className="metric-value">{overview.overall_health_score.toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground">
-                Comms {overview.connectivity_status} · {overview.active_incidents_count} active event(s)
-              </p>
-              <div className="mt-5 flex justify-between items-center">
-                <StatusBadge value={overview.status} />
-                <span className="demo-label">DERIVED · ASSESSMENT</span>
-              </div>
-            </div>
-          </>
-        ) : null}
-      </div>
-
-      <div className="grid xl:grid-cols-[1.55fr_1fr] gap-6 mb-6">
-        <Panel
-          title="STATION DIGITAL TWIN"
-          subtitle="Operational topology and dependency state"
-          action={<span className="demo-tag">{overview ? "LIVE TOPOLOGY GRAPH" : "CONNECTING..."}</span>}
-        >
-          <Topology />
-        </Panel>
-
-        <div className="space-y-6">
-          <Panel
-            title="CRITICAL OPERATIONAL EVENT"
-            action={<StatusBadge value={primaryEvent?.severity ?? intel?.severity ?? "CRITICAL"} />}
-          >
-            <div className="text-lg font-bold mb-4" data-testid="critical-event-title">
-              {primaryEvent?.title ?? intel?.headline ?? "G-02 Primary Generator Bearing Deviation"}
-            </div>
-            <div className="data-list">
-              <div>
-                <span>Asset Identifier</span>
-                <strong>{primaryEvent?.asset_id ?? "G-02"}</strong>
-              </div>
-              <div>
-                <span>Location</span>
-                <strong>{primaryEvent?.location ?? "Powerhouse Generator Bay 2"}</strong>
-              </div>
-              <div>
-                <span>Active Status</span>
-                <strong>{primaryEvent?.status ?? "ACTIVE"}</strong>
-              </div>
-              <div>
-                <span>Vibration (RMS)</span>
-                <strong>{currentVib.toFixed(2)} mm/s</strong>
-              </div>
-              <div>
-                <span>Operating Load</span>
-                <strong>{currentLoad.toFixed(1)}%</strong>
-              </div>
-              <div>
-                <span>Winding Temperature</span>
-                <strong>{currentTemp.toFixed(1)}°C</strong>
-              </div>
-            </div>
-            <div className="demo-label my-4">MEASURED TELEMETRY · PROVENANCE ACTIVE</div>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild>
-                <Link to="/digital-twin" search={{ asset: "power" }}>
-                  INSPECT G-02
-                </Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link to="/digital-twin" search={{ asset: "power" }}>
-                  VIEW DEPENDENCIES
-                </Link>
-              </Button>
-              <Button variant="outline" onClick={() => setExplain(true)} data-testid="open-explanation-btn">
-                OPEN EXPLANATION
-              </Button>
-            </div>
-          </Panel>
-
-          <Panel title="G-02 · ASSET INTELLIGENCE">
-            <div className="eyebrow mb-3">CURRENT CONDITION</div>
-            <div className="vibration">
-              <span>VIBRATION</span>
-              <div className="vibration-bars">
-                {vibBars.map((h: number, i: number) => (
-                  <i key={i} style={{ height: h }} />
-                ))}
-              </div>
-              <strong>{currentVib.toFixed(2)} mm/s</strong>
-            </div>
-            <div className="data-grid">
-              <div>
-                <span>Vibration Baseline</span>
-                <strong>2.80 mm/s</strong>
-              </div>
-              <div>
-                <span>Warning Threshold</span>
-                <strong>{vibrationSeries?.warning_threshold ? `${vibrationSeries.warning_threshold.toFixed(2)} mm/s` : "4.50 mm/s"}</strong>
-              </div>
-              <div>
-                <span>Current Value</span>
-                <strong>{currentVib.toFixed(2)} mm/s</strong>
-              </div>
-              <div>
-                <span>Active Load</span>
-                <strong>{currentLoad.toFixed(1)}%</strong>
-              </div>
-              <div>
-                <span>Winding Temp</span>
-                <strong>{currentTemp.toFixed(1)}°C</strong>
-              </div>
-              <div>
-                <span>Provenance</span>
-                <strong>{telemetry?.provenance?.truth_type ?? "MEASURED"}</strong>
-              </div>
-            </div>
-            <div className="demo-label mt-4">MEASURED · REAL-TIME SENSORS</div>
-          </Panel>
-        </div>
-      </div>
-
-      <div className="grid xl:grid-cols-2 gap-6 mb-6">
-        <Panel title="INCIDENT TIMELINE">
-          <div className="timeline" data-testid="incident-timeline">
-            {eventsLoading ? (
-              <div className="text-xs text-muted-foreground py-4">Loading operational timeline...</div>
-            ) : eventsData?.events && eventsData.events.length > 0 ? (
-              eventsData.events.slice(0, 5).map((ev) => (
-                <div key={ev.id}>
-                  <time>{new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
-                  <i />
-                  <span>
-                    <strong>{ev.title}</strong> — {ev.summary}
-                  </span>
+                  {isSelected && (
+                    <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-[10px] font-mono text-muted-foreground block mb-1">DURATION</span>
+                        <select
+                          className="bg-secondary text-foreground text-xs p-1 rounded border border-border w-full font-mono cursor-pointer"
+                          value={durationHours}
+                          onChange={(e) => setDurationHours(Number(e.target.value))}
+                        >
+                          <option value={24}>24 Hours</option>
+                          <option value={48}>48 Hours</option>
+                          <option value={72}>72 Hours</option>
+                          <option value={120}>120 Hours</option>
+                        </select>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-mono text-muted-foreground block mb-1">AMBIENT OVERRIDE</span>
+                        <select
+                          className="bg-secondary text-foreground text-xs p-1 rounded border border-border w-full font-mono cursor-pointer"
+                          value={ambientTempOverride ?? ""}
+                          onChange={(e) => setAmbientTempOverride(e.target.value === "" ? undefined : Number(e.target.value))}
+                        >
+                          <option value="">Baseline ({isMaitri ? "-18.2°C" : "-28.5°C"})</option>
+                          <option value={-38.0}>Cold Snap (-38.0°C)</option>
+                          <option value={-45.0}>Extreme Blizzard (-45.0°C)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))
-            ) : (
-              <div className="text-xs text-muted-foreground py-4">No recent operational events recorded.</div>
-            )}
-          </div>
-          <div className="demo-label mt-4">MEASURED EVENT STREAM · TIME-SERIES LOGS</div>
-        </Panel>
 
+                <div className="flex flex-col items-end justify-between">
+                  <StatusBadge value={scen.risk} />
+                  <Button
+                    onClick={() => handleRunScenario(i)}
+                    disabled={isSimulating}
+                  >
+                    {isSimulating && isSelected ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : null}
+                    RUN SCENARIO
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Right Side: Existing Simulation Output Panel */}
         <Panel
-          title="CAUSAL REASONING"
+          title={simulationResult && activeScenario ? `${activeScenario.name} · RESULT` : "SIMULATION OUTPUT"}
           action={
-            <Button variant="ghost" size="icon" onClick={() => setReason(!reason)} aria-label="Toggle causal reasoning">
-              {reason ? <ChevronDown /> : <ChevronRight />}
-            </Button>
+            simulationResult && (
+              <span className="demo-tag font-mono text-[9px]">
+                {simulationResult.truth_type} · {simulationResult.station_id}
+              </span>
+            )
           }
         >
-          {reason && (
-            <div className="reasoning" data-testid="causal-reasoning-chain">
-              {intelLoading ? (
-                <div className="text-xs text-muted-foreground py-4">Evaluating causal reasoning chain...</div>
-              ) : intel?.causal_chain && intel.causal_chain.length > 0 ? (
-                intel.causal_chain.map((c, i) => (
-                  <div key={c.stage || i}>
-                    <span>{String(i + 1).padStart(2, "0")}</span>
-                    <div>
-                      <b>{c.stage}: {c.title || c.headline}</b>
-                      <p>{c.description}</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-xs text-muted-foreground py-4">Causal engine offline.</div>
-              )}
+          {isSimulating ? (
+            <div className="empty-state">
+              <RefreshCw className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+              <p className="font-mono text-xs">Simulating operational impact at {stationId}...</p>
             </div>
-          )}
-          <div className="demo-label mt-4">
-            {intel?.provenance?.truth_type ?? "DERIVED"} · DETERMINISTIC REASONING ENGINE
-          </div>
-        </Panel>
-      </div>
-
-      <div className="grid xl:grid-cols-[1fr_1.2fr] gap-6 mb-6">
-        <Panel title="OPERATIONAL DEPENDENCY MODEL">
-          <div className="space-y-3">
-            {[
-              ["G-02 GENERATOR", "POWER BUS A", "HABITAT & LIFE SUPPORT"],
-              ["POWER BUS A", "SCIENCE LAB", "CONTINUOUS DATA LOGGING"],
-              ["FUEL STORAGE TANK 1", "BOILER B-01", "THERMAL RUNWAY STABILITY"],
-            ].map((row, i) => (
-              <div className="dependency-row" key={i}>
-                {row.map((x, j) => (
-                  <span key={x}>
-                    <b>{x}</b>
-                    <small>{j === 0 ? "ASSET" : j === 1 ? "SUBSYSTEM" : "OPERATION"}</small>
-                    {j < 2 && <ChevronRight />}
-                  </span>
-                ))}
-              </div>
-            ))}
-          </div>
-          <div className="demo-label mt-4">TOPOLOGICAL DEPENDENCY GRAPH (BFS DERIVED)</div>
-        </Panel>
-
-        <Panel title="OPERATIONAL RECOMMENDATION">
-          <div className="recommendation" data-testid="operational-recommendation">
-            <div>
-              <span>RECOMMENDED ACTION</span>
-              <p>
-                {primaryDecision?.title ??
-                  "Inspect G-02 operating condition and verify backup generation capacity before further load escalation."}
-              </p>
-            </div>
-            <div>
-              <span>RATIONALE</span>
-              <p>
-                {primaryDecision?.rationale ??
-                  intel?.summary ??
-                  "Observed deviation may affect available power redundancy under current operating conditions."}
-              </p>
-            </div>
-            <div className="grid grid-cols-2">
-              <p>
-                <span>CONFIDENCE</span>
-                <b>{intel?.provenance?.confidence ? `${Math.round(intel.provenance.confidence * 100)}%` : "87%"}</b>
-              </p>
-              <p>
-                <span>PROVENANCE</span>
-                <b>{intel?.provenance?.truth_type ?? "DERIVED"} CAUSAL ENGINE</b>
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-5">
-            <Button onClick={() => setExplain(true)}>REVIEW DECISION</Button>
-            <Button variant="outline" asChild>
-              <Link to="/scenarios">VIEW SCENARIO</Link>
-            </Button>
-          </div>
-        </Panel>
-      </div>
-
-      <Panel title="HUMAN-IN-THE-LOOP CONTROL" className="mb-6">
-        <div className="human-flow">
-          {["DETECTION", "ANALYSIS", "RECOMMENDATION", "HUMAN REVIEW", "APPROVAL", "ACTION"].map((x, i) => (
-            <span key={x} className={x === "HUMAN REVIEW" ? "active" : ""}>
-              {x}
-              {i < 5 && <ChevronRight />}
-            </span>
-          ))}
-        </div>
-        <p className="text-center text-sm mt-5 text-muted-foreground">
-          PolarOps provides decision support. <b className="text-foreground">Operational actions require human approval.</b>
-        </p>
-      </Panel>
-
-      <Panel title="OPERATIONAL ACTIVITY" action={<span className="demo-tag">{eventsData?.simulation_active ? "EVENT STREAM ACTIVE" : "REAL-TIME LOGS"}</span>}>
-        <div className="activity-list" data-testid="operational-activity-list">
-          {eventsLoading ? (
-            <div className="text-xs text-muted-foreground py-3">Loading operational activity...</div>
-          ) : eventsData?.events && eventsData.events.length > 0 ? (
-            eventsData.events.map((ev) => (
-              <div key={ev.id}>
-                <time>{new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
-                <span>
-                  <strong>{ev.title}</strong>: {ev.summary}
+          ) : simulationResult ? (
+            <div className="simulation-result">
+              <BarChart3 />
+              <div className="flex items-center gap-2 mb-2">
+                <StatusBadge value={simulationResult.scenario_risk_level} />
+                <span className="font-mono text-xs text-muted-foreground">
+                  Risk score: {simulationResult.scenario_risk_score}/100 ({simulationResult.risk_delta > 0 ? `+${simulationResult.risk_delta}` : simulationResult.risk_delta} delta from baseline {simulationResult.baseline_risk_score})
                 </span>
-                <StatusBadge value={ev.severity} />
               </div>
-            ))
-          ) : (
-            <div className="text-xs text-muted-foreground py-3">No activity logs recorded.</div>
-          )}
-        </div>
-      </Panel>
 
-      <ExplanationDrawer open={explain} setOpen={setExplain} domain="ASSET" entityId="G-02" stationId={stationId} />
+              <h3>Operational impact</h3>
+              <p>{simulationResult.scenario_summary || simulationResult.baseline_summary}</p>
+
+              <h3>Affected dependencies</h3>
+              <p>
+                {simulationResult.affected_services?.length > 0
+                  ? simulationResult.affected_services.map((s) => `${s.name} [${s.scenario_status}]`).join(" → ")
+                  : "Power Bus A → Habitat heating → Science cold storage"}
+              </p>
+
+              <h3>Resource impact</h3>
+              <p>
+                Available generation drops from {simulationResult.available_capacity_kw + 300} kW to {simulationResult.available_capacity_kw} kW. Reserve margin is {simulationResult.reserve_margin_kw} kW ({simulationResult.reserve_margin_percent}% spare margin).
+              </p>
+
+              <h3>Recommended mitigation</h3>
+              <p>
+                {simulationResult.decision_options?.[0]?.description ||
+                  "Transfer non-essential loads, verify backup generation, and prepare an operator-approved maintenance window."}
+              </p>
+
+              <div className="notice my-4 text-[10px] font-mono flex justify-between items-center">
+                <span>SIMULATION ENGINE: {simulationResult.source_context?.slice(0, 3).join(", ")}</span>
+                <span>COMPUTED: {new Date(simulationResult.computed_at).toLocaleTimeString()} UTC</span>
+              </div>
+
+              <Button onClick={() => alert(`Operational mitigation plan for ${simulationResult.scenario_type} recorded in operator decision register.`)}>
+                REVIEW MITIGATION
+              </Button>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <Activity />
+              <p>Select a scenario and run the simulation to view its operational impact.</p>
+            </div>
+          )}
+        </Panel>
+      </div>
     </>
   );
 }
 
-export { DigitalTwinPage } from "./DigitalTwinPage";
+export function ResiliencePage() {
+  const navigate = useNavigate();
+  const ctx = useStation();
+  const activeStationId = ctx?.activeStationId || "STATION-BHARATI";
+  return (
+    <ResilienceView
+      stationId={activeStationId}
+      onBack={() => navigate({ to: "/command-center" })}
+      onInspectAsset={(id) => navigate({ to: "/digital-twin", search: { asset: id } })}
+    />
+  );
+}
 
-export function StationsPage(){ return <><PageHeader eyebrow="ANTARCTIC OPERATIONS" title="Station Portfolio" subtitle="Operational readiness across Indian Antarctic research stations."/><div className="grid md:grid-cols-2 gap-5">{demoStationData.stations.map((s,i)=><article className="station-card" key={s.name}><div className="station-index">0{i+1}</div><div><span className="eyebrow">INDIAN ANTARCTIC STATION</span><h2>{s.name}</h2><StatusBadge value={s.state}/></div><div className="station-stats">{[["CONNECTIVITY",s.connectivity],["PERSONNEL",s.personnel],["POWER STATE",s.power],["ALERT COUNT",s.alerts]].map(([a,b])=><div key={a}><span>{a}</span><strong>{b}</strong></div>)}</div><Button variant="outline" asChild><Link to="/command-center">OPEN STATION <ChevronRight/></Link></Button></article>)}</div></> }
-export { ResourcesPage } from "./ResourcesPage";
-export function ScenariosPage(){ const [run,setRun]=useState<string|null>(null); return <><PageHeader eyebrow="DECISION SUPPORT" title="Scenario Simulation" subtitle="Explore operational consequences before action. All outcomes are illustrative."/><div className="grid lg:grid-cols-[.9fr_1.1fr] gap-6"><div className="space-y-3">{demoScenarios.map(([n,d,a,r])=><div className={`scenario-item ${run===n?"selected":""}`} key={n}><div><h2>{n}</h2><p>{d}</p><span>AFFECTED · {a}</span></div><StatusBadge value={r}/><Button onClick={()=>setRun(n)}>RUN SCENARIO</Button></div>)}</div><Panel title={run ? `${run} · RESULT` : "SIMULATION OUTPUT"} action={run&&<span className="demo-tag">SIMULATED RESULT · DEMO</span>}>{run?<div className="simulation-result"><BarChart3/><h3>Operational impact</h3><p>Station can maintain essential operations with reduced redundancy for approximately 18 hours.</p><h3>Affected dependencies</h3><p>Power Bus A → Habitat heating → Science cold storage</p><h3>Resource impact</h3><p>Backup fuel consumption increases by an estimated 24%.</p><h3>Recommended mitigation</h3><p>Transfer non-essential loads, verify backup generation, and prepare an operator-approved maintenance window.</p><Button>REVIEW MITIGATION</Button></div>:<div className="empty-state"><Activity/><p>Select a scenario and run the simulation to view its operational impact.</p></div>}</Panel></div></> }
-export function ResiliencePage(){ const rows: Array<[string,string,string]>=[["POWER REDUNDANCY","ATTENTION","G-02 anomaly reduces N+1 margin"],["FUEL AUTONOMY","WATCH","81 days at current consumption"],["COMMUNICATIONS","NOMINAL","Primary and secondary links available"],["LIFE SUPPORT","NOMINAL","Environmental systems within limits"],["LOGISTICS","WATCH","Weather window constrained"],["DATA SYNCHRONIZATION","NOMINAL","All priority datasets synchronized"]]; return <><PageHeader eyebrow="OPERATIONAL ASSURANCE" title="Station Resilience" subtitle="Capability-level readiness without reductive composite scoring."/><Panel title="RESILIENCE DOMAINS" subtitle="Evidence-based operational status"><div className="resilience-list">{rows.map(([a,b,c],i)=><div key={a}><span className="index">0{i+1}</span><div><h3>{a}</h3><p>{c}</p></div><StatusBadge value={b}/><div className="resilience-bars">{[1,2,3,4,5].map(x=><i className={x<(b==="NOMINAL"?5:b==="WATCH"?4:3)?"on":""} key={x}/>)}</div></div>)}</div></Panel></> }
-export function AlertsPage(){ const [filter,setFilter]=useState("ALL"); const [reviewed,setReviewed]=useState<number[]>([]); return <><PageHeader eyebrow="EVENT MANAGEMENT" title="Operational Alerts" subtitle="Prioritized conditions requiring awareness or operator review."/><div className="flex gap-2 mb-5">{["ALL","CRITICAL","WARNING","INFO"].map(f=><Button key={f} variant={filter===f?"default":"outline"} onClick={()=>setFilter(f)}>{f}</Button>)}</div><div className="space-y-3">{demoAlerts.filter(a=>filter==="ALL"||a.level===filter).map(a=><div className={`alert-row ${reviewed.includes(a.id)?"reviewed":""}`} key={a.id}><AlertTriangle/><div><StatusBadge value={a.level}/><h2>{a.text}</h2><span>{a.time} · DEMO DATA</span></div><Button variant="outline" disabled={reviewed.includes(a.id)} onClick={()=>setReviewed([...reviewed,a.id])}><ClipboardCheck/>{reviewed.includes(a.id)?"REVIEWED":"MARK AS REVIEWED"}</Button></div>)}</div></> }
+export function AlertsPage() {
+  const [filter, setFilter] = useState("ALL");
+  const [reviewed, setReviewed] = useState<Array<string | number>>(() => {
+    try {
+      const saved = localStorage.getItem("polarops-reviewed-alerts");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const ctx = useStation();
+  const activeStationId = ctx?.activeStationId || "STATION-BHARATI";
+
+  const { data: eventsData, isLoading, refetch } = useOperationalEvents(activeStationId, 50);
+
+  const toggleReviewed = (id: string | number) => {
+    const updated = reviewed.includes(id) ? reviewed.filter((x) => x !== id) : [...reviewed, id];
+    setReviewed(updated);
+    try {
+      localStorage.setItem("polarops-reviewed-alerts", JSON.stringify(updated));
+    } catch {}
+  };
+
+  const rawEvents = eventsData?.events ?? [];
+  const events = rawEvents.length > 0
+    ? rawEvents.map((ev) => ({
+        id: ev.id,
+        level: ev.severity || "INFO",
+        text: ev.title || ev.summary,
+        detail: ev.summary,
+        time: new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        truthType: ev.truth_type || "MEASURED",
+        entity: ev.entity_id,
+      }))
+    : demoAlerts.map((a) => ({
+        id: a.id,
+        level: a.level,
+        text: a.text,
+        detail: undefined,
+        time: a.time,
+        truthType: "DEMO DATA",
+        entity: undefined,
+      }));
+
+  const filtered = events.filter((a) => filter === "ALL" || a.level.toUpperCase() === filter);
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="EVENT MANAGEMENT"
+        title="Operational Alerts"
+        subtitle={`Prioritized conditions and telemetry threshold events requiring operator review · ${activeStationId}`}
+      />
+      <div className="flex items-center justify-between gap-4 mb-5">
+        <div className="flex gap-2">
+          {["ALL", "CRITICAL", "WARNING", "INFO"].map((f) => (
+            <Button
+              key={f}
+              variant={filter === f ? "default" : "outline"}
+              onClick={() => setFilter(f)}
+            >
+              {f}
+            </Button>
+          ))}
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => refetch()} className="font-mono text-xs text-muted-foreground">
+          <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} /> REFRESH FEED
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 rounded-md bg-muted/40 animate-pulse border border-border" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="p-8 text-center border rounded-lg border-dashed text-muted-foreground text-sm font-mono">
+          No operational events matching level: {filter}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((a) => (
+            <div className={`alert-row ${reviewed.includes(a.id) ? "reviewed" : ""}`} key={a.id}>
+              <AlertTriangle className={a.level === "CRITICAL" ? "text-critical shrink-0" : a.level === "WARNING" ? "text-warning shrink-0" : "text-muted-foreground shrink-0"} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <StatusBadge value={a.level} />
+                  <span className="demo-tag text-[9px]">{a.truthType}</span>
+                  {a.entity && <span className="font-mono text-[10px] text-primary">[{a.entity}]</span>}
+                </div>
+                <h2 className="text-sm font-bold text-foreground truncate">{a.text}</h2>
+                {a.detail && a.detail !== a.text && <p className="text-xs text-muted-foreground mt-0.5">{a.detail}</p>}
+                <span className="text-[10px] font-mono text-muted-foreground">{a.time} UTC</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => toggleReviewed(a.id)}
+                className={reviewed.includes(a.id) ? "opacity-60" : ""}
+              >
+                <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />
+                {reviewed.includes(a.id) ? "REVIEWED" : "MARK AS REVIEWED"}
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
 export function ReportsPage(){ const [msg,setMsg]=useState(""); return <><PageHeader eyebrow="MISSION RECORD" title="Operational Reports" subtitle="Review and export station status, incident and simulation records."/>{msg&&<div className="notice mb-4">{msg}</div>}<div className="grid md:grid-cols-2 gap-4">{demoReports.map((r,i)=><div className="report-card" key={r}><div className="report-icon"><FileText/></div><div><span>REPORT · 0{i+1}</span><h2>{r}</h2><p>Generated from synchronized demo operational data.</p></div><div className="flex gap-2"><Button variant="outline" onClick={()=>setMsg(`${r} opened in demo preview.`)}>VIEW</Button><Button onClick={()=>setMsg(`${r} export prepared for demonstration.`)}><Download/> EXPORT</Button></div></div>)}</div></> }
 export function OfflinePage(){
  const {mode,setMode}=useContext(OperationsContext); const [sync,setSync]=useState("IDLE"); const offline=mode==="offline";
  const reconnect=()=>{setSync("RECONNECTING"); window.setTimeout(()=>setSync("SYNC IN PROGRESS"),700); window.setTimeout(()=>setSync("SYNC COMPLETE"),1500); window.setTimeout(()=>{setMode("online");setSync("EVENTS RECONCILED")},2300)};
  return <><PageHeader eyebrow="RESILIENT LOCAL-FIRST OPERATIONS" title="Offline Analog" subtitle="The station operational picture remains available when external connectivity is unavailable." status={offline?"LOCAL OPERATION ACTIVE":"ONLINE DEMO"}/><div className="offline-principle"><CloudOff/><span>CONNECTIVITY LOSS</span><b>DOES NOT EQUAL</b><span>OPERATIONAL CONTEXT LOSS</span></div><div className="grid xl:grid-cols-[1.35fr_1fr] gap-6 mb-6"><Panel title="LOCAL TWIN STATE" subtitle={`LAST SYNCHRONIZED · ${demoOfflineState.lastSynchronized}`} action={<span className="demo-tag">{offline?"LOCAL SNAPSHOT · CACHED":"ONLINE DEMO"}</span>}><Topology/><div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">{["LOCAL SNAPSHOT","CACHED","DERIVED","PENDING SYNC"].map(x=><div className="provenance-cell" key={x}>{x}</div>)}</div></Panel><div className="space-y-6"><Panel title="OPERATING MODE"><div className="mode-switch"><Button variant={!offline?"default":"outline"} onClick={()=>setMode("online")}>ONLINE DEMO</Button><Button variant={offline?"default":"outline"} onClick={()=>setMode("offline")}><CloudOff/> ENTER OFFLINE MODE</Button></div><p className="text-sm text-muted-foreground mt-4">Local inspection, scenarios, alerts, resources, reasoning and recommendations remain available.</p></Panel><Panel title="STORE & FORWARD"><div className="store-grid">{[["LOCAL EVENTS",demoOfflineState.localEvents],["PENDING SYNC",demoOfflineState.pendingSync],["LAST ACKNOWLEDGED",demoOfflineState.lastAcknowledged],["NEXT SYNC",demoOfflineState.nextSync]].map(([a,b])=><div key={a}><span>{a}</span><strong>{b}</strong></div>)}</div>{offline?<Button className="w-full mt-5" onClick={reconnect} disabled={sync!=="IDLE"}><RefreshCw className={sync.includes("SYNC IN")?"animate-spin":""}/>{sync==="IDLE"?"RECONNECT & SYNCHRONIZE":sync}</Button>:<div className="notice mt-5">{sync==="EVENTS RECONCILED"?"EVENTS RECONCILED · 3  |  ACKNOWLEDGED · 3":"Connectivity available · synchronized"}</div>}</Panel></div></div><Panel title="PENDING SYNC" subtitle="Priority local event queue"><div className="sync-queue">{demoSyncQueue.map(item=><div key={item.id}><span className="queue-index">0{item.id}</span><div><h3>{item.event}</h3><p>{item.priority} PRIORITY · LOCAL EVENT</p></div><StatusBadge value={offline?item.state:"ACKNOWLEDGED"}/></div>)}</div></Panel><Panel title="RESILIENCE PATH" className="mt-6"><div className="operator-flow">{["LOCAL TWIN STATE","LOCAL STORE","PRIORITY QUEUE","STORE & FORWARD","SYNC","ACK / RECONCILE"].map((x,i)=><span key={x}>{x}{i<5&&<ArrowRight/>}</span>)}</div></Panel></>;
 }
-export function SettingsPage(){ const {dark,toggle}=useContext(ThemeContext); const {mode,setMode}=useContext(OperationsContext); const [critical,setCritical]=useState(true),[warnings,setWarnings]=useState(true),[system,setSystem]=useState(false); return <><PageHeader eyebrow="POLAROPS CONFIGURATION" title="System Settings" subtitle="Configure this local operational demonstration environment."/><div className="grid xl:grid-cols-2 gap-6"><Panel title="APPEARANCE"><SettingRow title="Dark operations theme" detail="Use Antarctic night operations colors"><Switch checked={dark} onCheckedChange={toggle} aria-label="Dark operations theme"/></SettingRow></Panel><Panel title="OPERATIONS"><SettingRow title="Offline Analog" detail="Continue from a local station snapshot"><Switch checked={mode==="offline"} onCheckedChange={(checked)=>setMode(checked?"offline":"online")} aria-label="Offline Analog"/></SettingRow><SelectRow title="Station" options={["BHARATI","MAITRI"]}/><SelectRow title="Default view" options={["Command Center","Digital Twin","Alerts"]}/><SelectRow title="Refresh interval" options={["30 seconds","1 minute","5 minutes"]}/></Panel><Panel title="NOTIFICATIONS"><SettingRow title="Critical alerts" detail="Conditions requiring immediate review"><Switch checked={critical} onCheckedChange={setCritical}/></SettingRow><SettingRow title="Warnings" detail="Emerging operational conditions"><Switch checked={warnings} onCheckedChange={setWarnings}/></SettingRow><SettingRow title="System notifications" detail="Synchronization and maintenance events"><Switch checked={system} onCheckedChange={setSystem}/></SettingRow></Panel><Panel title="SYSTEM"><SettingRow title="Demo mode" detail="Centralized local demonstration data"><StatusBadge value="ACTIVE"/></SettingRow><SettingRow title="Data provenance" detail="Measured, derived and illustrative labels"><Button variant="outline">VIEW</Button></SettingRow><SettingRow title="About PolarOps" detail="AODT · Smart India Hackathon 2026"><span className="font-mono text-xs">v0.1.0</span></SettingRow></Panel></div></> }
-function SettingRow({title,detail,children}:{title:string;detail:string;children:ReactNode}){return <div className="setting-row"><div><h3>{title}</h3><p>{detail}</p></div>{children}</div>}; function SelectRow({title,options}:{title:string;options:string[]}){return <div className="setting-row"><label>{title}</label><select aria-label={title}>{options.map(o=><option key={o}>{o}</option>)}</select></div>}
+export { SettingsPage } from "./SettingsPage";

@@ -1,2 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router"; import { SettingsPage } from "@/components/polarops";
-export const Route=createFileRoute("/settings")({head:()=>({meta:[{title:"Settings — PolarOps"},{name:"description",content:"PolarOps local prototype configuration."},{property:"og:title",content:"PolarOps Settings"},{property:"og:description",content:"PolarOps local prototype configuration."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary_large_image"}]}),component:SettingsPage});
+import { createFileRoute } from "@tanstack/react-router";
+import { SettingsPage } from "@/components/SettingsPage";
+
+export const Route = createFileRoute("/settings")({
+  head: () => ({
+    meta: [
+      { title: "Settings — PolarOps" },
+      { name: "description", content: "PolarOps local prototype operational configuration." },
+      { property: "og:title", content: "PolarOps Settings" },
+      { property: "og:description", content: "PolarOps local prototype operational configuration." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: SettingsPage,
+});

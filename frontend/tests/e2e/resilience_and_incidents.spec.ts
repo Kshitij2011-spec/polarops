@@ -175,10 +175,13 @@ test.describe("PolarOps Day 4: Resilience, Science Continuity, Incidents & Memor
     await page.getByTestId("reset-simulation-btn").click();
     await expect(page.getByTestId("comms-status-badge")).toHaveText(/ONLINE/i);
 
-    // Navigate to Resources & Fuel to ensure canonical fuel is untouched
-    await page.getByRole("button", { name: /Resources & Fuel/i }).click();
-    await expect(page.getByText(/142,500 L/i)).toBeVisible();
-    await page.getByRole("button", { name: /Inventory & Spares/i }).click();
+    // Navigate to Resources to ensure canonical fuel is untouched
+    await page.goto("/resources");
+    await expect(page.getByText(/142,500 L/i).first()).toBeVisible();
+    const tabBtn = page.getByRole("button", { name: /Inventory & Spares/i });
+    if (await tabBtn.isVisible()) {
+      await tabBtn.click();
+    }
     await expect(page.getByText(/Station Warehouse Critical Spares Inventory/i, { timeout: 10000 })).toBeVisible();
   });
 });
