@@ -27,6 +27,7 @@ export function ExplanationDrawer() {
       aria-label="5-Stage Causal Reasoning & Operational Explanation"
     >
       <aside
+        data-testid="explanation-drawer"
         className="w-full max-w-xl h-full bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col overflow-hidden text-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
@@ -85,6 +86,11 @@ export function ExplanationDrawer() {
                     {new Date(explanation.timestamp).toLocaleTimeString()} UTC
                   </span>
                 </div>
+                {explanation.subject && (
+                  <div className="text-xs font-semibold text-sky-300 font-mono tracking-tight">
+                    {explanation.subject}
+                  </div>
+                )}
                 <h3 className="text-sm font-bold text-slate-100 font-sans tracking-wide">
                   {explanation.summary}
                 </h3>
@@ -106,7 +112,9 @@ export function ExplanationDrawer() {
                   {explanation.evidence?.map((item, idx) => (
                     <div key={idx} className="p-3 flex items-center justify-between text-xs font-mono">
                       <div>
-                        <div className="font-semibold text-slate-200">{item.metric}</div>
+                        <div className="font-semibold text-slate-200">
+                          {item.factor ? `${item.factor} (${item.metric})` : item.metric}
+                        </div>
                         <div className="text-[10px] text-slate-400">{item.detail}</div>
                       </div>
                       <div className="text-right">
