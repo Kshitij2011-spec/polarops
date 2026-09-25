@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   Zap,
   Fuel,
@@ -9,34 +9,34 @@ import {
   AlertTriangle,
   CheckCircle2,
   ChevronRight,
+  ChevronDown,
   ShieldCheck,
-  RotateCcw,
   RefreshCw,
-  GitCompare,
   Check,
   X,
   SlidersHorizontal,
   Compass,
-  FileText,
-  Clock,
+  ArrowRight,
   ExternalLink,
 } from "lucide-react";
 import { useStationOverview } from "@/hooks/useStationOverview";
 import { useOperationalIntelligence } from "@/hooks/useOperationalIntelligence";
 import { useOperationalEvents } from "@/hooks/useOperationalEvents";
-import { useAssetTelemetry } from "@/hooks/useAssetTelemetry";
 import { useStation } from "@/context/StationContext";
 import { StationDigitalTwin } from "./StationDigitalTwin";
 import { ExplanationDrawer } from "./polarops";
-import { BatteryIndicator } from "./common/OperationalIndicators";
 
 export function CommandCenterView() {
-  const { activeStationId, openExplanation: openStationExplanation } = useStation();
+  const { activeStationId } = useStation();
   const stationId = activeStationId || "STATION-BHARATI";
+  const navigate = useNavigate();
 
   const [explainOpen, setExplainOpen] = useState(false);
-  const [approvalState, setApprovalState] = useState<"pending" | "approved" | "modified" | "rejected">("pending");
-  const [operatorComment, setOperatorComment] = useState("");
+  const [causalExpanded, setCausalExpanded] = useState(false);
+  const [activityExpanded, setActivityExpanded] = useState(false);
+  const [approvalState, setApprovalState] = useState<
+    "pending" | "approved" | "modified" | "rejected"
+  >("pending");
 
   // Live queries
   const {
@@ -49,7 +49,6 @@ export function CommandCenterView() {
 
   const {
     data: intel,
-    isLoading: intelLoading,
     refetch: refetchIntel,
   } = useOperationalIntelligence(stationId);
 
@@ -59,16 +58,10 @@ export function CommandCenterView() {
     refetch: refetchEvents,
   } = useOperationalEvents(stationId, 8);
 
-  const {
-    data: telemetry,
-    refetch: refetchTelemetry,
-  } = useAssetTelemetry("G-02", 15);
-
   const retryAll = () => {
     refetchOverview();
     refetchIntel();
     refetchEvents();
-    refetchTelemetry();
   };
 
   const powerSub = overview?.subsystem_summary?.find(
@@ -76,83 +69,89 @@ export function CommandCenterView() {
   );
 
   const primaryEvent = overview?.critical_events?.[0];
-  const primaryDecision = intel?.decisions?.[0];
-
-  const vibrationSeries = telemetry?.series?.find(
-    (s) => s.metric_key === "vibration_rms" || s.metric_name.toLowerCase().includes("vibration")
-  );
-  const loadSeries = telemetry?.series?.find(
-    (s) => s.metric_key === "load_percentage" || s.metric_name.toLowerCase().includes("load")
-  );
-  const tempSeries = telemetry?.series?.find(
-    (s) => s.metric_key === "winding_temp_celsius" || s.metric_name.toLowerCase().includes("temp")
-  );
-
-  const vibPoints = vibrationSeries?.points?.slice(-11) ?? [];
-  const maxVib = Math.max(...vibPoints.map((p) => p.value), 6);
-  const vibBars: number[] =
-    vibPoints.length > 0
-      ? vibPoints.map((p) => Math.max(4, Math.round((p.value / maxVib) * 36)))
-      : [10, 14, 18, 22, 28, 36, 32, 24, 18, 14, 12];
-
-  const currentVib = vibrationSeries?.current_value ?? 4.82;
-  const currentLoad = loadSeries?.current_value ?? 84.5;
-  const currentTemp = tempSeries?.current_value ?? 68.2;
-
-  // Station status color & label
   const stationStatus = overview?.status ?? (overviewLoading ? "CONNECTING..." : "NOMINAL");
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto">
-      {/* ============================================================
-          1. STATION IDENTITY & HEADER (Sections 13 & 14)
-          ============================================================ */}
-      <div className="border-b border-slate-200 dark:border-slate-800 pb-5 flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="space-y-5 max-w-[1600px] mx-auto font-sans pb-10">
+      {/* ── 01: COMPACT OPERATIONAL HEADER ───────────────────────────────── */}
+      <header className="border-b border-slate-200/80 dark:border-slate-800 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-3 font-sans">
         <div>
-          <div className="text-[11px] font-mono tracking-widest text-[#369ACC] font-bold uppercase flex items-center gap-2">
-            <span>STATION BHARATI · WINTER OPERATIONS</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-            <span className="text-slate-400 dark:text-slate-500">69°24′S 76°11′E</span>
+          <div className="text-[10px] font-sans tracking-wider text-primary font-semibold uppercase flex items-center gap-2">
+            <span>COMMAND CENTER</span>
+            <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
+            <span className="text-slate-400 dark:text-slate-500 font-mono text-[10px]">
+              {stationId === "STATION-MAITRI"
+                ? "MAITRI · 70°46′S 11°44′E"
+                : "STATION BHARATI · WINTER OPERATIONS"}
+            </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold font-headline text-slate-900 dark:text-white tracking-tight mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight mt-0.5">
             Operational Command Center
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            Station-wide operational state, dependencies and active decisions.
+          <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
+            High-priority attention items, active deviations, and immediate operational controls.
           </p>
         </div>
 
-        {/* Restrained operational status indicator */}
-        <div className="flex items-center gap-2 font-mono text-xs">
-          <div className="px-3 py-1.5 rounded bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 shadow-2xs flex items-center gap-2">
+        {/* Operational Context Badges */}
+        <div className="flex items-center gap-2 font-sans text-xs">
+          {/* Station Selector context */}
+          <div className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 text-xs font-medium">
+            <Compass className="w-3.5 h-3.5 text-primary" />
+            <span className="text-slate-700 dark:text-slate-300 font-semibold">
+              {stationId === "STATION-MAITRI" ? "Maitri Base" : "Bharati Station"}
+            </span>
+          </div>
+
+          {/* Telemetry link status */}
+          <div className="px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 text-xs font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-mono text-[11px] font-semibold">SAT-1 LIVE</span>
+          </div>
+
+          {/* Overall Station Status */}
+          <div
+            className={`px-2.5 py-1 rounded-xl border text-xs font-semibold flex items-center gap-1.5 ${
+              (stationStatus as string) === "CRITICAL"
+                ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30"
+                : (stationStatus as string) === "WATCH" || (stationStatus as string) === "WARNING"
+                ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+            }`}
+          >
             <span
-              className={`w-2 h-2 rounded-full shrink-0 ${
+              className={`w-1.5 h-1.5 rounded-full ${
                 (stationStatus as string) === "CRITICAL"
-                  ? "bg-[#DE324C]"
+                  ? "bg-rose-500"
                   : (stationStatus as string) === "WATCH" || (stationStatus as string) === "WARNING"
-                  ? "bg-[#F4895F]"
-                  : "bg-[#4FAE7A]"
+                  ? "bg-amber-500"
+                  : "bg-emerald-500"
               }`}
             />
-            <span className="text-slate-400 uppercase text-[10px]">STATUS:</span>
-            <span className="font-bold text-slate-900 dark:text-white">{stationStatus}</span>
+            <span className="font-sans font-bold">STATUS: {stationStatus}</span>
           </div>
         </div>
-      </div>
+      </header>
 
+      {/* Backend Error State Banner */}
       {overviewError && (
-        <div className="p-4 rounded-md border border-[#DE324C]/40 bg-[#DE324C]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[#DE324C]">
+        <div
+          data-testid="command-center-error"
+          className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-700 dark:text-rose-300 font-sans"
+        >
           <div className="flex items-center gap-2.5">
-            <AlertTriangle className="h-5 w-5 shrink-0" />
+            <AlertTriangle className="h-5 w-5 shrink-0 text-rose-500" />
             <div>
               <p className="text-sm font-bold">Failed to load real-time station telemetry</p>
-              <p className="text-xs opacity-90">{overviewErrorObj?.message ?? "Backend unreachable. Presenting local resilient state."}</p>
+              <p className="text-xs opacity-90">
+                {overviewErrorObj?.message ?? "Backend unreachable. Presenting local resilient state."}
+              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={retryAll}
-            className="px-3 py-1.5 rounded border border-[#DE324C]/50 hover:bg-[#DE324C]/20 text-xs font-mono font-bold flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 rounded-lg border border-rose-500/40 hover:bg-rose-500/20 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <RefreshCw size={13} />
             <span>RETRY CONNECTION</span>
@@ -160,696 +159,670 @@ export function CommandCenterView() {
         </div>
       )}
 
-      {/* ============================================================
-          2. OPERATIONAL METRICS (Section 15: 2x2 desktop, 1 col mobile)
-          POWER, FUEL, PERSONNEL, TEMPERATURE
-          ============================================================ */}
-      <section aria-labelledby="operational-metrics-heading">
-        <div className="flex items-center justify-between mb-3">
-          <h2 id="operational-metrics-heading" className="text-xs font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-            OPERATIONAL HEADROOM &amp; RUNWAY METRICS
-          </h2>
-          <span className="text-[10px] font-mono text-slate-400">2 × 2 DESKTOP MATRIX</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* 1. POWER */}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+      {/* ── 02: 4 COMPACT OPERATIONAL SUMMARY CARDS ──────────────────────── */}
+      <section aria-labelledby="operational-metrics-heading" className="space-y-1.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Card 1: Station Health / Readiness */}
+          <div
+            data-testid="metric-health"
+            className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs flex flex-col justify-between space-y-2.5 font-sans"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-sans font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                COMPOSITE HEALTH
+              </span>
+              <span
+                className={`text-[10px] font-sans px-2 py-0.5 rounded font-semibold border ${
+                  (overview?.overall_health_score ?? 88.4) >= 90
+                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                    : "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                }`}
+              >
+                {(overview?.overall_health_score ?? 88.4) >= 90 ? "NOMINAL" : "WATCH"}
+              </span>
+            </div>
             <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono font-bold text-[#369ACC] tracking-wider uppercase">
-                  POWER SUBSYSTEM
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-[#F4895F]/10 text-[#F4895F] border border-[#F4895F]/30">
-                  {powerSub?.status ?? "DEGRADED"}
-                </span>
+              <div className="text-2xl font-bold font-sans text-slate-900 dark:text-white">
+                {overview?.overall_health_score != null
+                  ? `${overview.overall_health_score.toFixed(1)}%`
+                  : "88.4%"}
               </div>
-              <div className="text-2xl sm:text-3xl font-bold font-headline text-slate-900 dark:text-white mt-2 mb-1">
-                {powerSub?.health_score !== undefined ? `${powerSub.health_score.toFixed(1)}%` : "84.5%"}
-              </div>
-              <BatteryIndicator
-                value={powerSub?.health_score ?? 84.5}
-                status={powerSub?.status ?? "DEGRADED"}
-                label="Power Subsystem Health"
-                className="my-1.5"
-              />
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                {powerSub?.name ?? "Primary Power Generation"} · N-1 redundancy degraded. Power Bus A/B operational.
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                {overview?.status === "NOMINAL"
+                  ? "All major station subsystems optimal"
+                  : "Primary Power Generation N-1 degraded"}
               </p>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-mono text-slate-400">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] text-muted-foreground font-sans">
+              <span>OVERALL READINESS</span>
+              <span className="font-mono text-[9.5px]">DERIVED · ASSESSMENT</span>
+            </div>
+          </div>
+
+          {/* Card 2: Power Subsystem */}
+          <div
+            data-testid="metric-power"
+            className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs flex flex-col justify-between space-y-2.5 font-sans"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-sans font-semibold text-primary uppercase tracking-wider">
+                POWER SUBSYSTEM
+              </span>
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                {powerSub?.status ?? "DEGRADED"}
+              </span>
+            </div>
+            <div>
+              <div className="text-2xl font-bold font-sans text-slate-900 dark:text-white">
+                {powerSub?.health_score != null
+                  ? `${powerSub.health_score.toFixed(1)}%`
+                  : "84.0%"}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                G-02 bearing anomaly · N-1 redundancy reduced
+              </p>
+            </div>
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] text-muted-foreground font-sans">
               <span>GENERATION &amp; DISTRIBUTION</span>
-              <span className="text-slate-500">MEASURED · TELEMETRY</span>
+              <span className="font-mono text-[9.5px]">MEASURED · TELEMETRY</span>
             </div>
           </div>
 
-          {/* 2. FUEL */}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+          {/* Card 3: Fuel Runway */}
+          <div
+            data-testid="metric-fuel"
+            className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs flex flex-col justify-between space-y-2.5 font-sans"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-sans font-semibold text-primary uppercase tracking-wider">
+                FUEL RUNWAY
+              </span>
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                {(overview?.fuel_runway_days ?? 70.3) < 90 ? "WATCH" : "NOMINAL"}
+              </span>
+            </div>
             <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono font-bold text-[#369ACC] tracking-wider uppercase">
-                  FUEL RUNWAY
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                  {(overview?.fuel_runway_days ?? 81) < 90 ? "WATCH" : "NOMINAL"}
-                </span>
+              <div className="text-2xl font-bold font-sans text-slate-900 dark:text-white">
+                {overview?.fuel_runway_days != null
+                  ? `${overview.fuel_runway_days.toFixed(1)} DAYS`
+                  : "70.3 DAYS"}
               </div>
-              <div className="text-2xl sm:text-3xl font-bold font-headline text-slate-900 dark:text-white mt-2 mb-1">
-                {overview?.fuel_runway_days ?? 81} <span className="text-lg font-normal text-slate-400 font-mono">DAYS</span>
-              </div>
-              <BatteryIndicator
-                value={Math.min(100, Math.round(((overview?.fuel_runway_days ?? 81) / 90) * 100))}
-                status={(overview?.fuel_runway_days ?? 81) < 90 ? "WATCH" : "NOMINAL"}
-                label="Fuel Reserve Runway"
-                className="my-1.5"
-              />
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                {overview?.fuel_quantity_liters !== undefined && overview.fuel_quantity_liters !== null
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                {overview?.fuel_quantity_liters != null
                   ? `${overview.fuel_quantity_liters.toLocaleString()} L in reserve`
-                  : "64,800 L in reserve"} across 4 insulated fuel tank banks.
+                  : "142,500 L in reserve"}{" "}
+                across 4 banks
               </p>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-mono text-slate-400">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] text-muted-foreground font-sans">
               <span>DIESEL STORAGE CAPACITY</span>
-              <span className="text-slate-500">MEASURED · RESERVES</span>
+              <span className="font-mono text-[9.5px]">MEASURED · RESERVES</span>
             </div>
           </div>
 
-          {/* 3. PERSONNEL */}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-4 sm:p-5 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono font-bold text-[#369ACC] tracking-wider uppercase">
-                  STATION PERSONNEL
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
-                  NOMINAL
-                </span>
-              </div>
-              <div className="text-2xl sm:text-3xl font-bold font-headline text-slate-900 dark:text-white mt-2 mb-1">
-                24 <span className="text-lg font-normal text-slate-400 font-mono">POB</span>
-              </div>
-              <BatteryIndicator
-                value={Math.min(100, Math.round((24 / (overview?.station_id === "STATION-MAITRI" ? 25 : 60)) * 100))}
-                status="NOMINAL"
-                label="Station Personnel Capacity"
-                className="my-1.5"
-              />
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                44th Indian Antarctic Expedition wintering team. 0 medical quarantines.
-              </p>
+          {/* Card 4: External Environment */}
+          <div
+            data-testid="metric-environment"
+            className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs flex flex-col justify-between space-y-2.5 font-sans"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-sans font-semibold text-primary uppercase tracking-wider">
+                EXTERNAL ENVIRONMENT
+              </span>
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30">
+                {(overview?.ambient_weather?.wind_speed_knots ?? 42) >= 35
+                  ? "CRITICAL"
+                  : "NOMINAL"}
+              </span>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-mono text-slate-400">
-              <span>STATION COMPLEMENT &amp; LIFE SUPPORT</span>
-              <span className="text-slate-500">ADMINISTRATIVE · STATION ROSTER</span>
-            </div>
-          </div>
-
-          {/* 4. TEMPERATURE / ENVIRONMENT */}
-          <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-4 sm:p-5 shadow-xs flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono font-bold text-[#369ACC] tracking-wider uppercase">
-                  EXTERNAL ENVIRONMENT
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
-                  {(overview?.ambient_weather?.wind_speed_knots ?? 28) >= 35 ? "CRITICAL" : "NOMINAL"}
-                </span>
-              </div>
-              <div className="text-2xl sm:text-3xl font-bold font-headline text-slate-900 dark:text-white mt-2 mb-1">
-                {overview?.ambient_weather?.temperature_celsius !== undefined
+              <div className="text-2xl font-bold font-sans text-slate-900 dark:text-white">
+                {overview?.ambient_weather?.temperature_celsius != null
                   ? `${overview.ambient_weather.temperature_celsius.toFixed(1)}°C`
-                  : "-18.4°C"}
+                  : "-28.5°C"}
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                Wind {overview?.ambient_weather?.wind_speed_knots ?? 28} kts · Wind Chill {overview?.ambient_weather?.wind_chill_celsius?.toFixed(1) ?? "-32.1"}°C · {overview?.ambient_weather?.conditions ?? "Clear Polar Skies"}.
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                Wind {overview?.ambient_weather?.wind_speed_knots ?? 42} kts · Chill{" "}
+                {overview?.ambient_weather?.wind_chill_celsius != null
+                  ? `${overview.ambient_weather.wind_chill_celsius.toFixed(1)}°C`
+                  : "-41.2°C"}
               </p>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-mono text-slate-400">
-              <span>BHARATI COASTAL WEATHER SENSORS</span>
-              <span className="text-slate-500">MEASURED · WEATHER SENSOR</span>
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] text-muted-foreground font-sans">
+              <span>WEATHER SENSOR</span>
+              <span className="font-mono text-[9.5px]">MEASURED · TELEMETRY</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ============================================================
-          3. DIGITAL TWIN (Section 16)
-          Power Plant, Comms Mast, Habitat, Science Lab, Fuel Farm,
-          Logistics Bay, Water & Waste with interactive operational dependencies
-          ============================================================ */}
-      <section aria-labelledby="digital-twin-topology-heading">
-        <div className="flex items-center justify-between mb-3">
+      {/* ── 03: PRIMARY OPERATIONAL VIEW — STATION SCHEMATIC (WHERE IS THE PROBLEM?) ─ */}
+      <section aria-labelledby="digital-twin-topology-heading" className="space-y-2 font-sans">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 id="digital-twin-topology-heading" className="text-xs font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-              STATION DIGITAL TWIN · OPERATIONAL TOPOLOGY
+            <span className="text-[10px] font-sans tracking-wider text-primary uppercase font-semibold">
+              PRIMARY OPERATIONAL VIEW
+            </span>
+            <h2
+              id="digital-twin-topology-heading"
+              className="text-base font-bold text-slate-900 dark:text-white font-sans"
+            >
+              Station Subsystem Topology &amp; Problem Isolation
             </h2>
           </div>
-          <span className="text-[10px] font-mono text-slate-400">
+          <span className="text-[10px] font-sans text-muted-foreground px-2 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
             N-1 REDUNDANCY ACTIVE
           </span>
         </div>
 
-        <StationDigitalTwin
-          onInspectAsset={(id) => {}}
-          onOpenExplanation={(domain, entityId) => setExplainOpen(true)}
-        />
+        <div data-testid="digital-twin-topology">
+          <StationDigitalTwin
+            onInspectAsset={(id) => {
+              navigate({ to: "/digital-twin", search: { asset: id } });
+            }}
+            onOpenExplanation={(domain, entityId) => setExplainOpen(true)}
+          />
+        </div>
       </section>
 
-      {/* ============================================================
-          4. G-02 CRITICAL EVENT & 5. G-02 ASSET INTELLIGENCE (Sections 17 & 18)
-          ============================================================ */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* G-02 Critical Operational Event Card */}
+      {/* ── 04 & 05: CRITICAL EVENTS & MITIGATION ACTION ───────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 font-sans">
+        {/* Card A: Active Critical Events */}
         <section
-          className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-5 shadow-xs flex flex-col justify-between"
+          className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-4"
           aria-labelledby="critical-event-heading"
         >
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#DE324C] animate-pulse" />
-                <span className="text-[11px] font-mono font-bold text-[#DE324C] uppercase tracking-wider">
-                  CRITICAL OPERATIONAL EVENT
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <span className="text-[10px] font-sans font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
+                  CURRENT ACTIVE EVENT
                 </span>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-[#DE324C]/10 text-[#DE324C] border border-[#DE324C]/30">
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded font-bold bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30">
                 ABNORMAL CONDITION
               </span>
             </div>
 
-            <div className="mt-3">
-              <h3 id="critical-event-heading" className="text-lg font-bold font-headline text-slate-900 dark:text-white">
-                GENERATOR G-02 · VIBRATION DEVIATION
+            <div>
+              <h3
+                id="critical-event-heading"
+                data-testid="critical-event-title"
+                className="text-base font-bold text-slate-900 dark:text-white font-sans"
+              >
+                {primaryEvent?.title ?? "Generator G-02 · Vibration Deviation"}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                Observed bearing vibration anomaly on Generator G-02 exceeds standard 4.50 mm/s baseline during elevated base load.
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                Observed bearing vibration anomaly on Generator G-02 exceeds standard 4.50 mm/s
+                baseline during elevated station winter base load.
               </p>
             </div>
 
-            <div className="mt-4 space-y-2 text-xs font-mono divide-y divide-slate-100 dark:divide-slate-800">
-              <div className="pt-2 flex justify-between">
-                <span className="text-slate-400">Condition:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">Bearing vibration RMS 4.82 mm/s</span>
+            {/* Compact Scannable Attributes */}
+            <div className="space-y-1.5 text-xs border border-slate-200/70 dark:border-slate-800 rounded-xl p-3 bg-slate-50/60 dark:bg-slate-800/30">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Condition:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  Bearing vibration RMS <span className="font-mono font-bold">4.82 mm/s</span>
+                </span>
               </div>
-              <div className="pt-2 flex justify-between">
-                <span className="text-slate-400">Operational Impact:</span>
-                <span className="font-semibold text-amber-600 dark:text-amber-400">N-1 power redundancy margin degraded</span>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Operational Impact:</span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">
+                  N-1 power redundancy margin degraded
+                </span>
               </div>
-              <div className="pt-2 flex justify-between">
-                <span className="text-slate-400">Key Dependency:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">Power Bus A → Habitat &amp; Science Labs</span>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Key Dependency:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  Power Bus A → Habitat &amp; Science Labs
+                </span>
               </div>
-              <div className="pt-2 flex justify-between">
-                <span className="text-slate-400">Risk Assessment:</span>
-                <span className="font-semibold text-[#DE324C]">Thermal breaker trip during impending blizzard</span>
-              </div>
-              <div className="pt-2 flex justify-between">
-                <span className="text-slate-400">Recommendation:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">Synchronize G-01 standby before load shed</span>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Station / Asset:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  Bharati · <span className="font-mono">G-02</span> (Power Generation)
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-2">
-            <Link
-              to="/digital-twin"
-              search={{ asset: "G-02" }}
-              className="px-3 py-1.5 rounded bg-[#369ACC] hover:bg-[#369ACC]/90 text-white text-xs font-mono font-bold transition-colors"
-            >
-              INSPECT ASSET
-            </Link>
-            <button
-              type="button"
-              onClick={() => setExplainOpen(true)}
-              className="px-3 py-1.5 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono font-medium transition-colors"
-            >
-              EXPLAIN EVENT
-            </button>
-            <Link
-              to="/digital-twin"
-              search={{ asset: "G-02" }}
-              className="px-3 py-1.5 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono font-medium transition-colors"
-            >
-              VIEW DEPENDENCIES
-            </Link>
+          {/* Quick Actions & Drill-down */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="open-explanation-btn"
+                onClick={() => setExplainOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary border border-primary/25 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>View explanation →</span>
+              </button>
+              <Link
+                to="/digital-twin"
+                search={{ asset: "G-02" }}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <span>INSPECT G-02</span>
+                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+              </Link>
+            </div>
+            <span className="text-[10px] font-sans text-muted-foreground">
+              MEASURED TELEMETRY · PROVENANCE ACTIVE
+            </span>
           </div>
         </section>
 
-        {/* G-02 Asset Intelligence Card */}
+        {/* Card B: Operational Recommendation & Human-in-the-Loop Control */}
         <section
-          className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-5 shadow-xs flex flex-col justify-between"
-          aria-labelledby="asset-intel-heading"
+          data-testid="operational-recommendation"
+          className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs flex flex-col justify-between space-y-4 font-sans"
+          aria-labelledby="human-in-the-loop-heading"
         >
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <span className="text-[11px] font-mono font-bold text-[#369ACC] uppercase tracking-wider">
-                G-02 · ASSET INTELLIGENCE &amp; CURRENT STATE
-              </span>
-              <span className="text-[10px] font-mono text-slate-400">
-                REAL-TIME TELEMETRY
+          <div className="space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80">
+              <div>
+                <span className="text-[10px] font-sans font-bold text-amber-600 dark:text-amber-400 tracking-wider uppercase">
+                  RECOMMENDED ACTION
+                </span>
+                <h3
+                  id="human-in-the-loop-heading"
+                  className="text-base font-bold text-slate-900 dark:text-white font-sans"
+                >
+                  Operator Approval Required
+                </h3>
+              </div>
+              <span
+                className={`text-[10px] font-sans px-2.5 py-1 rounded font-bold border ${
+                  approvalState === "approved"
+                    ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800"
+                    : approvalState === "rejected"
+                    ? "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-300 dark:border-red-800"
+                    : approvalState === "modified"
+                    ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800"
+                    : "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                }`}
+              >
+                {approvalState === "approved"
+                  ? "OPERATOR APPROVED · DISPATCHED"
+                  : approvalState === "rejected"
+                  ? "OPERATOR REJECTED"
+                  : approvalState === "modified"
+                  ? "OPERATOR MODIFIED"
+                  : "PENDING OPERATOR DECISION"}
               </span>
             </div>
 
-            {/* Vibration RMS Live Chart */}
-            <div className="mt-4 p-3 rounded bg-slate-50 dark:bg-[#070B12] border border-slate-200 dark:border-slate-800">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
-                  VIBRATION (RMS)
+            {/* Protocol Box */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 space-y-2 text-xs">
+              <div>
+                <span className="text-[10px] font-sans font-bold text-primary uppercase block mb-0.5">
+                  PROPOSED MITIGATION PROTOCOL:
                 </span>
-                <span className="text-sm font-mono font-bold text-[#DE324C]">
-                  {currentVib.toFixed(2)} mm/s
-                </span>
+                <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-sans">
+                  {intel?.decisions?.find((d) => d.is_primary)?.title ??
+                    intel?.decisions?.[0]?.title ??
+                    "Transfer non-critical science laboratory loads to Power Bus B and initiate hot-standby synchronization on Generator G-01 to restore N-1 electrical headroom before evening blizzard arrival."}
+                </p>
               </div>
-              <div className="flex items-end gap-1.5 h-10 w-full pt-1">
-                {vibBars.map((height, i) => (
-                  <div
-                    key={i}
-                    style={{ height: `${height}px` }}
-                    className={`flex-1 rounded-t transition-all ${
-                      i >= vibBars.length - 3
-                        ? "bg-[#DE324C]"
-                        : "bg-[#369ACC]/60"
+              <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                <span className="text-[10px] font-sans font-bold text-slate-500 dark:text-slate-400 uppercase block mb-0.5">
+                  RATIONALE:
+                </span>
+                <p className="text-slate-600 dark:text-slate-400 leading-relaxed font-sans">
+                  {intel?.decisions?.find((d) => d.is_primary)?.rationale ??
+                    intel?.decisions?.[0]?.rationale ??
+                    "Mitigates thermal breaker trip risk on primary generator while maintaining station-critical life support."}
+                </p>
+              </div>
+            </div>
+
+            {/* Human in the loop action triggers */}
+            {approvalState === "pending" ? (
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setApprovalState("approved")}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                >
+                  <Check size={14} />
+                  <span>APPROVE ACTION</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApprovalState("modified")}
+                  className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <SlidersHorizontal size={14} />
+                  <span>MODIFY PARAMETERS</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApprovalState("rejected")}
+                  className="px-3 py-1.5 rounded-xl border border-rose-300 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <X size={14} />
+                  <span>REJECT ACTION</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 text-xs font-sans">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  Action logged by Operator. Timestamp registered in Station Engineering Log.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setApprovalState("pending")}
+                  className="text-primary hover:underline font-semibold cursor-pointer"
+                >
+                  RESET DECISION
+                </button>
+              </div>
+            )}
+
+            {/* Progressive Disclosure for Causal Reasoning Chain */}
+            <div data-testid="causal-reasoning-chain" className="pt-2 border-t border-slate-100 dark:border-slate-800/80">
+              <button
+                type="button"
+                onClick={() => setCausalExpanded(!causalExpanded)}
+                className="w-full flex items-center justify-between text-xs font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer"
+              >
+                <span className="text-[11px] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                  <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                    {intel?.causal_chain?.[0]?.stage ?? "CHANGE"}
+                  </span>
+                  <span>WHY DOES THIS MATTER? DETERMINISTIC CAUSAL TRACE</span>
+                </span>
+                <span className="inline-flex items-center gap-1 font-normal text-muted-foreground text-xs">
+                  {causalExpanded ? "Hide trace" : `View ${intel?.causal_chain?.length ?? 7}-stage trace`}
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                      causalExpanded ? "rotate-180" : ""
                     }`}
                   />
-                ))}
-              </div>
-              <div className="flex justify-between text-[9px] font-mono text-slate-400 mt-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-800/60">
-                <span>Baseline: 2.80 mm/s</span>
-                <span className="text-amber-500 font-semibold">Warning: 4.50 mm/s</span>
-                <span className="text-[#DE324C] font-semibold">Critical: 7.10 mm/s</span>
-              </div>
-            </div>
+                </span>
+              </button>
 
-            {/* Current State Grid */}
-            <div className="grid grid-cols-3 gap-2 mt-4 text-xs font-mono">
-              <div className="p-2.5 rounded bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 block uppercase">Operating Load</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white mt-0.5 block">
-                  {currentLoad.toFixed(1)}%
-                </span>
-              </div>
-              <div className="p-2.5 rounded bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 block uppercase">Winding Temp</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white mt-0.5 block">
-                  {currentTemp.toFixed(1)}°C
-                </span>
-              </div>
-              <div className="p-2.5 rounded bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                <span className="text-[10px] text-slate-400 block uppercase">Provenance</span>
-                <span className="text-sm font-bold text-[#369ACC] mt-0.5 block">
-                  MEASURED
-                </span>
-              </div>
+              {causalExpanded && (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs animate-in fade-in-50 duration-200">
+                  {(intel?.causal_chain && intel.causal_chain.length > 0
+                    ? intel.causal_chain
+                    : [
+                        { stage: "CHANGE", title: "Mechanical Degradation", headline: "Vibration elevated at 4.82 mm/s", description: "Accelerated mechanical fatigue on G-02 bearing." },
+                        { stage: "CONTEXT", title: "Blizzard Conditions", headline: "-28.5°C with 42 kt winds", description: "Heating envelope elevated to 252 kW base load." },
+                        { stage: "DEPENDENCY", title: "Power Bus A", headline: "Feeds Habitat and Laser Radar", description: "Single-point distribution to atmospheric laser labs." },
+                        { stage: "RISK", title: "Thermal Breaker Trip", headline: "Continuous run over-temperature risk", description: "Stator temperature exceeds nominal threshold." },
+                        { stage: "CONSEQUENCE", title: "Automated Load Shedding", headline: "Non-critical science halted", description: "Lab loads disconnected under emergency shed protocol." },
+                        { stage: "SCENARIO", title: "18h Runtime Window", headline: "N-1 margin degraded", description: "Simulation shows 18h continuous stability under current load." },
+                        { stage: "ACTION", title: "Load Transfer & Sync", headline: "Shift load to Bus B & sync G-01", description: "Restores electrical headroom prior to storm peak." },
+                      ]
+                  ).map((item, idx) => (
+                    <div
+                      key={item.stage}
+                      className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-700/70 space-y-0.5"
+                    >
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                        <span className="font-mono font-bold text-primary">{item.stage}</span>
+                        <span className="font-mono">STAGE {String(idx + 1).padStart(2, "0")}</span>
+                      </div>
+                      <div className="font-bold text-xs text-slate-900 dark:text-white">
+                        {item.title}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        {"headline" in item && item.headline ? item.headline : item.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-[10px] font-mono text-slate-400 flex items-center justify-between">
-            <span>PROVENANCE: MEASURED · REAL-TIME SENSORS</span>
-            <span>POLAROPS SENSOR FEED OK</span>
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[10px] text-muted-foreground font-sans flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <ShieldCheck size={14} className="text-primary shrink-0" />
+              <span>Advisory role only — final switching remains under human command.</span>
+            </span>
+            <span className="font-mono text-[9.5px]">DETERMINISTIC REASONING ENGINE</span>
           </div>
         </section>
       </div>
 
-      {/* ============================================================
-          6. CAUSAL REASONING CHAIN (Section 19)
-          WHAT CHANGED → WHAT NOW → DEPENDENCY → RISK → CONSEQUENCE → SCENARIO → ACTION
-          ============================================================ */}
-      <section
-        className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-5 shadow-xs"
-        aria-labelledby="causal-reasoning-heading"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 gap-2">
+      {/* ── 06: CROSS-STATION CONTEXT — WHICH STATION NEEDS ATTENTION? ───── */}
+      <section aria-labelledby="cross-station-context-heading" className="space-y-2 font-sans">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 id="causal-reasoning-heading" className="text-xs font-mono font-bold tracking-wider text-[#6D5BD0] uppercase flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#6D5BD0]" />
-              <span>CAUSAL REASONING CHAIN · MULTI-STAGE ANALYSIS</span>
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Deterministic causal trace from initial telemetry deviation to operator action.
-            </p>
-          </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#6D5BD0]/10 text-[#6D5BD0] border border-[#6D5BD0]/30 font-bold self-start sm:self-auto">
-            DERIVED · REASONING ENGINE
-          </span>
-        </div>
-
-        {/* The 7-step causal chain */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-2.5 mt-4">
-          {[
-            {
-              step: "01",
-              stage: "WHAT CHANGED",
-              title: "Vibration Deviation",
-              detail: "G-02 RMS vibration rose to 4.82 mm/s (>4.5 threshold).",
-              highlight: false,
-            },
-            {
-              step: "02",
-              stage: "WHAT NOW",
-              title: "N-1 Margin Degraded",
-              detail: "Generator G-01 warm standby engaged. Redundancy reduced.",
-              highlight: false,
-            },
-            {
-              step: "03",
-              stage: "DEPENDENCY",
-              title: "Power Bus A",
-              detail: "Feeds Habitat life support and Science atmospheric lasers.",
-              highlight: false,
-            },
-            {
-              step: "04",
-              stage: "RISK",
-              title: "Thermal Trip Risk",
-              detail: "Elevated blizzard headwinds risk thermal breaker trip.",
-              highlight: true,
-            },
-            {
-              step: "05",
-              stage: "CONSEQUENCE",
-              title: "Shed Non-Essential",
-              detail: "Unscheduled trip would trigger automatic lab load shedding.",
-              highlight: false,
-            },
-            {
-              step: "06",
-              stage: "SCENARIO",
-              title: "18h Runtime Window",
-              detail: "Simulation shows 18h continuous stability under current load.",
-              highlight: false,
-            },
-            {
-              step: "07",
-              stage: "ACTION",
-              title: "Transfer Load & Sync",
-              detail: "Shift non-essential loads to Bus B and synchronize G-01.",
-              highlight: true,
-            },
-          ].map((item, idx) => (
-            <div
-              key={item.step}
-              className={`p-3 rounded border text-xs flex flex-col justify-between transition-colors ${
-                item.highlight
-                  ? "bg-[#6D5BD0]/10 border-[#6D5BD0]/40 text-slate-900 dark:text-white"
-                  : "bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
-              }`}
+            <span className="text-[10px] font-sans tracking-wider text-primary uppercase font-semibold">
+              CROSS-STATION CONTEXT
+            </span>
+            <h2
+              id="cross-station-context-heading"
+              className="text-base font-bold text-slate-900 dark:text-white font-sans"
             >
-              <div>
-                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
-                  <span>STAGE {item.step}</span>
-                  {idx < 6 && <ChevronRight size={12} className="hidden xl:block text-slate-400" />}
-                </div>
-                <div className="font-mono font-bold text-[10px] text-[#6D5BD0] uppercase">
-                  {item.stage}
-                </div>
-                <div className="font-bold text-xs mt-1 text-slate-900 dark:text-white">
-                  {item.title}
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">
-                  {item.detail}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-[10px] font-mono text-slate-400 flex items-center justify-between">
-          <span>DATA HONESTY: ILLUSTRATIVE DETERMINISTIC CAUSAL GRAPH (BFS DERIVED)</span>
-          <button
-            type="button"
-            onClick={() => setExplainOpen(true)}
-            className="text-[#369ACC] hover:underline font-semibold"
-          >
-            VIEW FULL 5-STAGE EXPLANATION DRAWER →
-          </button>
-        </div>
-      </section>
-
-      {/* ============================================================
-          7. HUMAN-IN-THE-LOOP CONTROL (Section 20)
-          RECOMMENDATION · OPERATOR APPROVAL REQUIRED
-          Actions: Approve, Modify, Reject
-          ============================================================ */}
-      <section
-        className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-5 shadow-xs"
-        aria-labelledby="human-in-the-loop-heading"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-2">
-          <div>
-            <span className="text-[10px] font-mono font-bold text-[#F4895F] tracking-widest uppercase">
-              OPERATIONAL DECISION SUPPORT
-            </span>
-            <h2 id="human-in-the-loop-heading" className="text-base font-bold font-headline text-slate-900 dark:text-white">
-              HUMAN-IN-THE-LOOP CONTROL · OPERATOR APPROVAL REQUIRED
+              Which Station Needs Attention Right Now?
             </h2>
-          </div>
-          <span
-            className={`text-[10px] font-mono px-2.5 py-1 rounded font-bold border self-start sm:self-auto ${
-              approvalState === "approved"
-                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800"
-                : approvalState === "rejected"
-                ? "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-300 dark:border-red-800"
-                : approvalState === "modified"
-                ? "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800"
-                : "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800"
-            }`}
-          >
-            {approvalState === "approved"
-              ? "OPERATOR APPROVED · DISPATCHED"
-              : approvalState === "rejected"
-              ? "OPERATOR REJECTED"
-              : approvalState === "modified"
-              ? "OPERATOR MODIFIED"
-              : "PENDING OPERATOR DECISION"}
-          </span>
-        </div>
-
-        <div className="py-4 space-y-3">
-          <div className="p-3.5 rounded bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80">
-            <span className="text-[10px] font-mono font-bold text-[#369ACC] uppercase block mb-1">
-              PROPOSED MITIGATION PROTOCOL:
-            </span>
-            <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-sans">
-              Transfer non-critical science laboratory loads to Power Bus B and initiate hot-standby synchronization on Generator G-01 to restore N-1 electrical headroom before evening blizzard arrival.
-            </p>
-          </div>
-
-          {approvalState === "pending" ? (
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              <button
-                type="button"
-                onClick={() => setApprovalState("approved")}
-                className="px-4 py-2 rounded bg-[#4FAE7A] hover:bg-[#4FAE7A]/90 text-white text-xs font-mono font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-              >
-                <Check size={14} />
-                <span>APPROVE ACTION</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setApprovalState("modified")}
-                className="px-4 py-2 rounded border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <SlidersHorizontal size={14} />
-                <span>MODIFY PARAMETERS</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setApprovalState("rejected")}
-                className="px-4 py-2 rounded border border-red-300 dark:border-red-800/80 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <X size={14} />
-                <span>REJECT ACTION</span>
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between p-3 rounded bg-slate-100 dark:bg-slate-800/80 text-xs font-mono">
-              <span className="text-slate-700 dark:text-slate-300">
-                Action recorded by Operator. Timestamp logged to Station Engineering Log.
-              </span>
-              <button
-                type="button"
-                onClick={() => setApprovalState("pending")}
-                className="text-[#369ACC] hover:underline font-bold"
-              >
-                RESET DECISION
-              </button>
-            </div>
-          )}
-        </div>
-
-        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 font-sans flex items-center gap-2">
-          <ShieldCheck size={15} className="text-[#369ACC] shrink-0" />
-          <span>
-            <b>PolarOps operates strictly in an advisory role.</b> Operational control and final equipment switching remain under human command.
-          </span>
-        </div>
-      </section>
-
-      {/* ============================================================
-          8. CROSS-STATION CONTEXT (Section 21)
-          Bharati vs Maitri (health, resources, connectivity, alerts, context)
-          No ranking as best/worst
-          ============================================================ */}
-      <section
-        className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-5 shadow-xs"
-        aria-labelledby="cross-station-context-heading"
-      >
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div>
-            <h2 id="cross-station-context-heading" className="text-xs font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-              CROSS-STATION OPERATIONAL CONTEXT · NCPOR ANTARCTIC BASES
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Balanced multi-station status comparison without reductive ranking.
-            </p>
           </div>
           <Link
             to="/stations"
-            className="text-[11px] font-mono text-[#369ACC] hover:underline flex items-center gap-1 font-semibold"
+            className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
           >
-            <span>FULL PORTFOLIO</span>
-            <ChevronRight size={12} />
+            <span>View All Stations</span>
+            <ChevronRight size={13} />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          {/* Station 1: BHARATI */}
-          <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850">
-            <div className="flex items-center justify-between mb-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {/* Bharati Station */}
+          <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex flex-col justify-between space-y-2.5">
+            <div className="flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-mono text-[#369ACC] uppercase font-bold">PRIMARY COASTAL BASE</span>
-                <h3 className="text-lg font-bold font-headline text-slate-900 dark:text-white">
+                <span className="text-[10px] font-sans font-bold text-primary uppercase">
+                  PRIMARY COASTAL BASE
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
                   Bharati Station
                 </h3>
-                <div className="text-[10px] font-mono text-slate-400">69°24′S 76°11′E · Larsemann Hills</div>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-[#F4895F]/10 text-[#F4895F] border border-[#F4895F]/30">
-                WATCH
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                WARNING
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 py-3 border-y border-slate-200/80 dark:border-slate-800 text-xs font-mono my-2">
+            <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+              ⚠ 2 active operational constraints: Generator G-02 bearing anomaly (N-1 degraded) &amp; Blizzard wind advisory (42 kts).
+            </p>
+
+            <div className="grid grid-cols-4 gap-2 py-2 border-y border-slate-100 dark:border-slate-800 text-xs">
               <div>
-                <span className="text-[10px] text-slate-400 block">HEALTH</span>
-                <span className="font-bold text-slate-900 dark:text-white">88.4%</span>
+                <span className="text-[10px] text-muted-foreground block font-sans">HEALTH</span>
+                <span className="font-bold text-slate-900 dark:text-white font-mono">88.4%</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">FUEL RUNWAY</span>
-                <span className="font-bold text-slate-900 dark:text-white">81 Days</span>
+                <span className="text-[10px] text-muted-foreground block font-sans">FUEL RUNWAY</span>
+                <span className="font-bold text-slate-900 dark:text-white font-mono">70.3 D</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">PERSONNEL</span>
-                <span className="font-bold text-slate-900 dark:text-white">24 POB</span>
+                <span className="text-[10px] text-muted-foreground block font-sans">PERSONNEL</span>
+                <span className="font-bold text-slate-900 dark:text-white font-mono">24 POB</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">ACTIVE ALERTS</span>
-                <span className="font-bold text-[#F4895F]">1 Warning</span>
+                <span className="text-[10px] text-muted-foreground block font-sans">ACTIVE ALERTS</span>
+                <span className="font-bold text-amber-600 dark:text-amber-400 font-mono">1 Active</span>
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-              Coastal research outpost with automated atmospheric instrumentation and high-bandwidth Ku-band telemetry.
-            </p>
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span className="text-muted-foreground text-[11px]">Larsemann Hills · 69°24′S</span>
+              <Link
+                to="/digital-twin"
+                search={{ asset: "G-02" }}
+                className="text-primary hover:underline font-semibold flex items-center gap-1"
+              >
+                <span>Inspect in Digital Twin</span>
+                <ArrowRight size={12} />
+              </Link>
+            </div>
           </div>
 
-          {/* Station 2: MAITRI */}
-          <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850">
-            <div className="flex items-center justify-between mb-2">
+          {/* Maitri Station */}
+          <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs flex flex-col justify-between space-y-2.5">
+            <div className="flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-mono text-[#369ACC] uppercase font-bold">INLAND RESEARCH BASE</span>
-                <h3 className="text-lg font-bold font-headline text-slate-900 dark:text-white">
+                <span className="text-[10px] font-sans font-bold text-primary uppercase">
+                  INLAND RESEARCH BASE
+                </span>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
                   Maitri Station
                 </h3>
-                <div className="text-[10px] font-mono text-slate-400">70°46′S 11°44′E · Schirmacher Oasis</div>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
                 NOMINAL
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 py-3 border-y border-slate-200/80 dark:border-slate-800 text-xs font-mono my-2">
+            <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">
+              ✓ No critical constraints: All 6 primary subsystems operating stably; 142 days fuel reserve.
+            </p>
+
+            <div className="grid grid-cols-4 gap-2 py-2 border-y border-slate-100 dark:border-slate-800 text-xs">
               <div>
-                <span className="text-[10px] text-slate-400 block">HEALTH</span>
-                <span className="font-bold text-slate-900 dark:text-white">94.2%</span>
+                <span className="text-[10px] text-muted-foreground block font-sans">HEALTH</span>
+                <span className="font-bold text-slate-900 dark:text-white font-mono">94.2%</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">FUEL RUNWAY</span>
-                <span className="font-bold text-slate-900 dark:text-white">142 Days</span>
+                <span className="text-[10px] text-muted-foreground block font-sans">FUEL RUNWAY</span>
+                <span className="font-bold text-slate-900 dark:text-white font-mono">142.0 D</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">PERSONNEL</span>
-                <span className="font-bold text-slate-900 dark:text-white">18 POB</span>
+                <span className="text-[10px] text-muted-foreground block font-sans">PERSONNEL</span>
+                <span className="font-bold text-slate-900 dark:text-white font-mono">18 POB</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">ACTIVE ALERTS</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">0 Active</span>
+                <span className="text-[10px] text-muted-foreground block font-sans">ACTIVE ALERTS</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">0 Active</span>
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-              Inland oasis station maintaining geological and geomagnetic observation records with HF/satellite store-and-forward.
-            </p>
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span className="text-muted-foreground text-[11px]">Schirmacher Oasis · 70°46′S</span>
+              <Link
+                to="/stations"
+                className="text-primary hover:underline font-semibold flex items-center gap-1"
+              >
+                <span>View Maitri Base</span>
+                <ArrowRight size={12} />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ============================================================
-          9. OPERATIONAL ACTIVITY & SUBSYSTEM STATE (Sections 13 & 27)
-          ============================================================ */}
+      {/* ── 07: COLLAPSIBLE RECENT ACTIVITY STREAM ────────────────────────── */}
       <section
-        className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-5 shadow-xs"
+        data-testid="operational-activity-list"
+        className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs transition-all font-sans"
         aria-labelledby="operational-activity-heading"
       >
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+        <button
+          type="button"
+          onClick={() => setActivityExpanded(!activityExpanded)}
+          className="w-full flex items-center justify-between cursor-pointer text-left"
+        >
           <div>
-            <h2 id="operational-activity-heading" className="text-xs font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-              OPERATIONAL ACTIVITY LOG · RECENT SYSTEM EVENTS
+            <span className="text-[10px] font-sans tracking-wider text-primary uppercase font-semibold">
+              OPERATIONAL ACTIVITY LOG
+            </span>
+            <h2
+              id="operational-activity-heading"
+              className="text-base font-bold text-slate-900 dark:text-white font-sans flex items-center gap-2"
+            >
+              <span>Recent System Events &amp; Audit Trail</span>
+              <span className="text-[10px] font-sans font-semibold text-muted-foreground px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                {eventsData?.events?.length ?? 6} Events
+              </span>
             </h2>
           </div>
-          <span className="text-[10px] font-mono text-slate-400">
-            SYNCHRONIZED AUDIT TRAIL
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80">
+            {activityExpanded ? "Collapse Activity" : "Expand Activity Log"}
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                activityExpanded ? "rotate-180" : ""
+              }`}
+            />
           </span>
-        </div>
+        </button>
 
-        <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
-          {eventsLoading ? (
-            <div className="py-4 text-xs font-mono text-slate-400 text-center">
-              Loading operational events stream...
-            </div>
-          ) : eventsData?.events && eventsData.events.length > 0 ? (
-            eventsData.events.slice(0, 6).map((ev) => (
-              <div key={ev.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="font-mono text-[11px] text-slate-400 shrink-0">
-                    {new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                  </span>
-                  <div className="truncate">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">{ev.title}</span>
-                    <span className="text-slate-500 dark:text-slate-400 hidden sm:inline"> — {ev.summary}</span>
-                  </div>
-                </div>
-                <span
-                  className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold shrink-0 border ${
-                    ev.severity === "CRITICAL"
-                      ? "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800"
-                      : ev.severity === "WARNING"
-                      ? "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
-                  }`}
-                >
-                  {ev.severity}
-                </span>
+        {/* Preview when collapsed */}
+        {!activityExpanded && (
+          <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-muted-foreground">
+            <span className="truncate">
+              Latest:{" "}
+              <strong className="text-foreground">
+                {eventsData?.events?.[0]?.title ?? "Generator G-02 Vibration Anomaly"}
+              </strong>{" "}
+              — {eventsData?.events?.[0]?.summary ?? "Bearing vibration RMS rose to 4.82 mm/s"}
+            </span>
+            <span className="font-mono text-[10px] shrink-0 ml-2">
+              {eventsData?.events?.[0]?.timestamp
+                ? new Date(eventsData.events[0].timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Live"}
+            </span>
+          </div>
+        )}
+
+        {/* Full stream when expanded */}
+        {activityExpanded && (
+          <div className="divide-y divide-slate-100 dark:divide-slate-800/80 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 animate-in fade-in-50 duration-200">
+            {eventsLoading ? (
+              <div className="py-4 text-xs font-mono text-muted-foreground text-center">
+                Loading operational events stream...
               </div>
-            ))
-          ) : (
-            <div className="py-4 text-xs font-mono text-slate-400 text-center">
-              No recent operational events logged.
-            </div>
-          )}
-        </div>
+            ) : eventsData?.events && eventsData.events.length > 0 ? (
+              eventsData.events.slice(0, 6).map((ev) => (
+                <div key={ev.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="font-mono text-[11px] text-muted-foreground shrink-0">
+                      {new Date(ev.timestamp).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </span>
+                    <div className="truncate">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {ev.title}
+                      </span>
+                      <span className="text-muted-foreground hidden sm:inline">
+                        {" "}
+                        — {ev.summary}
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold shrink-0 border ${
+                      ev.severity === "CRITICAL"
+                        ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30"
+                        : ev.severity === "WARNING"
+                        ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                    }`}
+                  >
+                    {ev.severity}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="py-4 text-xs text-muted-foreground text-center">
+                No recent operational events logged.
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Explanation Drawer */}

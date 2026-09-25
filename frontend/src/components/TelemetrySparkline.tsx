@@ -8,6 +8,9 @@ interface TelemetrySparklineProps {
   className?: string;
 }
 
+export { TelemetryTrendCard } from "./TelemetryTrendCard";
+export type { TelemetryTrendCardProps } from "./TelemetryTrendCard";
+
 export function TelemetrySparkline({ series, provenanceSource, className = "" }: TelemetrySparklineProps) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 

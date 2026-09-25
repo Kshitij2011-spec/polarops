@@ -115,27 +115,42 @@ def explain_asset(
                     )
                 )
 
-    # Fallback to nominal/warning baseline metrics if telemetry records are sparse
-    if not any("vibration" in e.metric.lower() for e in evidence):
-        evidence.append(
-            ExplanationEvidence(
-                factor="Bearing Vibration",
-                metric="bearing_vibration_mm_s",
-                value=4.8,
-                threshold=4.0,
-                status="WARNING",
-                detail="Bearing vibration at 4.8 mm/s exceeds warning limit of 4.0 mm/s.",
+    is_g02 = asset.code in ["G-02", "ASSET-GEN-02"] or asset.id in ["G-02", "ASSET-GEN-02", "GEN-BHARATI-G02"]
+
+    # Fallback to nominal/warning baseline metrics if telemetry records are sparse (only for G-02 hero)
+    if is_g02:
+        if not any("vibration" in e.metric.lower() for e in evidence):
+            evidence.append(
+                ExplanationEvidence(
+                    factor="Bearing Vibration",
+                    metric="bearing_vibration_mm_s",
+                    value=4.8,
+                    threshold=4.0,
+                    status="WARNING",
+                    detail="Bearing vibration at 4.8 mm/s exceeds warning limit of 4.0 mm/s.",
+                )
             )
-        )
-    if not any("coolant" in e.metric.lower() or "temp" in e.metric.lower() for e in evidence):
+        if not any("coolant" in e.metric.lower() or "temp" in e.metric.lower() for e in evidence):
+            evidence.append(
+                ExplanationEvidence(
+                    factor="Coolant Temperature",
+                    metric="coolant_temp_celsius",
+                    value=94.2,
+                    threshold=90.0,
+                    status="WARNING",
+                    detail="Coolant temperature at 94.2°C exceeds warning limit of 90.0°C.",
+                )
+            )
+    elif not evidence:
+        stat_val = asset.status.value if hasattr(asset.status, "value") else str(asset.status)
         evidence.append(
             ExplanationEvidence(
-                factor="Coolant Temperature",
-                metric="coolant_temp_celsius",
-                value=94.2,
-                threshold=90.0,
-                status="WARNING",
-                detail="Coolant temperature at 94.2°C exceeds warning limit of 90.0°C.",
+                factor=f"{asset.name} Operational Status",
+                metric="operational_status",
+                value=float(asset.health_score),
+                threshold=70.0,
+                status=stat_val,
+                detail=f"{asset.name} is operating with status {stat_val} (Health: {asset.health_score}/100).",
             )
         )
 
@@ -179,82 +194,140 @@ def explain_asset(
                 )
 
     if not consequences:
-        consequences.append(
-            ExplanationConsequence(
-                domain="HEATING",
-                impact="Habitat Zone 2 Heating Margin Reduced",
-                blast_radius_depth=2,
-                description="Thermal Loop B heat recovery is degraded; secondary heating margin for living quarters is compromised.",
+        if is_g02:
+            consequences.append(
+                ExplanationConsequence(
+                    domain="HEATING",
+                    impact="Habitat Zone 2 Heating Margin Reduced",
+                    blast_radius_depth=2,
+                    description="Thermal Loop B heat recovery is degraded; secondary heating margin for living quarters is compromised.",
+                )
             )
-        )
-        consequences.append(
-            ExplanationConsequence(
-                domain="ELECTRICAL",
-                impact="Redundant Generation Capacity Compromised",
-                blast_radius_depth=1,
-                description="Station electrical bus lacks N+1 redundancy; generator G-01 is operating without an active hot-standby.",
+            consequences.append(
+                ExplanationConsequence(
+                    domain="ELECTRICAL",
+                    impact="Redundant Generation Capacity Compromised",
+                    blast_radius_depth=1,
+                    description="Station electrical bus lacks N+1 redundancy; generator G-01 is operating without an active hot-standby.",
+                )
             )
-        )
+        else:
+            consequences.append(
+                ExplanationConsequence(
+                    domain="EQUIPMENT",
+                    impact=f"Localized Boundary Impact for {asset.code}",
+                    blast_radius_depth=0,
+                    description=f"No cascading downstream services or life-support zones directly affected by {asset.name}.",
+                )
+            )
 
     # Build Recovery Constraints
     recovery_constraints: list[RecoveryConstraint] = []
-    local_stock = inv_item.quantity_available if inv_item else 0
-    if local_stock == 0:
-        resupply_eta_text = (
-            f"Vessel {next_resupply.vessel_name} ETA in ~11 days."
-            if next_resupply
-            else "Resupply window unknown."
-        )
-        recovery_constraints.append(
-            RecoveryConstraint(
-                constraint_type="INVENTORY_STOCKOUT",
-                resource_id="SK-402",
-                description=f"Rotary Seal Kit SK-402 has 0 units in local stock at Central Spares. Preventive overhaul cannot proceed locally. {resupply_eta_text}",
-                impact_level="BLOCKING",
+    if is_g02:
+        local_stock = inv_item.quantity_available if inv_item else 0
+        if local_stock == 0:
+            resupply_eta_text = (
+                f"Vessel {next_resupply.vessel_name} ETA in ~11 days."
+                if next_resupply
+                else "Resupply window unknown."
             )
-        )
+            recovery_constraints.append(
+                RecoveryConstraint(
+                    constraint_type="INVENTORY_STOCKOUT",
+                    resource_id="SK-402",
+                    description=f"Rotary Seal Kit SK-402 has 0 units in local stock at Central Spares. Preventive overhaul cannot proceed locally. {resupply_eta_text}",
+                    impact_level="BLOCKING",
+                )
+            )
 
-    if has_blocked_order:
-        recovery_constraints.append(
-            RecoveryConstraint(
-                constraint_type="WORK_ORDER_BLOCKED",
-                resource_id="WO-2026-088",
-                description="Work order WO-2026-088 is in BLOCKED_PARTS status awaiting seal kit arrival.",
-                impact_level="HIGH",
+        if has_blocked_order:
+            recovery_constraints.append(
+                RecoveryConstraint(
+                    constraint_type="WORK_ORDER_BLOCKED",
+                    resource_id="WO-2026-088",
+                    description="Work order WO-2026-088 is in BLOCKED_PARTS status awaiting seal kit arrival.",
+                    impact_level="HIGH",
+                )
             )
-        )
+    else:
+        # Check if this specific asset has blocked work orders
+        for wo in work_orders:
+            if wo.status == "BLOCKED_PARTS":
+                recovery_constraints.append(
+                    RecoveryConstraint(
+                        constraint_type="WORK_ORDER_BLOCKED",
+                        resource_id=wo.id,
+                        description=f"Work order {wo.id} for {asset.code} is blocked awaiting spare parts.",
+                        impact_level="HIGH",
+                    )
+                )
 
     # Recommended next steps (non-actuating, decision support)
-    next_steps = [
-        RecommendedNextStep(
-            action_code="INSPECT_G02",
-            title="Inspect Asset G-02 Telemetry",
-            description="Examine 24h vibration sparklines and bearing temperature trends in Asset Intelligence.",
-            target_route="/assets/G-02",
-            action_type="INSPECT",
-        ),
-        RecommendedNextStep(
-            action_code="RUN_SCENARIO",
-            title="Evaluate Generator G-02 Failure Scenario",
-            description="Simulate complete loss of G-02 over 72h to calculate heating margin drop and fuel burn delta.",
-            target_route="/scenarios",
-            action_type="SIMULATE",
-        ),
-        RecommendedNextStep(
-            action_code="REVIEW_RECOVERY",
-            title="Review Spares & Resupply Recovery Chain",
-            description="Inspect SK-402 stockout in Inventory and track MV Vasiliy Golovnin shipment manifest.",
-            target_route="/resources",
-            action_type="REVIEW",
-        ),
-        RecommendedNextStep(
-            action_code="VIEW_MEMORY",
-            title="Check Resilience & Operational Memory",
-            description="Consult past incident memory (INC-2025 Winter Generator Tripping) for thermal transfer precedent.",
-            target_route="/resilience",
-            action_type="REVIEW",
-        ),
-    ]
+    if is_g02:
+        next_steps = [
+            RecommendedNextStep(
+                action_code="INSPECT_G02",
+                title="Inspect Asset G-02 Telemetry",
+                description="Examine 24h vibration sparklines and bearing temperature trends in Asset Intelligence.",
+                target_route="/assets/G-02",
+                action_type="INSPECT",
+            ),
+            RecommendedNextStep(
+                action_code="RUN_SCENARIO",
+                title="Evaluate Generator G-02 Failure Scenario",
+                description="Simulate complete loss of G-02 over 72h to calculate heating margin drop and fuel burn delta.",
+                target_route="/scenarios",
+                action_type="SIMULATE",
+            ),
+            RecommendedNextStep(
+                action_code="REVIEW_RECOVERY",
+                title="Review Spares & Resupply Recovery Chain",
+                description="Inspect SK-402 stockout in Inventory and track MV Vasiliy Golovnin shipment manifest.",
+                target_route="/resources",
+                action_type="REVIEW",
+            ),
+            RecommendedNextStep(
+                action_code="VIEW_MEMORY",
+                title="Check Resilience & Operational Memory",
+                description="Consult past incident memory (INC-2025 Winter Generator Tripping) for thermal transfer precedent.",
+                target_route="/resilience",
+                action_type="REVIEW",
+            ),
+        ]
+        summary_text = f"Bearing vibration (4.8 mm/s) and coolant temperature (94.2°C) exceed modeled limits, raising composite operational risk to {risk_result.score}/100."
+        why_text = f"{asset.name} provides critical powerhouse baseload and cogenerated thermal heat to Habitat Zone 2. Degradation threatens winter life-support margins."
+    else:
+        next_steps = [
+            RecommendedNextStep(
+                action_code=f"INSPECT_{asset.code}",
+                title=f"Inspect {asset.code} Telemetry & Status",
+                description=f"Review active operational telemetry and topology links for {asset.name}.",
+                target_route=f"/digital-twin?station={station_id}&asset={asset.code}",
+                action_type="INSPECT",
+            ),
+            RecommendedNextStep(
+                action_code="CHECK_TOPOLOGY",
+                title="Inspect Station Topology",
+                description="Verify upstream supply continuity in Operational Topology equipment map.",
+                target_route=f"/digital-twin?station={station_id}&asset={asset.code}",
+                action_type="INSPECT",
+            ),
+            RecommendedNextStep(
+                action_code="REVIEW_RESOURCES",
+                title="Review Station Resources",
+                description="Verify electrical and thermal power distribution in Resources view.",
+                target_route="/resources",
+                action_type="REVIEW",
+            ),
+        ]
+        stat_label = asset.status.value if hasattr(asset.status, "value") else str(asset.status)
+        cat_label = asset.category.value if hasattr(asset.category, "value") else str(asset.category)
+        crit_label = asset.criticality.value if hasattr(asset.criticality, "value") else str(asset.criticality)
+        if stat_label == "NOMINAL":
+            summary_text = f"{asset.name} is operating in NOMINAL condition with health score {asset.health_score}/100 and low composite operational risk ({risk_result.score}/100)."
+        else:
+            summary_text = f"{asset.name} is operating in {stat_label} condition with health score {asset.health_score}/100 and composite operational risk of {risk_result.score}/100."
+        why_text = f"{asset.name} ({asset.code}) operates in category {cat_label} with criticality {crit_label}. Station operational integrity depends on nominal telemetry and feeder continuity."
 
     return ExplanationResponse(
         subject=f"{asset.name} ({asset.code}) — Operational Anomaly & Risk Explanation",
@@ -262,8 +335,8 @@ def explain_asset(
         entity_id=asset.code,
         station_id=station_id,
         severity="WARNING" if asset.status == AssetStatus.WARNING else "CRITICAL" if asset.status == AssetStatus.CRITICAL else "INFO",
-        summary=f"Bearing vibration (4.8 mm/s) and coolant temperature (94.2°C) exceed modeled limits, raising composite operational risk to {risk_result.score}/100.",
-        why_it_matters=f"{asset.name} provides critical powerhouse baseload and cogenerated thermal heat to Habitat Zone 2. Degradation threatens winter life-support margins.",
+        summary=summary_text,
+        why_it_matters=why_text,
         evidence=evidence,
         consequences=consequences,
         recovery_constraints=recovery_constraints,
