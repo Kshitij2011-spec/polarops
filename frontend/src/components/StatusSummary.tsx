@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { StationOverview } from "../lib/api";
 import { TruthBadge } from "./TruthBadge";
+import { BatteryIndicator, NetworkSignalIndicator } from "./common/OperationalIndicators";
 
 export interface StatusSummaryProps {
   overview: StationOverview;
@@ -75,19 +76,13 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
           </div>
         </div>
 
-        {/* Health progress bar */}
-        <div className="w-full bg-slate-100 dark:bg-[#12141c] rounded-full h-1.5 mt-3 overflow-hidden border border-slate-200 dark:border-[#2a2f3e]/50">
-          <div
-            className={`h-full transition-all ${
-              isCritical
-                ? "bg-rose-500"
-                : isDegraded
-                ? "bg-amber-500"
-                : "bg-emerald-500"
-            }`}
-            style={{ width: `${overview.overall_health_score}%` }}
-          />
-        </div>
+        {/* Health indicator */}
+        <BatteryIndicator
+          value={overview.overall_health_score}
+          status={isCritical ? "CRITICAL" : isDegraded ? "WARNING" : "NOMINAL"}
+          label="Overall station health score"
+          className="mt-3"
+        />
       </div>
 
       {/* ── 2. Fuel & Energy Runway ───────────────────────── */}
@@ -181,9 +176,16 @@ export function StatusSummary({ overview }: StatusSummaryProps) {
               COMMUNICATIONS
             </span>
           </div>
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-            {overview.connectivity_status}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <NetworkSignalIndicator
+              level={overview.connectivity_status === "CONNECTED" ? 5 : 1}
+              active={overview.connectivity_status === "CONNECTED"}
+              status={overview.connectivity_status}
+            />
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+              {overview.connectivity_status}
+            </span>
+          </div>
         </div>
 
         <div className="mt-1 font-mono">

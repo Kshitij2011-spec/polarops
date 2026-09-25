@@ -20,6 +20,7 @@ import { fetchStationOverview } from "@/lib/api/station";
 import { LinkHealthPill } from "@/components/foundation/LinkHealthPill";
 import { useTheme, useOperations } from "@/components/polarops";
 import { useHealthCheck } from "@/hooks/useHealthCheck";
+import { NetworkSignalIndicator } from "@/components/common/OperationalIndicators";
 
 export interface HeaderBarProps {
   onMobileMenuToggle?: () => void;
@@ -221,7 +222,12 @@ export function HeaderBar({
         {/* Connectivity & Sync status badges for larger screens */}
         <div className="hidden xl:flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-mono">
-            <span className={`w-1.5 h-1.5 rounded-full ${connectivityDotColor}`} aria-hidden="true" />
+            <NetworkSignalIndicator
+              level={isOffline ? 1 : (apiOnline ? 5 : (healthError ? 0 : 2))}
+              active={!isOffline && apiOnline}
+              status={connectivityText}
+              className="mr-0.5"
+            />
             <span className="text-slate-400 dark:text-slate-500 uppercase">LINK:</span>
             <span className="font-semibold text-slate-700 dark:text-slate-300">{connectivityText}</span>
           </div>

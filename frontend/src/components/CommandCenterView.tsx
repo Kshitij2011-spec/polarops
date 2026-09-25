@@ -28,6 +28,7 @@ import { useAssetTelemetry } from "@/hooks/useAssetTelemetry";
 import { useStation } from "@/context/StationContext";
 import { StationDigitalTwin } from "./StationDigitalTwin";
 import { ExplanationDrawer } from "./polarops";
+import { BatteryIndicator } from "./common/OperationalIndicators";
 
 export function CommandCenterView() {
   const { activeStationId, openExplanation: openStationExplanation } = useStation();
@@ -186,6 +187,12 @@ export function CommandCenterView() {
               <div className="text-2xl sm:text-3xl font-bold font-headline text-slate-900 dark:text-white mt-2 mb-1">
                 {powerSub?.health_score !== undefined ? `${powerSub.health_score.toFixed(1)}%` : "84.5%"}
               </div>
+              <BatteryIndicator
+                value={powerSub?.health_score ?? 84.5}
+                status={powerSub?.status ?? "DEGRADED"}
+                label="Power Subsystem Health"
+                className="my-1.5"
+              />
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 {powerSub?.name ?? "Primary Power Generation"} · N-1 redundancy degraded. Power Bus A/B operational.
               </p>
@@ -210,6 +217,12 @@ export function CommandCenterView() {
               <div className="text-2xl sm:text-3xl font-bold font-headline text-slate-900 dark:text-white mt-2 mb-1">
                 {overview?.fuel_runway_days ?? 81} <span className="text-lg font-normal text-slate-400 font-mono">DAYS</span>
               </div>
+              <BatteryIndicator
+                value={Math.min(100, Math.round(((overview?.fuel_runway_days ?? 81) / 90) * 100))}
+                status={(overview?.fuel_runway_days ?? 81) < 90 ? "WATCH" : "NOMINAL"}
+                label="Fuel Reserve Runway"
+                className="my-1.5"
+              />
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 {overview?.fuel_quantity_liters !== undefined && overview.fuel_quantity_liters !== null
                   ? `${overview.fuel_quantity_liters.toLocaleString()} L in reserve`
@@ -236,6 +249,12 @@ export function CommandCenterView() {
               <div className="text-2xl sm:text-3xl font-bold font-headline text-slate-900 dark:text-white mt-2 mb-1">
                 24 <span className="text-lg font-normal text-slate-400 font-mono">POB</span>
               </div>
+              <BatteryIndicator
+                value={Math.min(100, Math.round((24 / (overview?.station_id === "STATION-MAITRI" ? 25 : 60)) * 100))}
+                status="NOMINAL"
+                label="Station Personnel Capacity"
+                className="my-1.5"
+              />
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 44th Indian Antarctic Expedition wintering team. 0 medical quarantines.
               </p>

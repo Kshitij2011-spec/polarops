@@ -18,6 +18,7 @@ import type { ScenarioSimulateResponse } from "@/lib/api";
 import { OperationalTopology } from "./OperationalTopology";
 import { StationsView } from "./Stations/StationsView";
 import { ResilienceView } from "./Resilience/ResilienceView";
+import { BatteryIndicator, NetworkSignalIndicator } from "./common/OperationalIndicators";
 
 const navGroups = [
   ["COMMAND", [["Overview", "/command-center", CircleGauge], ["Digital Twin", "/digital-twin", Boxes], ["Stations", "/stations", Radio]]],
@@ -107,7 +108,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const connectivityStatus = offline ? "OFFLINE MODE" : (apiOnline ? "CONNECTED" : (healthError ? "DISCONNECTED" : "CONNECTING..."));
   const connectivityDot = offline ? "bg-warning" : (apiOnline ? "bg-success" : (healthError ? "bg-critical" : "bg-warning animate-pulse"));
 
-  return <div className="min-h-screen bg-background text-foreground"><Sidebar/><div className="lg:pl-60"><header className="sticky top-0 z-30 min-h-16 bg-background/95 backdrop-blur border-b flex items-center px-4 lg:px-7 gap-4"><Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMenu(true)} aria-label="Open navigation"><Menu/></Button><div className="hidden md:flex items-center gap-7 flex-1">{[["STATION","BHARATI"],["STATE","WINTER"],["CONNECTIVITY",connectivityStatus],["SYNC",offline?"LOCAL OPERATION ACTIVE":(apiOnline?"SYNCHRONIZED":"PENDING SYNC")]].map(([a,b])=><div key={a}><div className="command-label">{a}</div><div className={`text-xs font-bold flex items-center gap-1.5 ${offline && (a==="CONNECTIVITY"||a==="SYNC") ? "text-warning" : (a==="CONNECTIVITY" && !apiOnline ? "text-critical" : "")}`}>{a === "CONNECTIVITY" && <span className={`status-dot ${connectivityDot}`}/>} {b}</div></div>)}</div><span className="demo-tag ml-auto md:ml-0">{offline ? "LOCAL SNAPSHOT" : (apiOnline ? "LIVE API / DEMO MIX" : "STANDALONE DEMO")}</span><div className="hidden sm:block"><div className="command-label">TIME</div><div className="font-mono text-xs font-semibold">14:32:08 UTC</div></div><Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">{dark ? <Sun/> : <Moon/>}</Button><Button variant="outline" size="icon" aria-label="System user"><UserRound/></Button></header><main className="p-4 sm:p-6 xl:p-8 max-w-[1680px] mx-auto">{offline && <div className="offline-strip"><CloudOff size={15}/> OFFLINE ANALOG · LOCAL OPERATION ACTIVE <span>LAST SYNC {demoOfflineState.lastSynchronized}</span></div>}{children}</main></div>
+  return <div className="min-h-screen bg-background text-foreground"><Sidebar/><div className="lg:pl-60"><header className="sticky top-0 z-30 min-h-16 bg-background/95 backdrop-blur border-b flex items-center px-4 lg:px-7 gap-4"><Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMenu(true)} aria-label="Open navigation"><Menu/></Button><div className="hidden md:flex items-center gap-7 flex-1">{[["STATION","BHARATI"],["STATE","WINTER"],["CONNECTIVITY",connectivityStatus],["SYNC",offline?"LOCAL OPERATION ACTIVE":(apiOnline?"SYNCHRONIZED":"PENDING SYNC")]].map(([a,b])=><div key={a}><div className="command-label">{a}</div><div className={`text-xs font-bold flex items-center gap-1.5 ${offline && (a==="CONNECTIVITY"||a==="SYNC") ? "text-warning" : (a==="CONNECTIVITY" && !apiOnline ? "text-critical" : "")}`}>{a === "CONNECTIVITY" && <NetworkSignalIndicator level={offline ? 1 : (apiOnline ? 5 : (healthError ? 0 : 2))} active={!offline && apiOnline} status={connectivityStatus} className="mr-0.5" />} {b}</div></div>)}</div><span className="demo-tag ml-auto md:ml-0">{offline ? "LOCAL SNAPSHOT" : (apiOnline ? "LIVE API / DEMO MIX" : "STANDALONE DEMO")}</span><div className="hidden sm:block"><div className="command-label">TIME</div><div className="font-mono text-xs font-semibold">14:32:08 UTC</div></div><Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">{dark ? <Sun/> : <Moon/>}</Button><Button variant="outline" size="icon" aria-label="System user"><UserRound/></Button></header><main className="p-4 sm:p-6 xl:p-8 max-w-[1680px] mx-auto">{offline && <div className="offline-strip"><CloudOff size={15}/> OFFLINE ANALOG · LOCAL OPERATION ACTIVE <span>LAST SYNC {demoOfflineState.lastSynchronized}</span></div>}{children}</main></div>
   {menu && <div className="fixed inset-0 z-50 bg-foreground/40 lg:hidden"><div className="w-72 h-full"><Sidebar mobile close={() => setMenu(false)}/></div><Button size="icon" variant="secondary" className="absolute left-[18.5rem] top-4" onClick={()=>setMenu(false)}><X/></Button></div>}</div>;
 }
 
@@ -485,9 +486,11 @@ export function ResourcesPage() {
               <StatusBadge value={res.status} />
             </div>
             <div className={`resource-number ${res.display.length > 9 ? "!text-[1.8rem]" : ""}`}>{res.display}</div>
-            <div className="resource-track">
-              <i style={{ width: `${Math.min(100, Math.max(0, res.percent))}%` }} />
-            </div>
+            <BatteryIndicator
+              value={res.percent}
+              status={res.status}
+              label={`${res.name} operational level`}
+            />
             <div className="grid grid-cols-2 gap-3 mt-5 text-xs">
               <div>
                 <span>{res.meta1Label}</span>
