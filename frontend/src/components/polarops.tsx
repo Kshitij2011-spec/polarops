@@ -1049,7 +1049,7 @@ export function AlertsPage() {
     </>
   );
 }
-export function ReportsPage() { const [msg, setMsg] = useState(""); return <><PageHeader eyebrow="MISSION RECORD" title="Operational Reports" subtitle="Review and export station status, incident and simulation records." />{msg && <div className="notice mb-4">{msg}</div>}<div className="grid md:grid-cols-2 gap-4">{demoReports.map((r, i) => <div className="report-card" key={r}><div className="report-icon"><FileText /></div><div><span>REPORT · 0{i + 1}</span><h2>{r}</h2><p>Generated from synchronized demo operational data.</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => setMsg(`${r} opened in demo preview.`)}>VIEW</Button><Button onClick={() => setMsg(`${r} export prepared for demonstration.`)}><Download /> EXPORT</Button></div></div>)}</div></> }
+export { ReportsView as ReportsPage } from "./Reports/ReportsView";
 export function OfflinePage() {
   const { mode, setMode } = useContext(OperationsContext); const [sync, setSync] = useState("IDLE"); const offline = mode === "offline";
   const reconnect = () => { setSync("RECONNECTING"); window.setTimeout(() => setSync("SYNC IN PROGRESS"), 700); window.setTimeout(() => setSync("SYNC COMPLETE"), 1500); window.setTimeout(() => { setMode("online"); setSync("EVENTS RECONCILED") }, 2300) };
