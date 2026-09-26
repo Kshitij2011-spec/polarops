@@ -16,6 +16,7 @@ import {
   Gauge,
   HardDrive,
   History,
+  Info,
   Layers,
   Lock,
   Radio,
@@ -24,6 +25,7 @@ import {
   Server,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Terminal,
   Thermometer,
@@ -331,8 +333,6 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
   const g01 = generatorAssets.find((g) => g.code === "G-01" || g.id === "G-01");
   const g02 = generatorAssets.find((g) => g.code === "G-02" || g.id === "G-02");
   const boilerAsset = assets?.find((a) => a.code === "B-01" || a.category === "BOILER");
-  const hvacAsset = assets?.find((a) => a.code === "HVAC-02" || a.category === "HVAC");
-  const pumpAsset = assets?.find((a) => a.code === "WP-01" || a.category === "PUMP");
 
   // Grid & Energy Telemetry
   const availableGenKw = energyModel?.available_generation_capacity_kw ?? 600;
@@ -352,12 +352,12 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       className="space-y-6 pb-20 font-sans text-slate-900 dark:text-slate-100"
     >
       {/* ─────────────────────────────────────────────────────────────
-          ACTION FEEDBACK BANNER (Toast)
+          ACTION FEEDBACK BANNER (Toast Notification)
           ───────────────────────────────────────────────────────────── */}
       {actionFeedback && (
         <div
           role="status"
-          className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-blue-500/30 bg-blue-50/90 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 text-xs font-sans shadow-sm backdrop-blur-sm"
+          className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-blue-500/30 bg-blue-50/90 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 text-xs font-sans shadow-sm backdrop-blur-sm animate-fade-in"
         >
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
@@ -373,8 +373,8 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          ZONE 0: COMPACT COMMAND HEADER
-          Station survivability context + integrated simulation controls
+          TOP BAR: CONTEXTUAL COMMAND HEADER & STATE-AWARE ACTION GROUP
+          Title, status mode, and prominent state-sensitive trigger buttons
           ───────────────────────────────────────────────────────────── */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div className="space-y-1">
@@ -394,14 +394,19 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
               {stationDisplayName}
             </span>
             <span className="text-slate-300 dark:text-slate-700">·</span>
-            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <span
+              className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                isOffline
+                  ? "bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20"
+                  : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20"
+              }`}
+            >
               {isOffline ? "Autonomous Degraded Mode" : "Nominal Connected"}
             </span>
           </div>
 
           <div className="flex items-center gap-3">
             <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
-            {/* Title preserved for e2e test assertion */}
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
               Operate Through Disruption
             </h1>
@@ -411,15 +416,15 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
           </p>
         </div>
 
-        {/* Integrated Simulation Controls Toolbar */}
+        {/* State-Aware Action Group: Only contextually appropriate action is dominant */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             data-testid="simulate-outage-btn"
             onClick={handleSimulateOutage}
             disabled={actionLoading || isOffline}
-            className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:cursor-not-allowed ${
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-xs disabled:cursor-not-allowed ${
               !isOffline
-                ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/20"
+                ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/20 active:scale-98 ring-2 ring-rose-500/30"
                 : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 opacity-60"
             }`}
           >
@@ -431,9 +436,9 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
             data-testid="restore-sync-btn"
             onClick={handleRestoreAndSync}
             disabled={actionLoading || !isOffline}
-            className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:cursor-not-allowed ${
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-xs disabled:cursor-not-allowed ${
               isOffline
-                ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/20 ring-2 ring-emerald-400/50 animate-pulse"
+                ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/20 ring-2 ring-emerald-400/60 animate-pulse active:scale-98"
                 : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 opacity-60"
             }`}
           >
@@ -455,517 +460,577 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       </header>
 
       {/* ─────────────────────────────────────────────────────────────
-          LAYER 1: RESILIENCE POSTURE (Primary Operational State)
-          Executive survivability overview across critical dimensions
+          PRIMARY VIEWPORT: COORDINATED OPERATIONS CONSOLE
+          Split composition: Left = Operational State, Right = Live Event & Reconciliation
+          Ensures immediate feedback, operational consequence, and next action in CURRENT VIEWPORT!
           ───────────────────────────────────────────────────────────── */}
       <section
         data-testid="resilience-posture-section"
         aria-label="Station Resilience Posture"
-        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-4 shadow-sm"
+        className="grid grid-cols-1 lg:grid-cols-12 gap-5"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              Resilience Posture
-            </h2>
-            <span
-              className={`px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
-                isOffline || g02?.status === "WARNING"
-                  ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-                  : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
-              }`}
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  isOffline || g02?.status === "WARNING" ? "bg-amber-500" : "bg-emerald-500"
-                }`}
-              />
-              <span>{isOffline ? "ATTENTION — AIR GAPPED" : "NOMINAL DEFENSE POSTURE"}</span>
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <span>Overall Station Health:</span>
-            <strong className="text-slate-900 dark:text-slate-100 font-mono font-bold">
-              {overallHealth}%
-            </strong>
-            <TruthBadge type="DERIVED" />
-          </div>
-        </div>
-
-        {/* 4 Core Operational Dimensions */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Dimension 1: Power Redundancy */}
-          <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <Zap className="h-3.5 w-3.5 text-amber-500" />
-                Power Generation
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-mono">
-                N+1 ACTIVE
-              </span>
-            </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              G-01 Online · G-02 Degraded
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-              {availableGenKw} kW capacity active vs {modeledLoadKw} kW modeled load. Reserve margin {reserveMarginKw} kW.
-            </p>
-          </div>
-
-          {/* Dimension 2: Thermal Resilience */}
-          <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <Flame className="h-3.5 w-3.5 text-orange-500" />
-                Thermal Loop Stability
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono">
-                LOOP B DEGRADED
-              </span>
-            </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              Aux Boiler B-01 Armed
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-              Thermal demand {thermalDemandKw} kW at {ambientTempC}°C. Boiler B-01 (91% health) ready for primary transfer.
-            </p>
-          </div>
-
-          {/* Dimension 3: Life Support & Water */}
-          <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <Shield className="h-3.5 w-3.5 text-blue-500" />
-                Life Support &amp; Water
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-mono">
-                NOMINAL
-              </span>
-            </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              Water Pump WP-01 (88%)
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-              Critical habitat atmospheric conditioning and reverse-osmosis water loop operating nominally.
-            </p>
-          </div>
-
-          {/* Dimension 4: Communications Link */}
-          <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <Radio className="h-3.5 w-3.5 text-blue-500" />
-                SatCom Continuity
-              </span>
-              <span
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
-                  isOffline
-                    ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
-                    : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                }`}
-              >
-                {isOffline ? "AIR GAPPED" : "DUAL BACKHAUL"}
-              </span>
-            </div>
-            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              {isOffline ? "Local SQLite WAL Active" : "GSAT-7 Transponder Locked"}
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
-              {isOffline
-                ? `Severed link · ${pendingCount} prioritized deltas spooled locally.`
-                : `680 ms latency · 2048 kbps bandwidth · Continuous ACK.`}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          LAYER 2: HEADROOM & SURVIVAL WINDOWS
-          Dedicated horizontal gauge cards with actual backend telemetry
-          ───────────────────────────────────────────────────────────── */}
-      <section
-        data-testid="comms-status-card"
-        aria-label="Headroom and Survival Windows"
-        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-4 shadow-sm"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              Headroom &amp; Survival Windows
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Calculated operational endurance and autonomous buffer margins under disruption.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              data-testid="comms-status-badge"
-              className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold ${
-                isOffline
-                  ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30"
-                  : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-              }`}
-            >
-              {isOffline ? "OFFLINE" : "ONLINE"}
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Gauge 1: Fuel Runway */}
-          <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-2.5">
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-semibold">Fuel Runway</span>
-              <TruthBadge type="DERIVED" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
-                {fuelRunwayDays}
-              </span>
-              <span className="text-xs text-slate-500">Days</span>
-            </div>
-            {/* Visual Gauge Bar */}
-            <div className="space-y-1">
-              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all"
-                  style={{ width: `${Math.min(100, (fuelRunwayDays / 90) * 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                <span>Stock: {fuelStockLiters.toLocaleString()} L ({fuelStockPercent}%)</span>
-                <span>Winter Target: 90d</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Gauge 2: Grid Reserve Margin */}
-          <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-2.5">
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-semibold">Grid Reserve Margin</span>
-              <TruthBadge type="DERIVED" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-                +{reserveMarginKw}
-              </span>
-              <span className="text-xs text-slate-500">kW</span>
-            </div>
-            {/* Visual Gauge Bar */}
-            <div className="space-y-1">
-              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-emerald-500 h-full rounded-full transition-all"
-                  style={{ width: `${Math.min(100, (modeledLoadKw / availableGenKw) * 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                <span>Dispatched: {modeledLoadKw} kW</span>
-                <span>Capacity: {availableGenKw} kW</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Gauge 3: Thermal Ingress & Demand */}
-          <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-2.5">
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-semibold">Thermal Demand</span>
-              <TruthBadge type="DERIVED" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
-                {thermalDemandKw}
-              </span>
-              <span className="text-xs text-slate-500">kW Demand</span>
-            </div>
-            <div className="space-y-1">
-              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-orange-500 h-full rounded-full transition-all"
-                  style={{ width: `${Math.min(100, (thermalDemandKw / 300) * 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                <span>Ambient: {ambientTempC}°C</span>
-                <span>Aux Boiler: Ready (100 kW)</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Gauge 4: UPS & Buffer Autonomy */}
-          <div
-            data-testid="battery-resilience-card"
-            className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-2.5"
-          >
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-semibold">UPS &amp; NVMe Autonomy</span>
-              <TruthBadge type="ESTIMATED" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-blue-600 dark:text-blue-400">
-                4.8
-              </span>
-              <span className="text-xs text-slate-500">Hours UPS</span>
-            </div>
-            <div className="space-y-1">
-              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                <div className="bg-blue-500 h-full rounded-full w-4/5" />
-              </div>
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                <span>NVMe Buffer: 72.0 Hours</span>
-                <span>48.4V DC Bus</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Micro-Telemetry HUD Bar for Automated Test Compatibility */}
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-slate-500 dark:text-slate-400">
-          <div className="flex items-center gap-4">
-            <div>
-              <span>Latency: </span>
-              <strong data-testid="comms-latency" className="text-slate-900 dark:text-slate-200">
-                {isOffline || commsStatus?.latency_ms === 9999 || commsStatus?.latency_ms === null || commsStatus?.latency_ms === undefined
-                  ? "DISCONNECTED"
-                  : `${commsStatus.latency_ms} ms`}
-              </strong>
-            </div>
-            <div>
-              <span>Bandwidth: </span>
-              <strong data-testid="comms-bandwidth" className="text-slate-900 dark:text-slate-200">
-                {commsStatus?.bandwidth_kbps ?? (isOffline ? 0 : 2048)} kbps
-              </strong>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div>
-              <span>Unsynced: </span>
-              <strong data-testid="pending-deltas-count" className="text-amber-600 dark:text-amber-400">
-                {pendingCount} Deltas
-              </strong>
-            </div>
-            <div>
-              <span>Sync State: </span>
-              <strong
-                data-testid="reconciliation-status"
-                className={isOffline ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"}
-              >
-                {isOffline ? "PENDING LINK" : "SYNCHRONIZED"}
-              </strong>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          LAYER 3: ACTIVE VULNERABILITIES & CASCADE RADAR
-          Compact top-level alert surfaced before workspaces
-          ───────────────────────────────────────────────────────────── */}
-      <section
-        aria-label="Active Vulnerabilities Summary"
-        className="rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/10 p-5 space-y-3.5 shadow-sm"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-200/60 dark:border-rose-900/30 pb-2.5">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-              Active Vulnerabilities &amp; Single Points of Failure
-            </h2>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-700 dark:text-rose-300 font-mono">
-              1 ACTIVE INCIDENT
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab("GRAPH")}
-              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
-            >
-              <span>Inspect Full Topology</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-          {/* Active Incident Snapshot */}
-          <div className="lg:col-span-6 space-y-1.5">
-            <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="font-bold text-rose-600 dark:text-rose-400">INC-2026-04</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-700 dark:text-rose-300">
-                MAJOR SEVERITY
-              </span>
-              <TruthBadge type="DERIVED" />
-            </div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              Generator G-02 High Vibration Anomaly &amp; Thermal Loop Degradation
-            </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Bearing vibration at 4.8 mm/s exceeding warning threshold (4.0 mm/s). Primary thermal coupling to Habitat Heating Loop B is constrained.
-            </p>
-          </div>
-
-          {/* Visual Cascade Chain */}
-          <div className="lg:col-span-6 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 space-y-2">
-            <div className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase">
-              Modeled Failure Propagation Pathway:
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-              <span className="px-2 py-1 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 font-bold">
-                G-02 (Diesel Gen)
-              </span>
-              <ArrowRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              <span className="px-2 py-1 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-bold">
-                HVAC-02 (Loop B)
-              </span>
-              <ArrowRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-              <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold">
-                Zone 2 Habitat Life Support
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1">
-              <span>Risk Score: <strong className="text-rose-600 dark:text-rose-400">74 / 100</strong></span>
-              <span>Standby Mitigation: <strong className="text-emerald-600 dark:text-emerald-400">Boiler B-01 Preheated</strong></span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          STEPPED RECONCILIATION TERMINAL CONSOLE
-          Triggered when restoring and syncing offline deltas
-          ───────────────────────────────────────────────────────────── */}
-      {activeSyncPhase && (
+        {/* ── LEFT SIDE (5 COLS): CURRENT OPERATIONAL STATE ───────── */}
         <div
-          data-testid="reconciliation-log-console"
-          className="p-4 rounded-xl border border-slate-800 bg-[#0F172A] shadow-xl text-slate-300 font-mono text-xs animate-fade-in"
+          data-testid="comms-status-card"
+          className="lg:col-span-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-4 shadow-sm flex flex-col justify-between"
         >
-          <div className="flex items-center justify-between border-b border-slate-700/80 pb-2.5 mb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
-              </span>
-              <span className="text-slate-100 font-mono font-bold uppercase tracking-wider text-[11px]">
-                STEPPED RECONNECTION &amp; RECONCILIATION PROTOCOL ACTIVE
-              </span>
+          {/* Section Header */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Resilience Posture
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500 font-mono">Health:</span>
+                <strong className="text-slate-900 dark:text-slate-100 font-mono font-bold text-xs">
+                  {overallHealth}%
+                </strong>
+                <TruthBadge type="DERIVED" />
+              </div>
             </div>
-            <button
-              onClick={() => setActiveSyncPhase(null)}
-              className="text-slate-400 hover:text-slate-200 text-xs p-0.5 rounded cursor-pointer transition-colors"
-              aria-label="Dismiss reconciliation log"
+
+            {/* Connection Status Banner */}
+            <div
+              className={`p-3.5 rounded-xl border transition-all ${
+                isOffline
+                  ? "border-rose-500/40 bg-rose-50/70 dark:bg-rose-950/20"
+                  : "border-emerald-500/40 bg-emerald-50/60 dark:bg-emerald-950/20"
+              }`}
             >
-              <X className="h-3.5 w-3.5" />
-            </button>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      isOffline ? "bg-rose-500 animate-ping" : "bg-emerald-500"
+                    }`}
+                  />
+                  <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                    {isOffline ? "Satellite Link Offline" : "Satellite Link Online"}
+                  </span>
+                </div>
+                <span
+                  data-testid="comms-status-badge"
+                  className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold ${
+                    isOffline
+                      ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                      : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                  }`}
+                >
+                  {isOffline ? "OFFLINE" : "ONLINE"}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
+                {isOffline
+                  ? "GSAT-7 backhaul severed. Station operating in autonomous degraded mode. All events spooled to local SQLite WAL."
+                  : "GSAT-7 transponder locked. Continuous bi-directional telemetry and remote sync active."}
+              </p>
+
+              {/* Connection HUD Bar */}
+              <div className="mt-3 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 grid grid-cols-2 gap-2 text-xs font-mono">
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase">Latency</span>
+                  <strong data-testid="comms-latency" className="text-slate-900 dark:text-slate-200 text-xs">
+                    {isOffline || commsStatus?.latency_ms === 9999 || commsStatus?.latency_ms === null || commsStatus?.latency_ms === undefined
+                      ? "DISCONNECTED"
+                      : `${commsStatus.latency_ms} ms`}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase">Bandwidth</span>
+                  <strong data-testid="comms-bandwidth" className="text-slate-900 dark:text-slate-200 text-xs">
+                    {commsStatus?.bandwidth_kbps ?? (isOffline ? 0 : 2048)} kbps
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase">Unsynced Items</span>
+                  <strong data-testid="pending-deltas-count" className="text-amber-600 dark:text-amber-400 text-xs">
+                    {pendingCount} Deltas
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-slate-400 text-[10px] block uppercase">Sync State</span>
+                  <strong
+                    data-testid="reconciliation-status"
+                    className={`text-xs ${isOffline ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"}`}
+                  >
+                    {isOffline ? "PENDING LINK" : "SYNCHRONIZED"}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Integrated Headroom & Survival Windows */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px] uppercase tracking-wide">
+                  Headroom &amp; Survival Windows
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">Autonomous Margins</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {/* Fuel Runway */}
+                <div className="p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                    <span className="font-semibold">Fuel Runway</span>
+                    <TruthBadge type="DERIVED" />
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-base font-bold font-mono text-slate-900 dark:text-white">
+                      {fuelRunwayDays}
+                    </span>
+                    <span className="text-[10px] text-slate-500">Days</span>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-full rounded-full"
+                      style={{ width: `${Math.min(100, (fuelRunwayDays / 90) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="text-[9px] text-slate-400 font-mono truncate">
+                    Stock: {fuelStockLiters.toLocaleString()} L ({fuelStockPercent}%)
+                  </div>
+                </div>
+
+                {/* Grid Reserve Margin */}
+                <div className="p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                    <span className="font-semibold">Grid Reserve</span>
+                    <TruthBadge type="DERIVED" />
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-base font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                      +{reserveMarginKw}
+                    </span>
+                    <span className="text-[10px] text-slate-500">kW</span>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-full rounded-full"
+                      style={{ width: `${Math.min(100, (modeledLoadKw / availableGenKw) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="text-[9px] text-slate-400 font-mono truncate">
+                    Dispatched: {modeledLoadKw} / {availableGenKw} kW
+                  </div>
+                </div>
+
+                {/* Thermal Ingress & Demand */}
+                <div className="p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                    <span className="font-semibold">Thermal Demand</span>
+                    <TruthBadge type="DERIVED" />
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-base font-bold font-mono text-slate-900 dark:text-white">
+                      {thermalDemandKw}
+                    </span>
+                    <span className="text-[10px] text-slate-500">kW</span>
+                  </div>
+                  <div className="text-[9px] text-slate-400 font-mono truncate">
+                    Ambient: {ambientTempC}°C · Aux Boiler Ready
+                  </div>
+                </div>
+
+                {/* UPS & NVMe Autonomy */}
+                <div
+                  data-testid="battery-resilience-card"
+                  className="p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-1"
+                >
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                    <span className="font-semibold">UPS Autonomy</span>
+                    <TruthBadge type="ESTIMATED" />
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-base font-bold font-mono text-blue-600 dark:text-blue-400">
+                      4.8
+                    </span>
+                    <span className="text-[10px] text-slate-500">Hours</span>
+                  </div>
+                  <div className="text-[9px] text-slate-400 font-mono truncate">
+                    NVMe Buffer: 72h · 48.4V DC Bus
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-1 font-mono text-[11px] leading-relaxed">
-            {reconciliationSteps.map((step, idx) => {
-              if (step.startsWith("P0 transferred")) {
-                const parts = step.split(" — ");
-                return (
-                  <div key={idx} className="flex items-start gap-2 py-0.5">
-                    <span className="text-slate-500 select-none">›</span>
-                    <span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 mr-1.5">
-                        P0
-                      </span>
-                      <span className="text-slate-300">transferred</span>
-                      <span className="text-slate-500 mx-1">—</span>
-                      <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
-                    </span>
-                  </div>
-                );
-              }
-              if (step.startsWith("P1 transferred")) {
-                const parts = step.split(" — ");
-                return (
-                  <div key={idx} className="flex items-start gap-2 py-0.5">
-                    <span className="text-slate-500 select-none">›</span>
-                    <span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 mr-1.5">
-                        P1
-                      </span>
-                      <span className="text-slate-300">transferred</span>
-                      <span className="text-slate-500 mx-1">—</span>
-                      <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
-                    </span>
-                  </div>
-                );
-              }
-              if (step.startsWith("P2 transferred")) {
-                const parts = step.split(" — ");
-                return (
-                  <div key={idx} className="flex items-start gap-2 py-0.5">
-                    <span className="text-slate-500 select-none">›</span>
-                    <span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 mr-1.5">
-                        P2
-                      </span>
-                      <span className="text-slate-300">transferred</span>
-                      <span className="text-slate-500 mx-1">—</span>
-                      <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
-                    </span>
-                  </div>
-                );
-              }
-              if (step.startsWith("P3 transferred")) {
-                const parts = step.split(" — ");
-                return (
-                  <div key={idx} className="flex items-start gap-2 py-0.5">
-                    <span className="text-slate-500 select-none">›</span>
-                    <span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-700/50 text-slate-300 border border-slate-600/50 mr-1.5">
-                        P3
-                      </span>
-                      <span className="text-slate-300">transferred</span>
-                      <span className="text-slate-500 mx-1">—</span>
-                      <span className="text-slate-400">{parts.slice(1).join(" — ")}</span>
-                    </span>
-                  </div>
-                );
-              }
-              if (step.includes("SHA-256") || step.includes("checksums verified")) {
-                return (
-                  <div key={idx} className="flex items-start gap-2 py-0.5">
-                    <span className="text-emerald-400 select-none">✔</span>
-                    <span className="text-slate-300">
-                      Canonical <span className="text-emerald-400 font-semibold">SHA-256</span> payload checksums{" "}
-                      <span className="text-emerald-400 font-semibold">verified</span> by station hub.
-                    </span>
-                  </div>
-                );
-              }
-              if (step.startsWith("Server ACK received")) {
-                return (
-                  <div key={idx} className="flex items-start gap-2 py-0.5">
-                    <span className="text-emerald-400 select-none">✔</span>
-                    <span className="text-slate-200">
-                      <span className="text-emerald-400 font-bold">Server ACK received:</span> All priority deltas reconciled. Satellite link{" "}
-                      <span className="text-emerald-400 font-bold">ONLINE</span>.
-                    </span>
-                  </div>
-                );
-              }
-              return (
-                <div key={idx} className="flex items-start gap-2 py-0.5">
-                  <span className="text-slate-500 select-none">›</span>
-                  <span className="text-slate-300">{step}</span>
-                </div>
-              );
-            })}
+          {/* Active Vulnerabilities & Single Points of Failure summary pill */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                <span>Active Vulnerabilities &amp; Single Points of Failure</span>
+              </span>
+              <button
+                onClick={() => setActiveTab("INCIDENTS")}
+                className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer flex items-center gap-0.5 text-[10px]"
+              >
+                <span>Inspect</span>
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+              G-02 Diesel Gen (Risk: 74/100) · Aux Boiler B-01 Preheated for standby transfer
+            </div>
           </div>
         </div>
-      )}
+
+        {/* ── RIGHT SIDE (7 COLS): LIVE EVENT / RECONCILIATION FEEDBACK CONSOLE ── */}
+        <div className="lg:col-span-7 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-4 shadow-sm flex flex-col justify-between">
+          {/* Dynamic State Console Content */}
+          <div className="space-y-4">
+            {/* Header of Right Console */}
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Terminal className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Live Event &amp; Reconciliation Feedback
+                </h2>
+              </div>
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                  activeSyncPhase
+                    ? "bg-blue-500/20 text-blue-600 dark:text-blue-400"
+                    : isOffline
+                    ? "bg-rose-500/20 text-rose-600 dark:text-rose-400"
+                    : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                }`}
+              >
+                {activeSyncPhase ? `STEP: ${activeSyncPhase}` : isOffline ? "AIR GAPPED" : "STANDBY READY"}
+              </span>
+            </div>
+
+            {/* CASE 1: ACTIVE RECONCILIATION IN PROGRESS */}
+            {activeSyncPhase && (
+              <div className="space-y-3 animate-fade-in">
+                {/* Stage Tracker Stepper */}
+                <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-50/50 dark:bg-blue-950/20 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+                      </span>
+                      <span>Stepped Reconnection Protocol Active</span>
+                    </span>
+                    <span className="font-mono text-[10px] text-blue-600 dark:text-blue-400">
+                      {activeSyncPhase === "RECONCILED" ? "COMPLETED" : "TRANSMITTING"}
+                    </span>
+                  </div>
+
+                  {/* Visual Protocol Stepper */}
+                  <div className="grid grid-cols-4 gap-1.5 text-center text-[10px] font-mono font-semibold pt-1">
+                    <div className="p-1 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                      1. Carrier Lock ✔
+                    </div>
+                    <div className="p-1 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                      2. P0-P1 Sync ✔
+                    </div>
+                    <div
+                      className={`p-1 rounded ${
+                        activeSyncPhase === "RECONCILED"
+                          ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                          : "bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 animate-pulse"
+                      }`}
+                    >
+                      3. SHA-256 Check
+                    </div>
+                    <div
+                      className={`p-1 rounded ${
+                        activeSyncPhase === "RECONCILED"
+                          ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
+                          : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                      }`}
+                    >
+                      4. Server ACK
+                    </div>
+                  </div>
+                </div>
+
+                {/* Log Terminal Console */}
+                <div
+                  data-testid="reconciliation-log-console"
+                  className="p-3.5 rounded-xl border border-slate-800 bg-[#0F172A] shadow-md text-slate-300 font-mono text-xs max-h-56 overflow-y-auto space-y-1.5"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-700/80 pb-1.5 mb-1.5 text-[10px] text-slate-400 uppercase tracking-wider">
+                    <span>Terminal Stream: Canonical Reconciliation Output</span>
+                    <button
+                      onClick={() => setActiveSyncPhase(null)}
+                      className="text-slate-400 hover:text-white"
+                      title="Dismiss log"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {reconciliationSteps.map((step, idx) => {
+                    if (step.startsWith("P0 transferred")) {
+                      return (
+                        <div key={idx} className="flex items-start gap-1.5 py-0.5 text-[11px]">
+                          <span className="text-slate-500">›</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                            P0
+                          </span>
+                          <span className="text-slate-300">{step}</span>
+                        </div>
+                      );
+                    }
+                    if (step.startsWith("P1 transferred")) {
+                      return (
+                        <div key={idx} className="flex items-start gap-1.5 py-0.5 text-[11px]">
+                          <span className="text-slate-500">›</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            P1
+                          </span>
+                          <span className="text-slate-300">{step}</span>
+                        </div>
+                      );
+                    }
+                    if (step.startsWith("P2 transferred")) {
+                      return (
+                        <div key={idx} className="flex items-start gap-1.5 py-0.5 text-[11px]">
+                          <span className="text-slate-500">›</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                            P2
+                          </span>
+                          <span className="text-slate-300">{step}</span>
+                        </div>
+                      );
+                    }
+                    if (step.startsWith("P3 transferred")) {
+                      return (
+                        <div key={idx} className="flex items-start gap-1.5 py-0.5 text-[11px]">
+                          <span className="text-slate-500">›</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-700 text-slate-300">
+                            P3
+                          </span>
+                          <span className="text-slate-400">{step}</span>
+                        </div>
+                      );
+                    }
+                    if (step.includes("SHA-256") || step.includes("checksums verified")) {
+                      return (
+                        <div key={idx} className="flex items-start gap-1.5 py-0.5 text-[11px] text-emerald-400 font-semibold">
+                          <span>✔</span>
+                          <span>Canonical SHA-256 payload checksums verified by station hub.</span>
+                        </div>
+                      );
+                    }
+                    if (step.startsWith("Server ACK received")) {
+                      return (
+                        <div key={idx} className="flex items-start gap-1.5 py-0.5 text-[11px] text-emerald-300 font-bold">
+                          <span>✔</span>
+                          <span>Server ACK received: All priority deltas reconciled. Satellite link ONLINE.</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={idx} className="flex items-start gap-1.5 py-0.5 text-[11px] text-slate-400">
+                        <span className="text-slate-600">›</span>
+                        <span>{step}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* CASE 2: OFFLINE STATE (OUTAGE SIMULATION ACTIVE) */}
+            {isOffline && !activeSyncPhase && (
+              <div className="space-y-3.5 animate-fade-in">
+                {/* Outage State & Consequence Callout */}
+                <div className="p-3.5 rounded-xl border border-rose-500/30 bg-rose-50/60 dark:bg-rose-950/20 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                      <span>Active Outage — Local Degraded Continuity Engaged</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-600">
+                      AIR GAPPED
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-700 dark:text-slate-300 space-y-1">
+                    <p className="font-semibold text-slate-900 dark:text-white">
+                      Consequence: G-02 incident telemetry &amp; station events buffered locally
+                    </p>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
+                      Zero data loss. High-resolution telemetry deltas and scientific observations are serialized into the local SQLite WAL ring buffer with canonical RFC 8259 formatting.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Level 1 Priority Queue Summary Cards */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-800 dark:text-slate-200 text-[11px] uppercase tracking-wide">
+                      Queued Priority Spool ({pendingCount} pending)
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">Sorted P0 → P3</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {/* P0 */}
+                    <div className="p-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 dark:bg-rose-950/30 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono font-bold text-rose-600 dark:text-rose-400">
+                        <span>P0 CRITICAL</span>
+                        <span>{p0Count}</span>
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                        G-02 Anomaly
+                      </div>
+                      <div className="text-[10px] text-rose-600 dark:text-rose-400 font-mono font-medium">
+                        First Dispatch
+                      </div>
+                    </div>
+
+                    {/* P1 */}
+                    <div className="p-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 dark:bg-amber-950/30 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono font-bold text-amber-600 dark:text-amber-400">
+                        <span>P1 HIGH</span>
+                        <span>{p1Count}</span>
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                        Work Orders
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        WO-2026-088
+                      </div>
+                    </div>
+
+                    {/* P2 */}
+                    <div className="p-2.5 rounded-xl border border-cyan-500/40 bg-cyan-500/10 dark:bg-cyan-950/30 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                        <span>P2 SCIENCE</span>
+                        <span>{p2Count}</span>
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                        Radar &amp; Seis
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        NVMe Buffer
+                      </div>
+                    </div>
+
+                    {/* P3 */}
+                    <div className="p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 space-y-1">
+                      <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400">
+                        <span>P3 ROUTINE</span>
+                        <span>{p3Count}</span>
+                      </div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                        Weather / Env
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        Telemetry
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Next Step Callout */}
+                <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 flex items-center justify-between gap-3 text-xs">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>Next Operational Step</span>
+                    </span>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      Click <strong>Restore &amp; Reconcile</strong> in the header above to re-establish GSAT-7 carrier lock and verify priority hashes.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleRestoreAndSync}
+                    disabled={actionLoading}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shrink-0 cursor-pointer shadow-xs animate-pulse"
+                  >
+                    Restore Now
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* CASE 3: ONLINE / NORMAL OPERATING STATE */}
+            {!isOffline && !activeSyncPhase && (
+              <div className="space-y-3.5 animate-fade-in">
+                {/* Readiness Posture Banner */}
+                <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-950/20 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>Ready for Disruption — Continuous Air-Gap Readiness</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-600">
+                      NOMINAL SYNC
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Station Bharati maintains continuous readiness for polar isolation. If the GSAT-7 satellite carrier is severed, the system immediately engages local degraded edge mode with zero data loss.
+                  </p>
+                </div>
+
+                {/* 4 Architectural Safeguards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                  <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-1">
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <Database className="h-3.5 w-3.5 text-blue-500" />
+                      <span>Autonomous Local Edge</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                      Local SQLite WAL storage caches telemetry, telemetry thresholds, and operator actions during communications blackouts.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-1">
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <Zap className="h-3.5 w-3.5 text-amber-500" />
+                      <span>Deterministic Priority Queue</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                      P0 critical alarms (Generator G-02) synchronize first on carrier restore, followed by P1 work orders, P2 science, and P3 routine feeds.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-1">
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <Lock className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>Canonical SHA-256 Integrity</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                      Every delta payload is formatted per RFC 8259 and cryptographically hashed for bit-for-bit verification upon hub synchronization.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-1">
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                      <HardDrive className="h-3.5 w-3.5 text-cyan-500" />
+                      <span>Scientific Data Spooling</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                      Instruments S-17 (Auroral Radar) and S-08 (Seismometer) buffer continuously to local NVMe storage with 72-hour retention guarantee.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Action guidance */}
+                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-800/40 text-[11px] text-slate-600 dark:text-slate-400 flex items-center justify-between">
+                  <span>Want to test autonomous transition? Click <strong>Simulate Outage</strong> in the header.</span>
+                  <span className="font-mono text-[10px] text-slate-400">0 DELTAS PENDING</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          LAYER 4: RESILIENCE WORKSPACES
-          Focused Secondary Tools: Sync Queue, Blast Radius, Graph, Science, Memory
+          SECONDARY WORKSPACE TABS & DETAILED INSPECTORS
+          Progressive disclosure: Detailed Queue, Incident Blast Radius, Graph, Science, Memory
           ───────────────────────────────────────────────────────────── */}
-      <section className="space-y-4">
+      <section className="space-y-4 pt-2">
         {/* Workspace Segmented Navigation Rail */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
           <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
@@ -1044,7 +1109,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
           </div>
         </div>
 
-        {/* ── WORKSPACE 1: SYNC QUEUE VIEW ────────────────────────── */}
+        {/* ── WORKSPACE 1: SYNC QUEUE VIEW (LEVEL 2 DETAILED TECHNICAL WORKSPACE) ── */}
         {activeTab === "QUEUE" && (
           <div data-testid="sync-queue-table" className="space-y-4">
             {/* Priority Lanes Summary & Filter Pills */}
@@ -1271,7 +1336,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Formatted JSON Payload Inspector with Crisp Framing */}
+                      {/* Formatted JSON Payload Inspector */}
                       <div className="space-y-1.5">
                         <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between font-sans">
                           <span>Structured Event Payload</span>
@@ -1367,7 +1432,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                         <td className="p-2.5 text-right">
                           <button
                             onClick={() => handleRetryQueueItem(item.id)}
-                            className="text-blue-600 hover:text-blue-500 font-semibold text-xs"
+                            className="text-blue-600 hover:text-blue-500 font-semibold text-xs cursor-pointer"
                           >
                             Reverify
                           </button>
