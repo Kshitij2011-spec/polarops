@@ -28,6 +28,7 @@ import { useAssetTelemetry } from "@/hooks/useAssetTelemetry";
 import { useStation } from "@/context/StationContext";
 import { StationDigitalTwin } from "./StationDigitalTwin";
 import { ExplanationDrawer } from "./polarops";
+import { ActivityStream } from "./ActivityStream";
 
 export function CommandCenterView() {
   const { activeStationId, openExplanation: openStationExplanation } = useStation();
@@ -780,57 +781,13 @@ export function CommandCenterView() {
       {/* ============================================================
           9. OPERATIONAL ACTIVITY & SUBSYSTEM STATE (Sections 13 & 27)
           ============================================================ */}
-      <section
-        className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] p-5 shadow-xs"
-        aria-labelledby="operational-activity-heading"
-      >
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div>
-            <h2 id="operational-activity-heading" className="text-xs font-mono font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase">
-              OPERATIONAL ACTIVITY LOG · RECENT SYSTEM EVENTS
-            </h2>
-          </div>
-          <span className="text-[10px] font-mono text-slate-400">
-            SYNCHRONIZED AUDIT TRAIL
-          </span>
-        </div>
-
-        <div className="divide-y divide-slate-100 dark:divide-slate-800 mt-2">
-          {eventsLoading ? (
-            <div className="py-4 text-xs font-mono text-slate-400 text-center">
-              Loading operational events stream...
-            </div>
-          ) : eventsData?.events && eventsData.events.length > 0 ? (
-            eventsData.events.slice(0, 6).map((ev) => (
-              <div key={ev.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="font-mono text-[11px] text-slate-400 shrink-0">
-                    {new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                  </span>
-                  <div className="truncate">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">{ev.title}</span>
-                    <span className="text-slate-500 dark:text-slate-400 hidden sm:inline"> — {ev.summary}</span>
-                  </div>
-                </div>
-                <span
-                  className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold shrink-0 border ${
-                    ev.severity === "CRITICAL"
-                      ? "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-300 dark:border-red-800"
-                      : ev.severity === "WARNING"
-                      ? "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
-                  }`}
-                >
-                  {ev.severity}
-                </span>
-              </div>
-            ))
-          ) : (
-            <div className="py-4 text-xs font-mono text-slate-400 text-center">
-              No recent operational events logged.
-            </div>
-          )}
-        </div>
+      <section aria-labelledby="operational-activity-heading">
+        <ActivityStream
+          stationId={stationId}
+          onOpenExplanation={(domain, entityId) => {
+            openStationExplanation(domain, entityId);
+          }}
+        />
       </section>
 
       {/* Explanation Drawer */}

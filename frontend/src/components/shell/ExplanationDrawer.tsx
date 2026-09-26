@@ -49,6 +49,7 @@ export function ExplanationDrawer() {
           <button
             type="button"
             onClick={closeExplanation}
+            data-testid="explanation-drawer-close-btn"
             className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-100 transition-colors"
             aria-label="Close Explanation Drawer"
           >

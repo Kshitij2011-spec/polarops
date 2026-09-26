@@ -1,10 +1,9 @@
 import { Link, useRouterState, useSearch, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, AlertTriangle, ArrowDown, ArrowRight, BarChart3, Bell, Boxes, ChevronDown, ChevronRight, CircleGauge, ClipboardCheck, CloudOff, Download, FileText, Fuel, Grid3X3, Menu, Minus, Moon, Plus, Radio, RefreshCw, RotateCcw, Satellite, Settings, ShieldCheck, Sun, UserRound, Users, X, Zap } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDown, ArrowRight, BarChart3, Bell, Boxes, ChevronDown, ChevronRight, CircleGauge, ClipboardCheck, CloudOff, Download, FileText, Fuel, Grid3X3, Menu, Minus, Moon, Plus, Radio, RefreshCw, RotateCcw, Satellite, Settings, ShieldCheck, Sun, UserRound, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { demoActivities, demoAlerts, demoCapabilities, demoDependencies, demoOfflineState, demoReports, demoSyncQueue } from "@/lib/demo-data";
+import { demoAlerts, demoCapabilities, demoOfflineState, demoReports, demoSyncQueue } from "@/lib/demo-data";
 import { useStationOverview } from "../hooks/useStationOverview";
 import { useOperationalEvents } from "../hooks/useOperationalEvents";
 import { useExplanation } from "../hooks/useExplanation";
@@ -13,11 +12,10 @@ import { useFuelStatus } from "../hooks/useFuelStatus";
 import { useEnergyModel } from "../hooks/useEnergyModel";
 import { useInventory } from "../hooks/useInventory";
 import { useResupply } from "../hooks/useResupply";
-import { useScenarioSimulation } from "../hooks/useScenarioSimulation";
-import type { ScenarioSimulateResponse } from "@/lib/api";
 import { OperationalTopology } from "./OperationalTopology";
 import { StationsView } from "./Stations/StationsView";
 import { ResilienceView } from "./Resilience/ResilienceView";
+import { ScenariosWorkspace } from "./Scenarios/ScenariosWorkspace";
 
 const navGroups = [
   ["COMMAND", [["Overview", "/command-center", CircleGauge], ["Digital Twin", "/digital-twin", Boxes], ["Stations", "/stations", Radio]]],
@@ -510,228 +508,7 @@ export function ResourcesPage() {
 }
 
 export function ScenariosPage() {
-  const ctx = useStation();
-  const searchStation = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("station") : null;
-  const stationId = (searchStation === "STATION-MAITRI" || searchStation === "STATION-BHARATI") ? searchStation : (ctx?.activeStationId || "STATION-BHARATI");
-  const isMaitri = stationId === "STATION-MAITRI";
-
-  const [selectedScenarioIndex, setSelectedScenarioIndex] = useState(0);
-  const [durationHours, setDurationHours] = useState(72);
-  const [ambientTempOverride, setAmbientTempOverride] = useState<number | undefined>(undefined);
-  const [simulationResult, setSimulationResult] = useState<ScenarioSimulateResponse | null>(null);
-  const [isSimulating, setIsSimulating] = useState(false);
-
-  const simulationMutation = useScenarioSimulation();
-
-  const scenariosList = [
-    {
-      name: "GENERATOR FAILURE",
-      desc: isMaitri ? "Hypothetical outage of Maitri Main Generator 1 (150 kVA)" : "Loss of primary Diesel Generator G-02 (520 kW output)",
-      affected: isMaitri ? "Power Bus, Station Oasis Facilities" : "Power Bus A, Habitat Zone 2 Heating, Science cold storage",
-      risk: isMaitri ? "HIGH" : "CRITICAL",
-      type: "GENERATOR_FAILURE",
-      targetAsset: isMaitri ? "MAITRI-GEN-01" : "G-02",
-    },
-    {
-      name: "FUEL SHORTAGE",
-      desc: isMaitri ? "Hypothetical winter fuel reserve drops below buffer threshold" : "Winter fuel falls below 90-day operational planning reserve",
-      affected: "Power Generation, Thermal Circuit, Logistics",
-      risk: "HIGH",
-      type: "GENERATOR_FAILURE",
-      targetAsset: isMaitri ? "MAITRI-GEN-01" : "G-02",
-    },
-    {
-      name: "COMMUNICATION LOSS",
-      desc: "Simulated complete outage of GSAT-7 / Inmarsat satellite link",
-      affected: "Telemetry Bus, Priority Queue Buffer, Science Synchronization",
-      risk: "MEDIUM",
-      type: "GENERATOR_FAILURE",
-      targetAsset: isMaitri ? "MAITRI-GEN-01" : "G-02",
-    },
-    {
-      name: "SEVERE WEATHER",
-      desc: "Approaching 42-knot blizzard cycle with -41.2°C wind chill",
-      affected: "External Traverse, Thermal Loading, Personnel Movement",
-      risk: "HIGH",
-      type: "GENERATOR_FAILURE",
-      targetAsset: isMaitri ? "MAITRI-GEN-01" : "G-02",
-    },
-    {
-      name: "SUPPLY DELAY",
-      desc: "Maritime resupply vessel MV Vasiliy Golovnin delayed by pack ice",
-      affected: "Critical Spares (SK-402), Generator Maintenance MWO-2026-089",
-      risk: "MEDIUM",
-      type: "GENERATOR_FAILURE",
-      targetAsset: isMaitri ? "MAITRI-GEN-01" : "G-02",
-    },
-  ];
-
-  const activeScenario = scenariosList[selectedScenarioIndex];
-
-  const handleRunScenario = (index: number) => {
-    setSelectedScenarioIndex(index);
-    const scen = scenariosList[index];
-    if (!scen) return;
-    setIsSimulating(true);
-
-    simulationMutation.mutate(
-      {
-        station_id: stationId,
-        scenario_type: "GENERATOR_FAILURE",
-        target_asset_id: scen.targetAsset,
-        duration_hours: durationHours,
-        ambient_temp_celsius: ambientTempOverride,
-      },
-      {
-        onSuccess: (data) => {
-          setSimulationResult(data);
-          setIsSimulating(false);
-        },
-        onError: () => {
-          setIsSimulating(false);
-        },
-      }
-    );
-  };
-
-  return (
-    <>
-      <PageHeader
-        eyebrow="DECISION SUPPORT"
-        title="Scenario Simulation"
-        subtitle={`Explore operational consequences before action · ${stationId}. All outcomes are illustrative.`}
-      />
-      <div className="grid lg:grid-cols-[.9fr_1.1fr] gap-6">
-        {/* Left Side: Existing Scenario Cards */}
-        <div className="space-y-3">
-          {scenariosList.map((scen, i) => {
-            const isSelected = selectedScenarioIndex === i;
-            return (
-              <div
-                className={`scenario-item ${isSelected ? "selected" : ""}`}
-                key={scen.name}
-              >
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="demo-tag text-[9px] uppercase tracking-wider">{scen.targetAsset}</span>
-                    <span className="text-[10px] font-mono text-muted-foreground">{stationId}</span>
-                  </div>
-                  <h2>{scen.name}</h2>
-                  <p>{scen.desc}</p>
-                  <span>AFFECTED · {scen.affected}</span>
-
-                  {isSelected && (
-                    <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-[10px] font-mono text-muted-foreground block mb-1">DURATION</span>
-                        <select
-                          className="bg-secondary text-foreground text-xs p-1 rounded border border-border w-full font-mono cursor-pointer"
-                          value={durationHours}
-                          onChange={(e) => setDurationHours(Number(e.target.value))}
-                        >
-                          <option value={24}>24 Hours</option>
-                          <option value={48}>48 Hours</option>
-                          <option value={72}>72 Hours</option>
-                          <option value={120}>120 Hours</option>
-                        </select>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-mono text-muted-foreground block mb-1">AMBIENT OVERRIDE</span>
-                        <select
-                          className="bg-secondary text-foreground text-xs p-1 rounded border border-border w-full font-mono cursor-pointer"
-                          value={ambientTempOverride ?? ""}
-                          onChange={(e) => setAmbientTempOverride(e.target.value === "" ? undefined : Number(e.target.value))}
-                        >
-                          <option value="">Baseline ({isMaitri ? "-18.2°C" : "-28.5°C"})</option>
-                          <option value={-38.0}>Cold Snap (-38.0°C)</option>
-                          <option value={-45.0}>Extreme Blizzard (-45.0°C)</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col items-end justify-between">
-                  <StatusBadge value={scen.risk} />
-                  <Button
-                    onClick={() => handleRunScenario(i)}
-                    disabled={isSimulating}
-                  >
-                    {isSimulating && isSelected ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : null}
-                    RUN SCENARIO
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Right Side: Existing Simulation Output Panel */}
-        <Panel
-          title={simulationResult && activeScenario ? `${activeScenario.name} · RESULT` : "SIMULATION OUTPUT"}
-          action={
-            simulationResult && (
-              <span className="demo-tag font-mono text-[9px]">
-                {simulationResult.truth_type} · {simulationResult.station_id}
-              </span>
-            )
-          }
-        >
-          {isSimulating ? (
-            <div className="empty-state">
-              <RefreshCw className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-              <p className="font-mono text-xs">Simulating operational impact at {stationId}...</p>
-            </div>
-          ) : simulationResult ? (
-            <div className="simulation-result">
-              <BarChart3 />
-              <div className="flex items-center gap-2 mb-2">
-                <StatusBadge value={simulationResult.scenario_risk_level} />
-                <span className="font-mono text-xs text-muted-foreground">
-                  Risk score: {simulationResult.scenario_risk_score}/100 ({simulationResult.risk_delta > 0 ? `+${simulationResult.risk_delta}` : simulationResult.risk_delta} delta from baseline {simulationResult.baseline_risk_score})
-                </span>
-              </div>
-
-              <h3>Operational impact</h3>
-              <p>{simulationResult.scenario_summary || simulationResult.baseline_summary}</p>
-
-              <h3>Affected dependencies</h3>
-              <p>
-                {simulationResult.affected_services?.length > 0
-                  ? simulationResult.affected_services.map((s) => `${s.name} [${s.scenario_status}]`).join(" → ")
-                  : "Power Bus A → Habitat heating → Science cold storage"}
-              </p>
-
-              <h3>Resource impact</h3>
-              <p>
-                Available generation drops from {simulationResult.available_capacity_kw + 300} kW to {simulationResult.available_capacity_kw} kW. Reserve margin is {simulationResult.reserve_margin_kw} kW ({simulationResult.reserve_margin_percent}% spare margin).
-              </p>
-
-              <h3>Recommended mitigation</h3>
-              <p>
-                {simulationResult.decision_options?.[0]?.description ||
-                  "Transfer non-essential loads, verify backup generation, and prepare an operator-approved maintenance window."}
-              </p>
-
-              <div className="notice my-4 text-[10px] font-mono flex justify-between items-center">
-                <span>SIMULATION ENGINE: {simulationResult.source_context?.slice(0, 3).join(", ")}</span>
-                <span>COMPUTED: {new Date(simulationResult.computed_at).toLocaleTimeString()} UTC</span>
-              </div>
-
-              <Button onClick={() => alert(`Operational mitigation plan for ${simulationResult.scenario_type} recorded in operator decision register.`)}>
-                REVIEW MITIGATION
-              </Button>
-            </div>
-          ) : (
-            <div className="empty-state">
-              <Activity />
-              <p>Select a scenario and run the simulation to view its operational impact.</p>
-            </div>
-          )}
-        </Panel>
-      </div>
-    </>
-  );
+  return <ScenariosWorkspace />;
 }
 
 export function ResiliencePage() {
