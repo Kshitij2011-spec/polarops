@@ -25,9 +25,10 @@ import { useOperationalEvents } from "@/hooks/useOperationalEvents";
 import { useStation } from "@/context/StationContext";
 import { StationDigitalTwin } from "./StationDigitalTwin";
 import { ExplanationDrawer } from "./polarops";
+import { ActivityStream } from "./ActivityStream";
 
 export function CommandCenterView() {
-  const { activeStationId } = useStation();
+  const { activeStationId, openExplanation: openStationExplanation } = useStation();
   const stationId = activeStationId || "STATION-BHARATI";
   const navigate = useNavigate();
 
@@ -719,7 +720,7 @@ export function CommandCenterView() {
         </div>
       </section>
 
-      {/* ── 07: COLLAPSIBLE RECENT ACTIVITY STREAM ────────────────────────── */}
+      {/* ── 07: COLLAPSIBLE OPERATIONAL ACTIVITY STREAM & AUDIT TRAIL ────── */}
       <section
         data-testid="operational-activity-list"
         className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs transition-all font-sans"
@@ -775,52 +776,19 @@ export function CommandCenterView() {
           </div>
         )}
 
-        {/* Full stream when expanded */}
+        {/* Full stream and Scenario ActivityStream when expanded */}
         {activityExpanded && (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800/80 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 animate-in fade-in-50 duration-200">
-            {eventsLoading ? (
-              <div className="py-4 text-xs font-mono text-muted-foreground text-center">
-                Loading operational events stream...
-              </div>
-            ) : eventsData?.events && eventsData.events.length > 0 ? (
-              eventsData.events.slice(0, 6).map((ev) => (
-                <div key={ev.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-mono text-[11px] text-muted-foreground shrink-0">
-                      {new Date(ev.timestamp).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })}
-                    </span>
-                    <div className="truncate">
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        {ev.title}
-                      </span>
-                      <span className="text-muted-foreground hidden sm:inline">
-                        {" "}
-                        — {ev.summary}
-                      </span>
-                    </div>
-                  </div>
-                  <span
-                    className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold shrink-0 border ${
-                      ev.severity === "CRITICAL"
-                        ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30"
-                        : ev.severity === "WARNING"
-                        ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
-                    }`}
-                  >
-                    {ev.severity}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="py-4 text-xs text-muted-foreground text-center">
-                No recent operational events logged.
-              </div>
-            )}
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 animate-in fade-in-50 duration-200">
+            <ActivityStream
+              stationId={stationId}
+              onOpenExplanation={(domain, entityId) => {
+                if (openStationExplanation) {
+                  openStationExplanation(domain, entityId);
+                } else {
+                  setExplainOpen(true);
+                }
+              }}
+            />
           </div>
         )}
       </section>

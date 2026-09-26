@@ -1298,7 +1298,7 @@ def generate_explanation(
         return explain_science(db, instrument_id=entity_id, station_id=station_id)
     elif clean_domain in ["INCIDENT", "INCIDENTS"]:
         return explain_incident(db, incident_id=entity_id, station_id=station_id)
-    elif clean_domain in ["SCENARIO", "SCENARIOS", "WHAT_IF"]:
+    elif clean_domain in ["SCENARIO", "SCENARIOS", "WHAT_IF", "DECISION", "ACTION", "COUNTERMEASURE", "MITIGATION"]:
         return explain_scenario(db, scenario_id=entity_id, station_id=station_id)
     elif clean_domain in ["CROSS_STATION", "CROSS-STATION", "PORTFOLIO", "STATIONS", "STATION_COMPARISON"]:
         return explain_cross_station(db, station_a_id=station_id, station_b_id=entity_id or "STATION-MAITRI")
