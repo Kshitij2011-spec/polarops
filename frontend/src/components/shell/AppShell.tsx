@@ -59,7 +59,7 @@ export function AppShell({ children }: AppShellProps) {
   }, []);
 
   return (
-    <div className="h-screen h-[100dvh] bg-[#F8FAFC] dark:bg-[#070B12] text-slate-900 dark:text-slate-100 flex overflow-hidden font-sans antialiased selection:bg-[#369ACC]/30 selection:text-[#172554] dark:selection:text-[#46B9C7] transition-colors duration-200">
+    <div className="h-screen h-[100dvh] bg-[#F8FAFC] dark:bg-[#070B12] text-slate-900 dark:text-slate-100 flex overflow-hidden font-sans antialiased selection:bg-[#369ACC]/30 selection:text-[#172554] dark:selection:text-[#46B9C7] transition-colors duration-150">
       {/* WCAG 2.2 Skip to main content link */}
       <a
         href="#main-content"

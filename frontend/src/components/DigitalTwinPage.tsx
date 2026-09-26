@@ -227,22 +227,36 @@ export function DigitalTwinPage() {
       className="space-y-4 animate-fade-in pb-16 font-sans text-slate-800 dark:text-slate-200"
       data-testid="digital-twin-page"
     >
-      {/* ── 01: COMPACT OPERATIONAL HEADER (56-80px SINGLE ROW) ────────── */}
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 dark:border-slate-800/80 pb-2.5">
-        <div className="flex items-center gap-3">
-          <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-primary uppercase leading-tight">
-              DIGITAL TWIN
-            </div>
-            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-tight flex items-baseline gap-1.5">
-              <span>{activeStation.name}</span>
-              <span className="text-muted-foreground font-normal text-xs sm:text-sm">· Station Digital Twin</span>
+      {/* ── 01: COMPACT OPERATIONAL HEADER ───────────────────────────────── */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-sans text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-blue-600 dark:text-blue-400">
+              Digital Twin
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">/</span>
+            <span className="font-medium text-slate-800 dark:text-slate-200">
+              {activeStation.name}
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">·</span>
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              Station Asset Graph
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <Boxes className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Station Digital Twin
             </h1>
           </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl">
+            Real-time physical asset topology, thermal/power bus telemetry, and cross-subsystem dependencies.
+          </p>
         </div>
 
         {/* Station Selector, Live Status, Truth Type, and Refresh */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {/* Station Selector Toggle */}
           <div className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700">
             <button
@@ -270,7 +284,7 @@ export function DigitalTwinPage() {
           </div>
 
           {/* Live Synchronized Status Pill */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs shadow-2xs">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs shadow-2xs">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
@@ -278,7 +292,7 @@ export function DigitalTwinPage() {
             <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono text-[11px] tracking-wide">STABLE</span>
             <span className="text-slate-300 dark:text-slate-700">·</span>
             <span className="font-semibold text-slate-900 dark:text-slate-100">Live Twin</span>
-            <span className="text-muted-foreground font-mono text-[11px]">· Last updated {lastTimestamp}</span>
+            <span className="text-muted-foreground font-mono text-[11px]">· {lastTimestamp}</span>
           </div>
 
           <TruthBadge type="MEASURED" />
@@ -287,7 +301,8 @@ export function DigitalTwinPage() {
           <button
             onClick={handleRetryAll}
             title="Synchronize Telemetry & Topology"
-            className="p-1.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shadow-2xs"
+            aria-label="Synchronize telemetry and topology"
+            className="p-2 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shadow-2xs"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${detailLoading || telemLoading ? "animate-spin" : ""}`} />
           </button>

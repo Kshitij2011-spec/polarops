@@ -40,7 +40,7 @@ export function StatusBadge({
       case "HIGH":
       case "ATTENTION":
         return {
-          bg: "bg-red-950/80 text-red-400 border-red-800/90 ring-1 ring-red-500/20",
+          bg: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/80 dark:text-red-400 dark:border-red-800/90 dark:ring-1 dark:ring-red-500/20",
           icon: AlertTriangle,
           defaultLabel: "CRITICAL",
           dotColor: "bg-red-500",
@@ -50,7 +50,7 @@ export function StatusBadge({
       case "WATCH":
       case "MEDIUM":
         return {
-          bg: "bg-amber-950/80 text-amber-400 border-amber-800/90 ring-1 ring-amber-500/20",
+          bg: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/80 dark:text-amber-400 dark:border-amber-800/90 dark:ring-1 dark:ring-amber-500/20",
           icon: AlertCircle,
           defaultLabel: norm === "DEGRADED" ? "DEGRADED" : "WARNING",
           dotColor: "bg-amber-500",
@@ -60,7 +60,7 @@ export function StatusBadge({
       case "OPERATIONAL":
       case "RECONCILED":
         return {
-          bg: "bg-emerald-950/80 text-emerald-400 border-emerald-800/90 ring-1 ring-emerald-500/20",
+          bg: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-400 dark:border-emerald-800/90 dark:ring-1 dark:ring-emerald-500/20",
           icon: CheckCircle2,
           defaultLabel: norm === "ONLINE" ? "ONLINE" : "NOMINAL",
           dotColor: "bg-emerald-500",
@@ -69,7 +69,7 @@ export function StatusBadge({
       case "ADVISORY":
       case "SYSTEM":
         return {
-          bg: "bg-sky-950/80 text-sky-400 border-sky-800/90 ring-1 ring-sky-500/20",
+          bg: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/80 dark:text-sky-400 dark:border-sky-800/90 dark:ring-1 dark:ring-sky-500/20",
           icon: Info,
           defaultLabel: norm === "ADVISORY" ? "ADVISORY" : "INFO",
           dotColor: "bg-sky-500",
@@ -79,14 +79,14 @@ export function StatusBadge({
       case "LOCAL_EDGE":
       case "STORED":
         return {
-          bg: "bg-purple-950/80 text-purple-400 border-purple-800/90 ring-1 ring-purple-500/20",
+          bg: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/80 dark:text-purple-400 dark:border-purple-800/90 dark:ring-1 dark:ring-purple-500/20",
           icon: CloudOff,
           defaultLabel: norm.includes("LOCAL") ? "LOCAL EDGE" : "OFFLINE",
           dotColor: "bg-purple-500",
         };
       default:
         return {
-          bg: "bg-slate-900 text-slate-300 border-slate-700",
+          bg: "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700",
           icon: Info,
           defaultLabel: norm || "UNKNOWN",
           dotColor: "bg-slate-400",

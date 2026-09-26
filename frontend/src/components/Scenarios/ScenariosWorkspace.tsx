@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Activity,
@@ -8,7 +8,6 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
-  ChevronUp,
   Clock,
   Compass,
   FileText,
@@ -95,9 +94,36 @@ export function ScenariosWorkspace() {
   const [authorizedActions, setAuthorizedActions] = useState<Record<string, { role: string; time: string }>>({});
   const [ledgerNotification, setLedgerNotification] = useState<string | null>(null);
 
-  // Progressive disclosure
+  // Progressive disclosure & dropdown state
   const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
   const [isConfiguratorExpanded, setIsConfiguratorExpanded] = useState<boolean>(true);
+  const [scenarioDropdownOpen, setScenarioDropdownOpen] = useState<boolean>(false);
+  const [expandedActionCodes, setExpandedActionCodes] = useState<Record<string, boolean>>({});
+  const [isWhyExpanded, setIsWhyExpanded] = useState<boolean>(false);
+  const scenarioDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside & Escape key listeners for scenario dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        scenarioDropdownRef.current &&
+        !scenarioDropdownRef.current.contains(e.target as Node)
+      ) {
+        setScenarioDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setScenarioDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   // Operational 3-question action details helper (What?, Why?, What changes?)
   const getActionDetails = (code: string, fallbackTitle: string, fallbackImpact: string) => {
@@ -201,6 +227,16 @@ export function ScenariosWorkspace() {
   const effectiveTargetAsset = customAssetId || activeScenario.targetAsset;
   const stationLabel = stationId === "STATION-MAITRI" ? "Maitri" : "Bharati";
 
+  const getScenarioDisplayLabel = (scen: { name: string; risk: string }) => {
+    const title = scen.name
+      .toLowerCase()
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+    const risk = scen.risk.charAt(0).toUpperCase() + scen.risk.slice(1).toLowerCase();
+    return `${title} · ${risk} Risk`;
+  };
+
   // Run Single-Station Simulation
   const handleRunScenario = (index: number) => {
     const scen = scenariosList[index] ?? activeScenario;
@@ -299,75 +335,73 @@ export function ScenariosWorkspace() {
   };
 
   return (
-    <div className="space-y-4 pb-16 transition-colors">
+    <div className="space-y-4 pb-16 max-w-full overflow-x-hidden transition-colors duration-150">
       {/* ── Page Header ─────────────────────────────────── */}
-      <div className="space-y-1">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-sans text-slate-500 dark:text-slate-400">
             <button
               onClick={() => navigate({ to: "/command-center" })}
               aria-label="Return to Station Command Center"
-              className="flex items-center justify-center h-6 w-6 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              title="Return to Station Command Center"
+              className="flex items-center gap-1 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors cursor-pointer"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Command Center</span>
             </button>
-            <button
-              onClick={() => navigate({ to: "/command-center" })}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline transition-colors cursor-pointer"
-            >
-              Command Center
-            </button>
-            <span className="text-border text-xs">/</span>
-            <span className="text-xs font-semibold text-foreground">Scenarios</span>
-            <TruthBadge type="SCENARIO" />
+            <span className="text-slate-300 dark:text-slate-700">/</span>
+            <span className="font-semibold text-blue-600 dark:text-blue-400">
+              Scenarios
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">·</span>
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              Consequence Simulation
+            </span>
           </div>
-          <div className="text-[10px] font-mono text-muted-foreground flex flex-wrap items-center gap-1.5">
-            <span className="font-semibold text-primary">WHAT-IF CONSEQUENCE SIMULATOR</span>
-            <span>·</span>
-            <span>Stateless Simulator: Current database state is completely preserved.</span>
+
+          <div className="flex items-center gap-2.5">
+            <Activity className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Cross-Domain Scenario Engine
+            </h1>
           </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl">
+            Stateless consequence modeling: simulates generation dispatch, dependency blast radius, and risk escalation.
+            <span className="sr-only">Stateless Simulator: Current database state is completely preserved.</span>
+          </p>
         </div>
 
-        <h1 className="text-xl font-bold text-foreground leading-tight">
-          <span>Cross-Domain Scenario Engine</span>{" "}
-          <span className="text-muted-foreground font-normal">·</span>{" "}
-          <span className="font-semibold text-muted-foreground">
-            Scenario Simulation
-          </span>
-        </h1>
-        <p className="text-xs text-muted-foreground max-w-2xl">
-          Explore operational consequences before action. Stateless in-memory consequence modeling: simulates generation dispatch, dependency blast radius, fuel runway, and risk escalation.
-        </p>
-      </div>
+        {/* Right side: Mode Navigation + Truth Badge */}
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            {([
+              { key: "SINGLE_STATION" as WorkspaceMode, label: "Single Station", icon: Activity },
+              { key: "CROSS_STATION" as WorkspaceMode, label: "Bharati ↔ Maitri", icon: Radio },
+              { key: "ACTION_LEDGER" as WorkspaceMode, label: "Audit Ledger", icon: FileText, count: auditLedger.length },
+            ]).map(({ key, label, icon: Icon, count }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setActiveMode(key)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium font-sans transition-colors duration-150 cursor-pointer ${
+                  activeMode === key
+                    ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 shadow-xs border border-slate-200/80 dark:border-slate-700"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{label}</span>
+                {count !== undefined && count > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-primary text-primary-foreground font-bold leading-none">
+                    {count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
 
-      {/* ── Mode Navigation ─────────────────────────────── */}
-      <div className="flex items-center gap-1 p-0.5 rounded-lg bg-secondary w-fit border border-border">
-        {([
-          { key: "SINGLE_STATION" as WorkspaceMode, label: "Single Station", icon: Activity },
-          { key: "CROSS_STATION" as WorkspaceMode, label: "Bharati ↔ Maitri", icon: Radio },
-          { key: "ACTION_LEDGER" as WorkspaceMode, label: "Audit Ledger", icon: FileText, count: auditLedger.length },
-        ]).map(({ key, label, icon: Icon, count }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setActiveMode(key)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-              activeMode === key
-                ? "bg-card text-foreground shadow-xs border border-border"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            <span>{label}</span>
-            {count !== undefined && count > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-primary text-primary-foreground font-bold leading-none">
-                {count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+          <TruthBadge type="SCENARIO" />
+        </div>
+      </header>
 
       {/* Global Ledger Notification Banner */}
       {ledgerNotification && (
@@ -392,24 +426,24 @@ export function ScenariosWorkspace() {
           {/* ── Scenario Configurator ─────────────────────── */}
           {simulationResult && !isConfiguratorExpanded ? (
             /* Compact parameter summary bar (collapsed state) */
-            <div className="scenario-item selected rounded-lg border border-border bg-card p-3 shadow-2xs">
+            <div className="scenario-item selected rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-2xs transition-colors duration-150">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="font-semibold text-foreground">{stationLabel}</span>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="font-mono text-xs font-semibold text-foreground">{effectiveTargetAsset}</span>
-                  <span className="text-muted-foreground">outage</span>
-                  <span className="text-muted-foreground">·</span>
+                <div className="flex flex-wrap items-center gap-2 text-sm font-sans">
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">{stationLabel}</span>
+                  <span className="text-slate-400 dark:text-slate-600">·</span>
+                  <span className="font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">{effectiveTargetAsset}</span>
+                  <span className="text-slate-500 dark:text-slate-400">outage</span>
+                  <span className="text-slate-400 dark:text-slate-600">·</span>
                   <div className="inline-flex items-center gap-1">
                     {[24, 48, 72, 120].map((hrs) => (
                       <button
                         key={hrs}
                         type="button"
                         onClick={() => setDurationHours(hrs)}
-                        className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-all cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-[11px] font-semibold font-sans border transition-colors duration-150 cursor-pointer ${
                           durationHours === hrs
                             ? "bg-primary text-primary-foreground border-primary shadow-2xs"
-                            : "bg-secondary text-muted-foreground border-border hover:text-foreground"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-slate-100"
                         }`}
                       >
                         <span className="font-mono">{hrs}h</span>
@@ -418,17 +452,17 @@ export function ScenariosWorkspace() {
                   </div>
                   {ambientTempOverride && (
                     <>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="font-mono text-xs text-foreground">{ambientTempOverride}°C</span>
+                      <span className="text-slate-400 dark:text-slate-600">·</span>
+                      <span className="font-mono text-xs text-slate-900 dark:text-slate-100">{ambientTempOverride}°C</span>
                     </>
                   )}
                   <StatusBadge status={activeScenario.risk} size="sm" />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 font-sans">
                   <button
                     type="button"
                     onClick={() => setIsConfiguratorExpanded(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground border border-border bg-card hover:bg-secondary transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 transition-colors duration-150 cursor-pointer"
                   >
                     <Sliders className="h-3 w-3" />
                     <span>Edit parameters</span>
@@ -437,7 +471,7 @@ export function ScenariosWorkspace() {
                     type="button"
                     onClick={() => handleRunScenario(selectedScenarioIndex)}
                     disabled={isSimulating}
-                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-colors duration-150 cursor-pointer shadow-xs disabled:opacity-50"
                   >
                     {isSimulating ? (
                       <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -451,88 +485,148 @@ export function ScenariosWorkspace() {
             </div>
           ) : (
             /* Expanded configurator */
-            <div className="scenario-item selected relative rounded-lg border border-border bg-card p-4 shadow-2xs space-y-4">
+            <div className="scenario-item selected relative rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-4 transition-colors duration-150">
               {/* Configurator Header */}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Sliders className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold text-foreground">
-                    Scenario configuration
+                  <span className="text-sm font-semibold font-sans text-slate-900 dark:text-slate-100">
+                    Scenario Configuration
                   </span>
-                  <span className="font-mono text-[10px] text-muted-foreground">{stationId}</span>
+                  <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">{stationId}</span>
                 </div>
                 <StatusBadge status={activeScenario.risk} size="sm" />
               </div>
 
               {/* Scenario Dropdown Selector */}
-              <div className="space-y-1.5">
-                <label htmlFor="scenario-type-select" className="text-[11px] font-medium text-muted-foreground block">
-                  Disruption scenario
+              <div className="space-y-1.5" ref={scenarioDropdownRef}>
+                <label className="text-xs font-semibold font-sans text-slate-700 dark:text-slate-300 block">
+                  Scenario
                 </label>
-                <select
-                  id="scenario-type-select"
-                  aria-label="Select Scenario Profile"
-                  value={selectedScenarioIndex}
-                  onChange={(e) => {
-                    const idx = Number(e.target.value);
-                    setSelectedScenarioIndex(idx);
-                    setCustomAssetId("");
-                  }}
-                  className="w-full rounded-md border border-border bg-secondary px-3 py-2 text-sm font-semibold text-foreground cursor-pointer shadow-2xs focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  {scenariosList.map((scen, idx) => (
-                    <option key={scen.name} value={idx}>
-                      {scen.name} · {scen.risk} RISK
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setScenarioDropdownOpen((prev) => !prev)}
+                    style={{ fontFamily: "var(--font-inter)" }}
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans text-[15px] font-semibold leading-[1.45] tracking-normal hover:border-sky-500/80 dark:hover:border-sky-400/80 focus:outline-none focus:ring-2 focus:ring-sky-500/30 transition-colors duration-150 cursor-pointer shadow-2xs"
+                    aria-haspopup="listbox"
+                    aria-expanded={scenarioDropdownOpen}
+                    aria-label={`Select Scenario Profile. Current: ${getScenarioDisplayLabel(activeScenario)}`}
+                  >
+                    <span className="truncate font-sans font-semibold text-[15px] leading-[1.45] tracking-normal" style={{ fontFamily: "var(--font-inter)" }}>
+                      {getScenarioDisplayLabel(activeScenario)}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-slate-600 dark:text-slate-300 transition-transform duration-150 shrink-0 ml-2 ${
+                        scenarioDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {/* Accessible native select kept in DOM for screen readers and automated test queries */}
+                  <select
+                    id="scenario-type-select"
+                    aria-label="Select Scenario Profile"
+                    value={selectedScenarioIndex}
+                    onChange={(e) => {
+                      const idx = Number(e.target.value);
+                      setSelectedScenarioIndex(idx);
+                      setCustomAssetId("");
+                    }}
+                    className="sr-only"
+                    tabIndex={-1}
+                  >
+                    {scenariosList.map((scen, idx) => (
+                      <option key={scen.name} value={idx}>
+                        {scen.name} · {scen.risk} RISK
+                      </option>
+                    ))}
+                  </select>
+
+                  {scenarioDropdownOpen && (
+                    <div
+                      style={{ fontFamily: "var(--font-inter)" }}
+                      className="absolute left-0 right-0 top-full mt-1.5 z-40 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 animate-in fade-in zoom-in-95 duration-100 font-sans"
+                      role="listbox"
+                      aria-label="Scenario Profiles"
+                    >
+                      {scenariosList.map((scen, idx) => {
+                        const isSelected = selectedScenarioIndex === idx;
+                        return (
+                          <button
+                            key={scen.name}
+                            type="button"
+                            onClick={() => {
+                              setSelectedScenarioIndex(idx);
+                              setCustomAssetId("");
+                              setScenarioDropdownOpen(false);
+                            }}
+                            style={{ fontFamily: "var(--font-inter)" }}
+                            className={`w-full px-3.5 py-2.5 text-left text-[14px] font-sans leading-normal tracking-normal flex items-center justify-between transition-colors duration-150 cursor-pointer ${
+                              isSelected
+                                ? "bg-sky-50 dark:bg-sky-950/60 text-sky-950 dark:text-sky-200 font-semibold border-l-2 border-primary"
+                                : "text-slate-900 dark:text-slate-200 hover:bg-sky-50/70 dark:hover:bg-slate-800/90 hover:text-sky-950 dark:hover:text-white font-medium"
+                            }`}
+                            role="option"
+                            aria-selected={isSelected}
+                          >
+                            <span style={{ fontFamily: "var(--font-inter)" }}>{getScenarioDisplayLabel(scen)}</span>
+                            {isSelected && (
+                              <CheckCircle2 className="h-4 w-4 text-sky-600 dark:text-sky-400 shrink-0 ml-2" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Scenario Description */}
-              <div className="space-y-0.5">
-                <h2 className="text-sm font-bold text-foreground">
+              <div className="space-y-0.5 font-sans">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                   {activeScenario.name}
                 </h2>
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                   {activeScenario.desc}
                 </p>
-                <div className="text-[11px] text-muted-foreground pt-0.5">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
                   Affected: {activeScenario.affected}
                 </div>
               </div>
 
               {/* ── SPECIFIC SIMULATION OPTIONS PER SCENARIO TYPE ── */}
-              <div className="pt-3 border-t border-border space-y-3">
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
                 {/* CASE 0: GENERATOR FAILURE SPECIFIC OPTIONS */}
                 {selectedScenarioIndex === 0 && (
-                  <div className="space-y-3">
+                  <div className="space-y-3 font-sans">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Target generator
+                        <label htmlFor="target-asset-select" className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Target Generator
                         </label>
                         <select
                           id="target-asset-select"
                           aria-label="Target Generator"
-                          className="bg-secondary text-foreground text-xs p-2 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                           value={effectiveTargetAsset}
                           onChange={(e) => setCustomAssetId(e.target.value)}
                         >
-                          <option value={isMaitri ? "MAITRI-GEN-01" : "G-02"}>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={isMaitri ? "MAITRI-GEN-01" : "G-02"}>
                             {isMaitri ? "Maitri Gen 1 (150 kVA)" : "Generator G-02 (Aux Diesel)"}
                           </option>
-                          <option value={isMaitri ? "MAITRI-GEN-02" : "G-01"}>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={isMaitri ? "MAITRI-GEN-02" : "G-01"}>
                             {isMaitri ? "Maitri Gen 2 (150 kVA)" : "Generator G-01 (Baseload)"}
                           </option>
-                          <option value={isMaitri ? "MAITRI-BOILER-01" : "B-01"}>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={isMaitri ? "MAITRI-BOILER-01" : "B-01"}>
                             {isMaitri ? "Maitri Boiler 1" : "Boiler B-01 (Hydronic)"}
                           </option>
                         </select>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Outage duration
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Outage Duration
                         </label>
                         <div className="flex items-center gap-1.5 pt-0.5">
                           {[24, 48, 72, 120].map((hrs) => (
@@ -540,10 +634,10 @@ export function ScenariosWorkspace() {
                               key={hrs}
                               type="button"
                               onClick={() => setDurationHours(hrs)}
-                              className={`flex-1 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer ${
+                              className={`flex-1 py-1.5 rounded-md text-xs font-semibold font-sans border transition-colors duration-150 cursor-pointer ${
                                 durationHours === hrs
                                   ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                                  : "bg-secondary text-foreground border-border hover:bg-accent"
+                                  : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100"
                               }`}
                             >
                               <span className="font-mono">{hrs}h</span>
@@ -554,12 +648,12 @@ export function ScenariosWorkspace() {
 
                       {/* Ambient Cold Snap Override */}
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Ambient override
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Ambient Condition
                         </label>
                         <select
                           aria-label="Ambient Temperature Override"
-                          className="bg-secondary text-foreground text-xs p-2 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                           value={ambientTempOverride ?? ""}
                           onChange={(e) =>
                             setAmbientTempOverride(
@@ -567,15 +661,15 @@ export function ScenariosWorkspace() {
                             )
                           }
                         >
-                          <option value="">Baseline ({isMaitri ? "-18.2°C" : "-28.5°C"})</option>
-                          <option value={-38.0}>Cold Snap (-38.0°C)</option>
-                          <option value={-45.0}>Extreme Blizzard (-45.0°C)</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="">Baseline ({isMaitri ? "-18.2°C" : "-28.5°C"})</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={-38.0}>Cold Snap (-38.0°C)</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={-45.0}>Extreme Blizzard (-45.0°C)</option>
                         </select>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-1 text-[10px] text-muted-foreground">
-                      <Thermometer className="h-3 w-3 text-primary" />
+                    <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-600 dark:text-slate-300 font-sans">
+                      <Thermometer className="h-3.5 w-3.5 text-primary" />
                       <span>Simulated Ambient Cold Snap:</span>
                       <input
                         type="range"
@@ -587,12 +681,12 @@ export function ScenariosWorkspace() {
                         className="w-48 accent-primary cursor-pointer"
                         aria-label="Temperature slider"
                       />
-                      <span className="font-mono text-xs text-foreground font-semibold">
+                      <span className="font-mono text-xs text-slate-900 dark:text-slate-100 font-bold">
                         {ambientTempOverride ? `${ambientTempOverride}°C` : (isMaitri ? "-18.2°C" : "-28.5°C")}
                       </span>
                     </div>
 
-                    <div className="p-2.5 rounded-md bg-secondary border border-border text-[11px] text-muted-foreground">
+                    <div className="p-2.5 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 font-sans">
                       <span className="font-semibold text-primary">Dispatch posture: </span>
                       <span className="font-mono text-xs">G-01</span> governor carries single-generator electrical load up to <span className="font-mono text-xs">280 kW</span> max continuous limit.
                     </div>
@@ -601,58 +695,58 @@ export function ScenariosWorkspace() {
 
                 {/* CASE 1: FUEL SHORTAGE SPECIFIC OPTIONS */}
                 {selectedScenarioIndex === 1 && (
-                  <div className="space-y-3">
+                  <div className="space-y-3 font-sans">
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Storage tank
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Storage Tank
                         </label>
                         <select
                           id="target-asset-select"
                           aria-label="Target Fuel Tank"
-                          className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                           defaultValue="FUEL-TK-01"
                         >
-                          <option value="FUEL-TK-01">TK-01 Main ({isMaitri ? "198,000 L" : "142,500 L"})</option>
-                          <option value="FUEL-TK-02">TK-02 Day Service Tank (12,000 L)</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="FUEL-TK-01">TK-01 Main ({isMaitri ? "198,000 L" : "142,500 L"})</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="FUEL-TK-02">TK-02 Day Service Tank (12,000 L)</option>
                         </select>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Planning horizon
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Planning Horizon
                         </label>
                         <select
                           aria-label="Fuel Planning Horizon"
-                          className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                           value={durationHours}
                           onChange={(e) => setDurationHours(Number(e.target.value))}
                         >
-                          <option value={72}>72h Rapid Depletion</option>
-                          <option value={120}>120h Winter Storm Hold</option>
-                          <option value={48}>48h Immediate Rationing</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={72}>72h Rapid Depletion</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={120}>120h Winter Storm Hold</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={48}>48h Immediate Rationing</option>
                         </select>
                       </div>
                     </div>
 
                     {/* Burn Rate Rationing Mode */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-muted-foreground block">
-                        Daily burn rate rationing
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                        Daily Burn Rate Rationing
                       </label>
                       <select
                         aria-label="Fuel Burn Rate Rationing Mode"
-                        className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                         value={fuelRationingMode}
                         onChange={(e) => setFuelRationingMode(e.target.value)}
                       >
-                        <option value="STANDARD">Standard Baseline ({isMaitri ? "1,488 L/day" : "2,028 L/day"})</option>
-                        <option value="CONSERVATION">Eco-Conservation -15% ({isMaitri ? "1,265 L/day" : "1,724 L/day"})</option>
-                        <option value="EMERGENCY">Emergency Rationing -30% ({isMaitri ? "1,042 L/day" : "1,420 L/day"})</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="STANDARD">Standard Baseline ({isMaitri ? "1,488 L/day" : "2,028 L/day"})</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="CONSERVATION">Eco-Conservation -15% ({isMaitri ? "1,265 L/day" : "1,724 L/day"})</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="EMERGENCY">Emergency Rationing -30% ({isMaitri ? "1,042 L/day" : "1,420 L/day"})</option>
                       </select>
                     </div>
 
-                    <div className="p-2.5 rounded-md bg-secondary border border-border text-[11px] text-muted-foreground">
+                    <div className="p-2.5 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 font-sans">
                       <span className="font-semibold text-warning">Fuel impact: </span>
                       {fuelRationingMode === "EMERGENCY"
                         ? "Aggressive -30% rationing extends runway by +26 days but requires non-critical science shutdown."
@@ -665,60 +759,60 @@ export function ScenariosWorkspace() {
 
                 {/* CASE 2: COMMUNICATION LOSS SPECIFIC OPTIONS */}
                 {selectedScenarioIndex === 2 && (
-                  <div className="space-y-3">
+                  <div className="space-y-3 font-sans">
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Ground terminal
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Ground Terminal
                         </label>
                         <select
                           id="target-asset-select"
                           aria-label="Satellite Ground Terminal"
-                          className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                           value={commsSatelliteLink}
                           onChange={(e) => setCommsSatelliteLink(e.target.value)}
                         >
-                          <option value="GSAT_7">GSAT-7 Polar Link (Loss of Signal)</option>
-                          <option value="INMARSAT">Inmarsat Backup (Degraded)</option>
-                          <option value="DUAL">Complete Dual Satellite Outage</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="GSAT_7">GSAT-7 Polar Link (Loss of Signal)</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="INMARSAT">Inmarsat Backup (Degraded)</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="DUAL">Complete Dual Satellite Outage</option>
                         </select>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Outage window
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Outage Window
                         </label>
                         <select
                           aria-label="Comms Outage Duration"
-                          className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                           value={durationHours}
                           onChange={(e) => setDurationHours(Number(e.target.value))}
                         >
-                          <option value={24}>24 Hours Orbit Gap</option>
-                          <option value={48}>48 Hours Extended Blackout</option>
-                          <option value={72}>72 Hours Storm Isolation</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={24}>24 Hours Orbit Gap</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={48}>48 Hours Extended Blackout</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={72}>72 Hours Storm Isolation</option>
                         </select>
                       </div>
                     </div>
 
                     {/* Store-and-Forward Buffer Strategy */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-muted-foreground block">
-                        Store-and-forward buffer strategy
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                        Store-and-Forward Buffer Strategy
                       </label>
                       <select
                         aria-label="Telemetry Retention Strategy"
-                        className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                         value={commsBufferStrategy}
                         onChange={(e) => setCommsBufferStrategy(e.target.value)}
                       >
-                        <option value="STORE_FORWARD">Store-and-Forward (Priority Local Queue)</option>
-                        <option value="THROTTLE_SCIENCE">Throttle Science Payloads (Life-Support Only)</option>
-                        <option value="HF_BURST">Emergency High-Frequency (HF) Radio Burst</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="STORE_FORWARD">Store-and-Forward (Priority Local Queue)</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="THROTTLE_SCIENCE">Throttle Science Payloads (Life-Support Only)</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="HF_BURST">Emergency High-Frequency (HF) Radio Burst</option>
                       </select>
                     </div>
 
-                    <div className="p-2.5 rounded-md bg-secondary border border-border text-[11px] text-muted-foreground">
+                    <div className="p-2.5 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 font-sans">
                       <span className="font-semibold text-primary">Offline protocol: </span>
                       Station operates in autonomous offline analog mode; science synchronization deferred until carrier re-lock.
                     </div>
@@ -727,61 +821,61 @@ export function ScenariosWorkspace() {
 
                 {/* CASE 3: SEVERE WEATHER SPECIFIC OPTIONS */}
                 {selectedScenarioIndex === 3 && (
-                  <div className="space-y-3">
+                  <div className="space-y-3 font-sans">
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Wind velocity
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Wind Velocity
                         </label>
                         <select
                           id="target-asset-select"
                           aria-label="Storm Wind Velocity"
-                          className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                           value={weatherWindKts}
                           onChange={(e) => setWeatherWindKts(Number(e.target.value))}
                         >
-                          <option value={35}>35 kts High Gale</option>
-                          <option value={42}>42 kts (Current Winter Storm)</option>
-                          <option value={60}>60 kts Severe Blizzard</option>
-                          <option value={85}>85 kts Catastrophic Blizzard</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={35}>35 kts High Gale</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={42}>42 kts (Current Winter Storm)</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={60}>60 kts Severe Blizzard</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={85}>85 kts Catastrophic Blizzard</option>
                         </select>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Envelope heat draw
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Envelope Heat Draw
                         </label>
                         <select
                           aria-label="Building Envelope Thermal Demand"
-                          className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                           value={weatherEnvelopeDemand}
                           onChange={(e) => setWeatherEnvelopeDemand(e.target.value)}
                         >
-                          <option value="+15%">Nominal +15% Thermal Loss</option>
-                          <option value="+35%">Elevated +35% Envelope Demand</option>
-                          <option value="+50%">Extreme +50% Thermal Draw</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="+15%">Nominal +15% Thermal Loss</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="+35%">Elevated +35% Envelope Demand</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="+50%">Extreme +50% Thermal Draw</option>
                         </select>
                       </div>
                     </div>
 
                     {/* Cold Snap Ambient Slider */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-muted-foreground block">
-                        Blizzard cold snap temperature
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                        Blizzard Cold Snap Temperature
                       </label>
                       <select
                         aria-label="Ambient Temperature Override"
-                        className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                         value={ambientTempOverride ?? -38.0}
                         onChange={(e) => setAmbientTempOverride(Number(e.target.value))}
                       >
-                        <option value={-35.0}>Antarctic Gales (-35.0°C)</option>
-                        <option value={-38.0}>Severe Blizzard (-38.0°C)</option>
-                        <option value={-45.0}>Extreme Blizzard (-45.0°C)</option>
-                        <option value={-52.0}>Record Polar Vortex (-52.0°C)</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={-35.0}>Antarctic Gales (-35.0°C)</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={-38.0}>Severe Blizzard (-38.0°C)</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={-45.0}>Extreme Blizzard (-45.0°C)</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={-52.0}>Record Polar Vortex (-52.0°C)</option>
                       </select>
-                      <div className="flex items-center gap-2 pt-1 text-[10px] text-muted-foreground">
-                        <Thermometer className="h-3 w-3 text-primary" />
+                      <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-600 dark:text-slate-300 font-sans">
+                        <Thermometer className="h-3.5 w-3.5 text-primary" />
                         <input
                           type="range"
                           min="-55"
@@ -795,7 +889,7 @@ export function ScenariosWorkspace() {
                       </div>
                     </div>
 
-                    <div className="p-2.5 rounded-md bg-secondary border border-border text-[11px] text-muted-foreground">
+                    <div className="p-2.5 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 font-sans">
                       <span className="font-semibold text-warning">Freeze hazard: </span>
                       Extreme wind chill increases habitat thermal load by {weatherEnvelopeDemand}; electrical heat-tracing active on external lines.
                     </div>
@@ -804,59 +898,59 @@ export function ScenariosWorkspace() {
 
                 {/* CASE 4: SUPPLY DELAY SPECIFIC OPTIONS */}
                 {selectedScenarioIndex === 4 && (
-                  <div className="space-y-3">
+                  <div className="space-y-3 font-sans">
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Resupply vessel
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Resupply Vessel
                         </label>
                         <select
                           id="target-asset-select"
                           aria-label="Target Resupply Vessel"
-                          className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                           defaultValue="MV_VASILIY"
                         >
-                          <option value="MV_VASILIY">MV Vasiliy Golovnin (ETA delayed)</option>
-                          <option value="SA_AGULHAS">SA Agulhas II (Joint Voyage)</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="MV_VASILIY">MV Vasiliy Golovnin (ETA delayed)</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="SA_AGULHAS">SA Agulhas II (Joint Voyage)</option>
                         </select>
                       </div>
 
                       <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-muted-foreground block">
-                          Pack ice delay
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                          Pack Ice Delay
                         </label>
                         <select
                           aria-label="Vessel Delay Horizon"
-                          className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                           value={supplyDelayDays}
                           onChange={(e) => setSupplyDelayDays(Number(e.target.value))}
                         >
-                          <option value={7}>+7 Days Ice Resistance</option>
-                          <option value={11}>+11 Days (Current Forecast)</option>
-                          <option value={21}>+21 Days Pack Ice Stall</option>
-                          <option value={35}>+35 Days Complete Freeze-Out</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={7}>+7 Days Ice Resistance</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={11}>+11 Days (Current Forecast)</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={21}>+21 Days Pack Ice Stall</option>
+                          <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value={35}>+35 Days Complete Freeze-Out</option>
                         </select>
                       </div>
                     </div>
 
                     {/* Critical Spare Stockout */}
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-muted-foreground block">
-                        Critical spare bottleneck
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                        Critical Spare Bottleneck
                       </label>
                       <select
                         aria-label="Critical Spare Stockout"
-                        className="bg-secondary text-foreground text-xs p-1.5 rounded-md border border-border w-full cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        className="w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-sans p-2 cursor-pointer focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors duration-150"
                         value={supplySparePart}
                         onChange={(e) => setSupplySparePart(e.target.value)}
                       >
-                        <option value="SK-402">SK-402 Rotary Seal Kit (0 in Stock · G-02 Blocked)</option>
-                        <option value="BF-201">BF-201 Fuel Filters (Critical 3-day buffer)</option>
-                        <option value="LUB-104">LUB-104 Engine Lubricant Drums</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="SK-402">SK-402 Rotary Seal Kit (0 in Stock · G-02 Blocked)</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="BF-201">BF-201 Fuel Filters (Critical 3-day buffer)</option>
+                        <option className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100" value="LUB-104">LUB-104 Engine Lubricant Drums</option>
                       </select>
                     </div>
 
-                    <div className="p-2.5 rounded-md bg-secondary border border-border text-[11px] text-muted-foreground">
+                    <div className="p-2.5 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 font-sans">
                       <span className="font-semibold text-violet">Logistics contingency: </span>
                       Vessel delay of +{supplyDelayDays} days requires evaluating ski-equipped Twin Otter air-drop from Maitri or Casey Station.
                     </div>
@@ -864,11 +958,11 @@ export function ScenariosWorkspace() {
                 )}
 
                 {/* Card Action Footer */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-border">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="h-2 w-2 rounded-full bg-success" />
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 font-sans">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
                     <span>Configuration:</span>
-                    <span className="font-mono font-semibold text-foreground">
+                    <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
                       {effectiveTargetAsset} • {durationHours}h • {ambientTempOverride ? `${ambientTempOverride}°C` : "Baseline"}
                     </span>
                   </div>
@@ -877,7 +971,7 @@ export function ScenariosWorkspace() {
                     type="button"
                     onClick={() => handleRunScenario(selectedScenarioIndex)}
                     disabled={isSimulating}
-                    className="flex items-center justify-center gap-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 text-xs font-semibold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                    className="flex items-center justify-center gap-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 text-xs font-semibold font-sans transition-colors duration-150 cursor-pointer shadow-xs disabled:opacity-50"
                   >
                     {isSimulating ? (
                       <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -889,16 +983,8 @@ export function ScenariosWorkspace() {
                   <button
                     type="button"
                     onClick={() => handleRunScenario(selectedScenarioIndex)}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      right: 0,
-                      width: "12px",
-                      height: "12px",
-                      opacity: 0.01,
-                      zIndex: 9999,
-                      pointerEvents: "auto",
-                    }}
+                    className="sr-only"
+                    aria-label="RUN SCENARIO"
                   >
                     RUN SCENARIO
                   </button>
@@ -940,24 +1026,30 @@ export function ScenariosWorkspace() {
               {/* ═══════════════════════════════════════════════════════════════ */}
               {/* INCIDENT SUMMARY                                              */}
               {/* ═══════════════════════════════════════════════════════════════ */}
-              <div className="rounded-lg border border-border bg-card p-4 shadow-2xs space-y-3">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-3 font-sans transition-colors duration-150">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="space-y-1">
+                    <div className="text-[10px] font-mono font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      SIMULATION COMPLETE · DECISION IMPACT ANALYSIS · Counterfactual
+                    </div>
                     <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-destructive" />
-                      <span className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider">
+                      <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                      <span className="text-[10px] font-mono font-semibold text-destructive uppercase tracking-wider">
                         OFFLINE FOR {simulationResult.duration_hours}H
                       </span>
                     </div>
-                    <h2 className="text-lg font-bold text-foreground">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
                       {activeScenario.name}
                     </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Hypothetical consequence on <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{effectiveTargetAsset}</span> ({stationLabel})
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <StatusBadge status={simulationResult.scenario_risk_level} size="sm" />
                     <div className="text-right font-mono text-xs">
-                      <div className="font-bold text-foreground">
+                      <div className="font-bold text-slate-900 dark:text-slate-100">
                         {simulationResult.scenario_risk_score}/100
                       </div>
                       <div className={`font-semibold ${simulationResult.risk_delta > 0 ? "text-destructive" : "text-success"}`}>
@@ -965,9 +1057,10 @@ export function ScenariosWorkspace() {
                       </div>
                     </div>
                     <button
+                      type="button"
                       data-testid="explain-scenario-btn"
                       onClick={() => handleOpenExplanation("SCENARIOS", simulationResult.scenario_id || effectiveTargetAsset)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-secondary hover:bg-accent text-muted-foreground hover:text-foreground border border-border transition-colors cursor-pointer"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium font-sans bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors duration-150 cursor-pointer"
                       title="Open deterministic scenario operational explanation drawer"
                     >
                       <HelpCircle className="h-3.5 w-3.5 text-primary" />
@@ -977,15 +1070,15 @@ export function ScenariosWorkspace() {
                 </div>
 
                 {/* Plain-English Lead Sentence */}
-                <div className="border-t border-border pt-3">
-                  <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                  <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
                     <Info className="h-3 w-3 text-primary" />
                     <span>Operational impact · Consequence Summary</span>
                   </div>
-                  <p className="text-sm font-semibold text-foreground leading-snug">
-                    Available generation drops from <span className="font-mono">{(simulationResult.available_capacity_kw + 300).toFixed(0)} kW</span> to <span className="font-mono">{simulationResult.available_capacity_kw.toFixed(0)} kW</span> (-50% capacity drop) and puts <span className="font-mono">{simulationResult.affected_services.length}</span> mission-critical services at risk.
+                  <p className="text-sm font-semibold font-sans text-slate-900 dark:text-slate-100 leading-snug">
+                    Available generation drops from <span className="font-mono font-bold">{(simulationResult.available_capacity_kw + 300).toFixed(0)} kW</span> to <span className="font-mono font-bold">{simulationResult.available_capacity_kw.toFixed(0)} kW</span> (-50% capacity drop) and puts <span className="font-mono font-bold">{simulationResult.affected_services.length}</span> mission-critical services at risk.
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
                     {simulationResult.scenario_summary || simulationResult.baseline_summary}
                   </p>
                 </div>
@@ -1000,52 +1093,62 @@ export function ScenariosWorkspace() {
               {/* ═══════════════════════════════════════════════════════════════ */}
               {/* ENERGY & CAPACITY — Resource impact                           */}
               {/* ═══════════════════════════════════════════════════════════════ */}
-              <div className="rounded-lg border border-border bg-card p-4 shadow-2xs space-y-3">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-3 font-sans transition-colors duration-150">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                       Energy &amp; capacity
                     </h3>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
                       Resource impact · Cross-Domain Energy Reserve Margin
                     </p>
                   </div>
                   <span
-                    className={`status-badge rounded-md ${
+                    className={`px-2.5 py-0.5 rounded-md font-mono text-xs font-bold border ${
                       simulationResult.reserve_margin_percent < 10
-                        ? "status-critical"
+                        ? "text-destructive border-destructive/30 bg-destructive/10"
                         : simulationResult.reserve_margin_percent < 25
-                        ? "status-warning"
-                        : "status-nominal"
+                        ? "text-warning border-warning/30 bg-warning/10"
+                        : "text-success border-success/30 bg-success/10"
                     }`}
                   >
                     {simulationResult.reserve_margin_percent.toFixed(1)}% MARGIN
                   </span>
                 </div>
 
-                {/* Capacity Comparison */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="font-medium text-muted-foreground">Available capacity</span>
-                    <span className="font-mono font-bold text-foreground">
-                      {simulationResult.available_capacity_kw.toFixed(0)} kW
+                {/* 4 Primary KPI metric tiles */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                  <div className="p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Thermal Demand</span>
+                    <span className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {(simulationResult.projected_load_kw * 0.42).toFixed(1)} kW
                     </span>
                   </div>
-                  <div className="w-full bg-secondary h-6 rounded-md overflow-hidden flex items-center px-3 border border-border">
-                    <span className="text-[10px] font-mono font-semibold text-muted-foreground">
-                      Single-generator continuous limit: {simulationResult.available_capacity_kw.toFixed(0)} kW
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between text-xs">
-                    <span className="font-medium text-warning">Projected load</span>
-                    <span className="font-mono font-bold text-warning">
+                  <div className="p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Projected Load</span>
+                    <span className="font-mono text-sm font-bold text-warning">
                       {simulationResult.projected_load_kw.toFixed(1)} kW
                     </span>
                   </div>
-                  <div className="w-full bg-secondary h-7 rounded-md overflow-hidden relative border border-border">
+                  <div className="p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Available Capacity</span>
+                    <span className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {simulationResult.available_capacity_kw.toFixed(0)} kW
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Reserve Margin</span>
+                    <span className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
+                      {simulationResult.reserve_margin_kw.toFixed(1)} kW
+                    </span>
+                  </div>
+                </div>
+
+                {/* Capacity Progress Bar */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-7 rounded-md overflow-hidden relative border border-slate-200 dark:border-slate-700">
                     <div
-                      className={`h-full transition-all ${
+                      className={`h-full transition-all duration-300 ${
                         simulationResult.reserve_margin_percent < 10
                           ? "bg-destructive"
                           : simulationResult.reserve_margin_percent < 25
@@ -1065,60 +1168,32 @@ export function ScenariosWorkspace() {
                       <span className="text-white drop-shadow-xs">
                         Load: {simulationResult.projected_load_kw.toFixed(0)} kW
                       </span>
-                      <span className="text-foreground drop-shadow-xs">
+                      <span className="text-slate-900 dark:text-slate-100 drop-shadow-xs">
                         Reserve: {simulationResult.reserve_margin_kw.toFixed(0)} kW
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1 font-sans">
                     <span>
-                      <span className="font-mono">{simulationResult.projected_load_kw.toFixed(1)} kW</span> load
+                      Continuous limit: <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{simulationResult.available_capacity_kw.toFixed(0)} kW</span>
                     </span>
                     <span>
-                      <span className="font-mono">{simulationResult.reserve_margin_kw.toFixed(1)} kW</span> reserve (<span className="font-mono">{simulationResult.reserve_margin_percent.toFixed(1)}%</span> spare)
+                      Spare margin: <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{simulationResult.reserve_margin_percent.toFixed(1)}%</span>
                     </span>
                   </div>
                 </div>
 
                 {/* Survivability Status */}
-                <div className="flex items-center gap-2 p-3 rounded-md border border-border bg-secondary">
+                <div className="flex items-center gap-2.5 p-3 rounded-lg border border-amber-500/20 bg-amber-50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200 font-sans">
                   <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
                   <div>
-                    <span className="text-xs font-semibold text-foreground">
+                    <span className="text-xs font-semibold block">
                       Survivable — reduced redundancy
                     </span>
-                    <p className="text-[11px] text-muted-foreground">
-                      The station can carry the modeled load during the <span className="font-mono">{simulationResult.duration_hours}h</span> scenario, but only one generator remains available.
+                    <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
+                      The station can carry the modeled load during the <span className="font-mono font-semibold">{simulationResult.duration_hours}h</span> scenario, but only one generator remains available.
                     </p>
-                  </div>
-                </div>
-
-                {/* Secondary capacity metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-border text-xs">
-                  <div>
-                    <span className="text-[10px] text-muted-foreground block">Thermal Demand</span>
-                    <span className="font-mono font-semibold text-foreground">
-                      {(simulationResult.projected_load_kw * 0.42).toFixed(1)} kW
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-muted-foreground block">Projected Load</span>
-                    <span className="font-mono font-semibold text-foreground">
-                      {simulationResult.projected_load_kw.toFixed(1)} kW
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-muted-foreground block">Available Capacity</span>
-                    <span className="font-mono font-semibold text-foreground">
-                      {simulationResult.available_capacity_kw.toFixed(0)} kW
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-muted-foreground block">Reserve Margin</span>
-                    <span className="font-mono font-semibold text-foreground">
-                      {simulationResult.reserve_margin_kw.toFixed(1)} kW
-                    </span>
                   </div>
                 </div>
               </div>
@@ -1126,47 +1201,47 @@ export function ScenariosWorkspace() {
               {/* ═══════════════════════════════════════════════════════════════ */}
               {/* RESPONSE OPTIONS — Recommended mitigation                     */}
               {/* ═══════════════════════════════════════════════════════════════ */}
-              <div className="rounded-lg border border-border bg-card p-4 shadow-2xs space-y-3">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-3 font-sans transition-colors duration-150">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                       What can the operator do?
                     </h3>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
                       Recommended mitigation · Prototype Decision-Support Countermeasures
                     </p>
                   </div>
-                  <span className="text-[11px] text-muted-foreground">
-                    Human authorization required
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    Advisory action · Human approval required
                   </span>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {simulationResult.decision_options?.map((opt: ScenarioDecisionOption) => {
                     const isAuth = Boolean(authorizedActions[opt.code]);
+                    const isExpanded = Boolean(expandedActionCodes[opt.code]);
                     const details = getActionDetails(opt.code, opt.title, opt.operational_impact);
 
                     return (
                       <div
                         key={opt.code}
-                        className={`p-3 rounded-md border transition-all ${
+                        className={`p-3.5 rounded-lg border transition-colors duration-150 font-sans ${
                           isAuth
-                            ? "bg-card border-success/30 ring-1 ring-success/10"
-                            : "bg-card border-border hover:border-muted-foreground/30"
+                            ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500/30 ring-1 ring-emerald-500/10"
+                            : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                         }`}
                       >
-                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
-                          <div className="space-y-2 flex-1">
-                            {/* Header */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="space-y-1 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs font-bold text-primary">
+                              <span className="text-xs font-bold font-mono text-primary">
                                 {details.stepNum}
                               </span>
-                              <span className="text-xs font-semibold text-foreground">
+                              <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                                 {details.heading}
                               </span>
-                              <span className="text-muted-foreground text-xs">·</span>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-slate-300 dark:text-slate-600 text-xs">·</span>
+                              <span className="text-xs text-slate-600 dark:text-slate-400">
                                 {opt.title}
                               </span>
                               <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md font-semibold border ${
@@ -1177,32 +1252,28 @@ export function ScenariosWorkspace() {
                                 {opt.risk_reduction_tier}
                               </span>
                               {isAuth && (
-                                <span className="flex items-center gap-1 text-[10px] font-semibold text-success bg-success/10 px-2 py-0.5 rounded-md">
+                                <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20">
                                   <CheckCircle2 className="h-3 w-3" />
                                   Authorized
                                 </span>
                               )}
                             </div>
-
-                            {/* 3-Question Grid */}
-                            <div className="grid grid-cols-1 gap-1 text-xs pl-1 border-l-2 border-border">
-                              <div>
-                                <span className="text-[10px] font-semibold text-muted-foreground">What? </span>
-                                <span className="text-foreground">{details.what}</span>
-                              </div>
-                              <div>
-                                <span className="text-[10px] font-semibold text-muted-foreground">Why? </span>
-                                <span className="text-muted-foreground">{details.why}</span>
-                              </div>
-                              <div>
-                                <span className="text-[10px] font-semibold text-muted-foreground">What changes? </span>
-                                <span className="font-mono text-[11px] text-primary">{details.changes}</span>
-                              </div>
-                            </div>
                           </div>
 
-                          {/* Action Buttons */}
-                          <div className="flex md:flex-col items-center md:items-end gap-2 shrink-0">
+                          {/* Action & Disclosure Buttons */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setExpandedActionCodes((prev) => ({ ...prev, [opt.code]: !prev[opt.code] }))}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-300 transition-colors duration-150 cursor-pointer"
+                              title="Toggle 3-question operational details"
+                              aria-expanded={isExpanded}
+                            >
+                              <HelpCircle className="h-3.5 w-3.5 text-primary" />
+                              <span>Explain logic</span>
+                              <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${isExpanded ? "rotate-180" : ""}`} />
+                            </button>
+
                             <button
                               type="button"
                               onClick={() =>
@@ -1213,10 +1284,10 @@ export function ScenariosWorkspace() {
                                 )
                               }
                               disabled={isAuth}
-                              className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold transition-all shadow-xs cursor-pointer min-h-[44px] ${
+                              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors duration-150 shadow-xs cursor-pointer min-h-[36px] ${
                                 isAuth
-                                  ? "bg-success text-white cursor-default opacity-90"
-                                  : "bg-foreground hover:bg-foreground/90 text-background"
+                                  ? "bg-emerald-600 text-white cursor-default opacity-90"
+                                  : "bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900"
                               }`}
                             >
                               {isAuth ? (
@@ -1231,18 +1302,38 @@ export function ScenariosWorkspace() {
                                 </>
                               )}
                             </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleOpenExplanation("SCENARIOS", simulationResult.scenario_id || effectiveTargetAsset)}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-medium bg-secondary hover:bg-accent text-muted-foreground border border-border transition-colors cursor-pointer"
-                              title="Open deterministic decision reasoning trace"
-                            >
-                              <HelpCircle className="h-3.5 w-3.5 text-primary" />
-                              <span>Explain logic</span>
-                            </button>
                           </div>
                         </div>
+
+                        {/* Progressive Disclosure: 3-Question Grid (Collapsed by default, expanded on click) */}
+                        {isExpanded && (
+                          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2 animate-in fade-in duration-100">
+                            <div className="grid grid-cols-1 gap-1.5 text-xs pl-2.5 border-l-2 border-primary/40">
+                              <div>
+                                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">What? </span>
+                                <span className="text-slate-800 dark:text-slate-200">{details.what}</span>
+                              </div>
+                              <div>
+                                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Why? </span>
+                                <span className="text-slate-600 dark:text-slate-400">{details.why}</span>
+                              </div>
+                              <div>
+                                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">What changes? </span>
+                                <span className="font-mono text-[11px] text-primary">{details.changes}</span>
+                              </div>
+                            </div>
+                            <div className="pt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenExplanation("SCENARIOS", simulationResult.scenario_id || effectiveTargetAsset)}
+                                className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-600 dark:text-sky-400 hover:underline cursor-pointer"
+                              >
+                                <span>Open full deterministic reasoning trace</span>
+                                <ArrowRight className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1252,17 +1343,17 @@ export function ScenariosWorkspace() {
               {/* ═══════════════════════════════════════════════════════════════ */}
               {/* DOWNSTREAM DEPENDENCIES — What breaks?                        */}
               {/* ═══════════════════════════════════════════════════════════════ */}
-              <div className="rounded-lg border border-border bg-card p-4 shadow-2xs space-y-3">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-3 font-sans transition-colors duration-150">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                       What breaks?
                     </h3>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
                       Affected dependencies · Downstream Services Exposed by Outage
                     </p>
                   </div>
-                  <span className="text-[10px] font-mono font-semibold text-destructive">
+                  <span className="text-xs font-mono font-semibold text-destructive px-2 py-0.5 rounded bg-destructive/10 border border-destructive/20">
                     {simulationResult.affected_services.length} exposed
                   </span>
                 </div>
@@ -1275,46 +1366,46 @@ export function ScenariosWorkspace() {
                 </div>
 
                 {/* Compact Causal Flow */}
-                <div className="flex flex-wrap items-center gap-1.5 text-xs py-2">
-                  <span className="px-2 py-1 rounded-md bg-destructive/10 text-destructive font-semibold border border-destructive/20 font-mono text-[11px]">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs py-1.5">
+                  <span className="px-2.5 py-1 rounded-md bg-destructive/10 text-destructive font-semibold border border-destructive/20 font-mono text-[11px]">
                     {effectiveTargetAsset} fails
                   </span>
-                  <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0 hidden sm:block" />
-                  <ArrowDown className="h-3 w-3 text-muted-foreground shrink-0 sm:hidden" />
-                  <span className="px-2 py-1 rounded-md bg-secondary text-foreground border border-border text-[11px]">
+                  <ArrowRight className="h-3 w-3 text-slate-400 shrink-0 hidden sm:block" />
+                  <ArrowDown className="h-3 w-3 text-slate-400 shrink-0 sm:hidden" />
+                  <span className="px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px]">
                     Available generation drops to <span className="font-mono font-semibold">{simulationResult.available_capacity_kw.toFixed(0)} kW</span>
                   </span>
-                  <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0 hidden sm:block" />
-                  <ArrowDown className="h-3 w-3 text-muted-foreground shrink-0 sm:hidden" />
-                  <span className="px-2 py-1 rounded-md bg-warning/10 text-warning border border-warning/20 text-[11px]">
+                  <ArrowRight className="h-3 w-3 text-slate-400 shrink-0 hidden sm:block" />
+                  <ArrowDown className="h-3 w-3 text-slate-400 shrink-0 sm:hidden" />
+                  <span className="px-2.5 py-1 rounded-md bg-warning/10 text-warning border border-warning/20 text-[11px] font-medium">
                     Single-generator operation
                   </span>
-                  <ArrowRight className="h-3 w-3 text-muted-foreground shrink-0 hidden sm:block" />
-                  <ArrowDown className="h-3 w-3 text-muted-foreground shrink-0 sm:hidden" />
-                  <span className="px-2 py-1 rounded-md bg-destructive/10 text-destructive border border-destructive/20 text-[11px]">
+                  <ArrowRight className="h-3 w-3 text-slate-400 shrink-0 hidden sm:block" />
+                  <ArrowDown className="h-3 w-3 text-slate-400 shrink-0 sm:hidden" />
+                  <span className="px-2.5 py-1 rounded-md bg-destructive/10 text-destructive border border-destructive/20 text-[11px] font-medium">
                     {simulationResult.affected_services.length} services degraded
                   </span>
                 </div>
 
                 {/* Affected Service Rows */}
-                <div className="divide-y divide-border">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {simulationResult.affected_services.map((srv) => (
                     <div
                       key={srv.service_id}
                       className="flex items-start justify-between gap-3 py-2.5"
                     >
                       <div className="space-y-0.5 flex-1">
-                        <span className="text-xs font-semibold text-foreground">
+                        <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                           {srv.name}
                         </span>
-                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
                           {srv.degradation_rationale}
                         </p>
                       </div>
-                      <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-md shrink-0 ${
+                      <span className={`text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md shrink-0 border ${
                         srv.scenario_status === "DEGRADED" || srv.scenario_status === "CRITICAL"
-                          ? "text-destructive bg-destructive/10 border border-destructive/20"
-                          : "text-warning bg-warning/10 border border-warning/20"
+                          ? "text-destructive bg-destructive/10 border-destructive/20"
+                          : "text-warning bg-warning/10 border-warning/20"
                       }`}>
                         {srv.scenario_status}
                       </span>
@@ -1323,15 +1414,15 @@ export function ScenariosWorkspace() {
                 </div>
 
                 {/* Recovery Constraints & Supply Chain */}
-                <div className="border-t border-border pt-3 space-y-2">
-                  <p className="text-[10px] text-muted-foreground">
+                <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2">
+                  <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     Recovery Constraints — Logistics &amp; Supply Chain
                   </p>
 
-                  <div className="flex flex-wrap gap-3">
-                    <div className="flex-1 min-w-[200px] p-3 rounded-md border border-border bg-secondary space-y-1">
-                      <span className="text-[10px] font-medium text-muted-foreground">Spare part required</span>
-                      <div className="font-mono text-sm font-bold text-foreground">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-1">
+                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Spare part required</span>
+                      <div className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
                         {supplySparePart || "SK-402"}
                       </div>
                       <div className="text-[11px] text-destructive font-semibold">
@@ -1339,58 +1430,68 @@ export function ScenariosWorkspace() {
                       </div>
                     </div>
 
-                    <div className="flex-1 min-w-[200px] p-3 rounded-md border border-border bg-secondary space-y-1">
-                      <span className="text-[10px] font-medium text-muted-foreground">Next resupply</span>
-                      <div className="text-sm font-semibold text-foreground">
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-1">
+                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Next resupply</span>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                         MV Vasiliy Golovnin · <span className="font-mono">{supplyDelayDays || 11}</span> days
                       </div>
-                      <div className="text-[11px] text-muted-foreground">
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
                         Expedition vessel delayed by sea ice pack
                       </div>
                     </div>
 
-                    <div className="flex-1 min-w-[200px] p-3 rounded-md border border-primary/20 bg-primary/5 space-y-1">
+                    <div className="p-3 rounded-lg border border-primary/20 bg-primary/5 space-y-1">
                       <div className="flex items-center gap-1">
                         <Plane className="h-3 w-3 text-primary" />
                         <span className="text-[10px] font-medium text-primary">Emergency airlift alternative</span>
                       </div>
-                      <div className="text-sm font-semibold text-foreground">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                         ~<span className="font-mono">48</span> hours*
                       </div>
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">
                         *Subject to polar weather and aircraft availability.
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Why? */}
-                <div className="p-3 rounded-md bg-secondary border border-border">
-                  <div className="flex items-center gap-1.5 mb-1">
+                {/* Why? Disruption details accordion */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsWhyExpanded(!isWhyExpanded)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors duration-150 cursor-pointer"
+                  >
                     <HelpCircle className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-xs font-semibold text-foreground">Why?</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {effectiveTargetAsset} normally supplies primary electrical / thermal demand. With {effectiveTargetAsset} offline, G-01 becomes the only online generator. This reduces redundancy and leaves the station exposed to another failure.
-                  </p>
+                    <span>{isWhyExpanded ? "Hide disruption rationale" : "Why did this disruption occur?"}</span>
+                    <ChevronDown className={`h-3 w-3 transition-transform duration-150 ${isWhyExpanded ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {isWhyExpanded && (
+                    <div className="mt-2 p-3 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 animate-in fade-in duration-100">
+                      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-sans">
+                        {effectiveTargetAsset} normally supplies primary electrical and thermal demand. With {effectiveTargetAsset} offline, G-01 becomes the only online generator. This eliminates redundancy and leaves the station exposed to another failure.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* ═══════════════════════════════════════════════════════════════ */}
               {/* TECHNICAL DELTAS — Baseline vs. Scenario Deltas               */}
               {/* ═══════════════════════════════════════════════════════════════ */}
-              <div className="rounded-lg border border-border bg-card p-4 shadow-2xs space-y-3">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-3 font-sans transition-colors duration-150">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                       Baseline vs. Simulated Scenario Impact Deltas
                     </h3>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
                       Deterministic metric deltas (Before vs After)
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="px-2 py-0.5 rounded-md bg-secondary border border-border text-foreground font-medium text-[11px]">
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-medium text-[11px]">
                       Baseline
                     </span>
                     <span className="px-2 py-0.5 rounded-md bg-primary/10 border border-primary/30 text-primary font-medium text-[11px]">
@@ -1400,33 +1501,33 @@ export function ScenariosWorkspace() {
                   </div>
                 </div>
 
-                {/* Delta Metrics Table */}
-                <div className="border border-border rounded-md overflow-hidden">
+                {/* Delta Metrics Table with overflow-x-auto to prevent layout blowout */}
+                <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-secondary">
-                        <th className="text-left p-2 font-medium text-muted-foreground">Metric</th>
-                        <th className="text-right p-2 font-medium text-muted-foreground">Baseline Value</th>
-                        <th className="text-right p-2 font-medium text-muted-foreground">Scenario Value</th>
-                        <th className="text-right p-2 font-medium text-muted-foreground">Delta</th>
+                      <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
+                        <th className="text-left p-2.5 font-medium text-slate-600 dark:text-slate-400">Metric</th>
+                        <th className="text-right p-2.5 font-medium text-slate-600 dark:text-slate-400">Baseline Value</th>
+                        <th className="text-right p-2.5 font-medium text-slate-600 dark:text-slate-400">Scenario Value</th>
+                        <th className="text-right p-2.5 font-medium text-slate-600 dark:text-slate-400">Delta</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-sans">
                       {simulationResult.deltas.map((delta) => (
-                        <tr key={delta.name}>
-                          <td className="p-2 text-foreground">{delta.name}</td>
-                          <td className="p-2 text-right font-mono text-muted-foreground">
+                        <tr key={delta.name} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                          <td className="p-2.5 text-slate-900 dark:text-slate-100 font-medium">{delta.name}</td>
+                          <td className="p-2.5 text-right font-mono text-slate-600 dark:text-slate-400">
                             {delta.baseline_value} {delta.unit}
                           </td>
-                          <td className="p-2 text-right font-mono font-semibold text-foreground">
+                          <td className="p-2.5 text-right font-mono font-semibold text-slate-900 dark:text-slate-100">
                             {delta.scenario_value} {delta.unit}
                           </td>
-                          <td className={`p-2 text-right font-mono font-semibold ${
+                          <td className={`p-2.5 text-right font-mono font-semibold ${
                             delta.impact_direction === "NEGATIVE"
-                              ? "text-destructive"
+                              ? "text-red-600 dark:text-red-400"
                               : delta.impact_direction === "POSITIVE"
-                              ? "text-success"
-                              : "text-muted-foreground"
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-slate-600 dark:text-slate-400"
                           }`}>
                             {delta.delta > 0 ? `+${delta.delta}` : delta.delta} {delta.unit}
                           </td>
@@ -1441,22 +1542,22 @@ export function ScenariosWorkspace() {
                   <button
                     type="button"
                     onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                    className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    className="flex items-center gap-1 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors duration-150 cursor-pointer"
                   >
                     <span>{showTechnicalDetails ? "Hide" : "Show"} model assumptions &amp; thermodynamic configuration</span>
-                    {showTechnicalDetails ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${showTechnicalDetails ? "rotate-180" : ""}`} />
                   </button>
 
                   {showTechnicalDetails && (
-                    <div className="mt-2 p-3 rounded-md bg-secondary border border-border space-y-2">
-                      <h5 className="text-xs font-semibold text-foreground">
+                    <div className="mt-2.5 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2 animate-in fade-in duration-100">
+                      <h5 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                         Model assumptions &amp; thermodynamic configuration
                       </h5>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs text-muted-foreground">
-                        <div>Ambient temperature: <strong className="text-foreground font-mono">{ambientTempOverride ? `${ambientTempOverride}°C` : (isMaitri ? "-18.2°C" : "-28.5°C")}</strong></div>
-                        <div>Outage duration: <strong className="text-foreground font-mono">{simulationResult.duration_hours}h</strong></div>
-                        <div>Dispatch posture: <strong className="text-foreground font-mono">G-01</strong> (Single generator)</div>
-                        <div>Model: <strong className="text-foreground">Deterministic Energy &amp; Thermodynamic Model</strong></div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs text-slate-600 dark:text-slate-400">
+                        <div>Ambient temperature: <strong className="text-slate-900 dark:text-slate-100 font-mono">{ambientTempOverride ? `${ambientTempOverride}°C` : (isMaitri ? "-18.2°C" : "-28.5°C")}</strong></div>
+                        <div>Outage duration: <strong className="text-slate-900 dark:text-slate-100 font-mono">{simulationResult.duration_hours}h</strong></div>
+                        <div>Dispatch posture: <strong className="text-slate-900 dark:text-slate-100 font-mono">G-01</strong> (Single generator)</div>
+                        <div>Model: <strong className="text-slate-900 dark:text-slate-100">Deterministic Energy &amp; Thermodynamic Model</strong></div>
                       </div>
                     </div>
                   )}
@@ -1466,19 +1567,19 @@ export function ScenariosWorkspace() {
               {/* ═══════════════════════════════════════════════════════════════ */}
               {/* TIMELINE                                                       */}
               {/* ═══════════════════════════════════════════════════════════════ */}
-              <div className="rounded-lg border border-border bg-card p-4 shadow-2xs space-y-3">
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-2xs space-y-3 font-sans transition-colors duration-150">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-foreground">
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                     <span className="font-mono">{simulationResult.duration_hours}h</span> failure timeline
                   </h4>
-                  <span className="text-[10px] text-muted-foreground font-mono">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                     0h → {simulationResult.duration_hours}h
                   </span>
                 </div>
 
                 {/* Desktop: horizontal track */}
                 <div className="hidden sm:block relative pt-2 pb-2">
-                  <div className="absolute top-7 left-4 right-4 h-0.5 bg-border -z-0" />
+                  <div className="absolute top-7 left-4 right-4 h-0.5 bg-slate-200 dark:bg-slate-800 -z-0" />
                   <div className="grid grid-cols-5 gap-2 relative z-10">
                     {[
                       { time: "0h", title: `${effectiveTargetAsset} offline`, desc: "Immediate 300 kW drop. Single-generator alert active.", badge: "FAILURE", color: "text-destructive border-destructive/30 bg-destructive/5" },
@@ -1487,7 +1588,7 @@ export function ScenariosWorkspace() {
                       { time: "48h", title: "Airlift arrives*", desc: "Emergency spare delivery window opens via Twin Otter.", badge: "REPAIR", color: "text-violet border-violet/30 bg-violet/5" },
                       { time: `${simulationResult.duration_hours}h`, title: "Scenario review", desc: "Scenario ends. Station state reassessment and rebuild.", badge: "REASSESS", color: "text-success border-success/30 bg-success/5" },
                     ].map((step, idx) => (
-                      <div key={idx} className="p-2.5 rounded-md border border-border bg-card space-y-1">
+                      <div key={idx} className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-xs font-bold text-primary">
                             {step.time}
@@ -1496,10 +1597,10 @@ export function ScenariosWorkspace() {
                             {step.badge}
                           </span>
                         </div>
-                        <div className="text-xs font-semibold text-foreground truncate">
+                        <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
                           {step.title}
                         </div>
-                        <p className="text-[10px] text-muted-foreground leading-tight">
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
                           {step.desc}
                         </p>
                       </div>
@@ -1519,14 +1620,14 @@ export function ScenariosWorkspace() {
                     <div key={idx} className="flex gap-3">
                       <div className="flex flex-col items-center">
                         <div className="h-2 w-2 rounded-full bg-primary border-2 border-primary mt-1.5" />
-                        {idx < arr.length - 1 && <div className="w-px flex-1 bg-border" />}
+                        {idx < arr.length - 1 && <div className="w-px flex-1 bg-slate-200 dark:bg-slate-800" />}
                       </div>
                       <div className="pb-3 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs font-bold text-primary">{step.time}</span>
-                          <span className="text-xs font-semibold text-foreground">{step.title}</span>
+                          <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">{step.title}</span>
                         </div>
-                        <p className="text-[11px] text-muted-foreground">{step.desc}</p>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400">{step.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -1536,7 +1637,7 @@ export function ScenariosWorkspace() {
               {/* ═══════════════════════════════════════════════════════════════ */}
               {/* PROVENANCE FOOTER                                              */}
               {/* ═══════════════════════════════════════════════════════════════ */}
-              <div className="p-3 rounded-md bg-card border border-border flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+              <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400 font-sans transition-colors duration-150">
                 <span className="font-mono">
                   SIMULATION ENGINE: DETERMINISTIC ENERGY &amp; THERMODYNAMIC MODEL
                 </span>

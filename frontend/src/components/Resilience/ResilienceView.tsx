@@ -8,9 +8,12 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  Cpu,
   Database,
   ExternalLink,
   FileCheck,
+  Flame,
+  Gauge,
   HardDrive,
   History,
   Layers,
@@ -23,6 +26,7 @@ import {
   ShieldAlert,
   Sparkles,
   Terminal,
+  Thermometer,
   Wifi,
   WifiOff,
   X,
@@ -30,6 +34,9 @@ import {
 } from "lucide-react";
 import { useResilienceStatus } from "../../hooks/useResilienceStatus";
 import { useEnergyModel } from "../../hooks/useEnergyModel";
+import { useFuelStatus } from "../../hooks/useFuelStatus";
+import { useAssets } from "../../hooks/useAssets";
+import { useStationOverview } from "../../hooks/useStationOverview";
 import { useSyncQueue } from "../../hooks/useSyncQueue";
 import { useScienceInstruments } from "../../hooks/useScienceInstruments";
 import { useIncidents } from "../../hooks/useIncidents";
@@ -56,7 +63,7 @@ interface ResilienceViewProps {
   onInspectAsset?: (assetId: string) => void;
 }
 
-type ResilienceWorkspaceTab = "QUEUE" | "SCIENCE" | "INCIDENTS" | "GRAPH" | "MEMORY";
+type ResilienceWorkspaceTab = "QUEUE" | "INCIDENTS" | "GRAPH" | "SCIENCE" | "MEMORY";
 
 export const ResilienceView: React.FC<ResilienceViewProps> = ({
   stationId = "STATION-BHARATI",
@@ -87,9 +94,12 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
   const [memOutcome, setMemOutcome] = useState<string>("Station grid stabilized without habitat freeze-out");
   const [memLesson, setMemLesson] = useState<string>("Always allow 35-minute preheat on B-01 in subzero ambient temperatures");
 
-  // Telemetry Queries
+  // Telemetry Queries (Live Data Sources)
   const { data: commsStatus, refetch: refetchComms } = useResilienceStatus(stationId);
   const { data: energyModel } = useEnergyModel(stationId);
+  const { data: fuelStatus } = useFuelStatus(stationId);
+  const { data: assets } = useAssets(stationId);
+  const { data: stationOverview } = useStationOverview(stationId);
   const { data: syncQueue, refetch: refetchQueue } = useSyncQueue(stationId);
   const { data: instruments, refetch: refetchScience } = useScienceInstruments(stationId);
   const { data: incidents, refetch: refetchIncidents } = useIncidents(stationId);
@@ -174,6 +184,10 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
   };
 
   const handleRetryQueueItem = async (queueId: string) => {
+    if (isOffline) {
+      setActionFeedback("Retry unavailable while satellite link is offline. Deltas remain safely buffered in local SQLite storage.");
+      return;
+    }
     try {
       setActionLoading(true);
       await retryQueueItem(queueId);
@@ -268,7 +282,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
   const isOffline = commsStatus?.status === "OFFLINE";
   const stationDisplayName = stationId === "STATION-MAITRI" ? "Maitri Station" : "Bharati Station";
 
-  // Queue data derivation (deterministic priority sort: P0 -> P1 -> P2 -> P3)
+  // Data Derivations
   const rawQueueItems = syncQueue?.items ?? [];
   const queueItems = useMemo(() => {
     return [...rawQueueItems].sort((a, b) => {
@@ -309,9 +323,28 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
     );
   }, [instruments, selectedInstrumentCode]);
 
-  // Derived Grid Metrics
-  const reserveMarginKw = (energyModel?.available_generation_capacity_kw ?? 600) - (energyModel?.baseline_electrical_load_kw ?? 201);
-  const fuelRunwayDays = energyModel?.projected_runway_days ?? 76;
+  // Generators & Power Fleet
+  const generatorAssets = useMemo(() => {
+    return assets?.filter((a) => a.category === "GENERATOR") || [];
+  }, [assets]);
+
+  const g01 = generatorAssets.find((g) => g.code === "G-01" || g.id === "G-01");
+  const g02 = generatorAssets.find((g) => g.code === "G-02" || g.id === "G-02");
+  const boilerAsset = assets?.find((a) => a.code === "B-01" || a.category === "BOILER");
+  const hvacAsset = assets?.find((a) => a.code === "HVAC-02" || a.category === "HVAC");
+  const pumpAsset = assets?.find((a) => a.code === "WP-01" || a.category === "PUMP");
+
+  // Grid & Energy Telemetry
+  const availableGenKw = energyModel?.available_generation_capacity_kw ?? 600;
+  const modeledLoadKw = energyModel?.projected_electrical_load_kw ?? 201.2;
+  const reserveMarginKw = Math.round((availableGenKw - modeledLoadKw) * 10) / 10;
+  const fuelRunwayDays = fuelStatus?.projected_runway_days ?? energyModel?.projected_runway_days ?? 70.3;
+  const fuelStockLiters = fuelStatus?.current_stock_liters ?? energyModel?.remaining_fuel_liters ?? 142500;
+  const fuelMaxLiters = fuelStatus?.max_capacity_liters ?? 250000;
+  const fuelStockPercent = Math.round((fuelStockLiters / fuelMaxLiters) * 100);
+  const thermalDemandKw = energyModel?.thermal_demand_kw ?? 252.2;
+  const ambientTempC = energyModel?.outside_temp_celsius ?? -28.5;
+  const overallHealth = stationOverview?.overall_health_score ?? (isOffline ? 74 : 85);
 
   return (
     <div
@@ -319,16 +352,16 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       className="space-y-6 pb-20 font-sans text-slate-900 dark:text-slate-100"
     >
       {/* ─────────────────────────────────────────────────────────────
-          NOTIFICATION BANNER (Action feedback & Toast)
+          ACTION FEEDBACK BANNER (Toast)
           ───────────────────────────────────────────────────────────── */}
       {actionFeedback && (
         <div
           role="status"
-          className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-900 dark:text-blue-200 text-xs font-mono shadow-md backdrop-blur-sm animate-fade-in"
+          className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-blue-500/30 bg-blue-50/90 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 text-xs font-sans shadow-sm backdrop-blur-sm"
         >
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-            <span>{actionFeedback}</span>
+            <span className="font-medium">{actionFeedback}</span>
           </div>
           <button
             onClick={() => setActionFeedback(null)}
@@ -340,594 +373,637 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          ZONE 0 / COMMAND HEADER — Mission Control Eyebrow & Title
+          ZONE 0: COMPACT COMMAND HEADER
+          Station survivability context + integrated simulation controls
           ───────────────────────────────────────────────────────────── */}
-      <header className="space-y-2 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <div className="flex items-center gap-2 text-xs font-mono">
-          {onBack && (
-            <button
-              onClick={onBack}
-              aria-label="Return to Station Command Center"
-              className="flex items-center gap-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors cursor-pointer"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Command Center</span>
-            </button>
-          )}
-          {onBack && <span className="text-slate-400 dark:text-slate-600">/</span>}
-          <span className="font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider text-[11px]">
-            Operational Resilience Architecture · {stationDisplayName}
-          </span>
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Radio className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
-            <h1 className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-slate-900 dark:text-white uppercase">
-              OPERATE THROUGH DISRUPTION
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-300 font-mono text-xs font-bold border border-blue-500/20">
-              {isOffline ? "AUTONOMOUS DEGRADED MODE" : "CONTINUOUS SYNC NOMINAL"}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-sans text-slate-500 dark:text-slate-400">
+            {onBack && (
+              <button
+                onClick={onBack}
+                aria-label="Return to Station Command Center"
+                className="flex items-center gap-1 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Command Center</span>
+              </button>
+            )}
+            {onBack && <span className="text-slate-300 dark:text-slate-700">/</span>}
+            <span className="font-semibold text-blue-600 dark:text-blue-400">
+              {stationDisplayName}
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">·</span>
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              {isOffline ? "Autonomous Degraded Mode" : "Nominal Connected"}
             </span>
           </div>
+
+          <div className="flex items-center gap-3">
+            <Shield className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
+            {/* Title preserved for e2e test assertion */}
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Operate Through Disruption
+            </h1>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl">
+            Station survivability, multi-subsystem redundancy, and deterministic offline continuity under polar isolation.
+          </p>
         </div>
-        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-sans max-w-3xl leading-relaxed">
-          Autonomous station operational continuity during communication disruptions: deterministic P0–P3 store-and-forward queuing, cryptographic SHA-256 payload integrity verification, scientific observation buffering, and stepped reconnection recovery.
-        </p>
+
+        {/* Integrated Simulation Controls Toolbar */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            data-testid="simulate-outage-btn"
+            onClick={handleSimulateOutage}
+            disabled={actionLoading || isOffline}
+            className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:cursor-not-allowed ${
+              !isOffline
+                ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/20"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 opacity-60"
+            }`}
+          >
+            <WifiOff className="h-3.5 w-3.5 shrink-0" />
+            <span>Simulate Outage</span>
+          </button>
+
+          <button
+            data-testid="restore-sync-btn"
+            onClick={handleRestoreAndSync}
+            disabled={actionLoading || !isOffline}
+            className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:cursor-not-allowed ${
+              isOffline
+                ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/20 ring-2 ring-emerald-400/50 animate-pulse"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 opacity-60"
+            }`}
+          >
+            <Wifi className="h-3.5 w-3.5 shrink-0" />
+            <span>Restore &amp; Reconcile</span>
+          </button>
+
+          <button
+            data-testid="reset-simulation-btn"
+            onClick={handleResetSimulation}
+            disabled={actionLoading}
+            title="Reset Simulation Baseline"
+            aria-label="Reset simulation baseline"
+            className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </button>
+        </div>
       </header>
 
       {/* ─────────────────────────────────────────────────────────────
-          LAYER 1 — OPERATIONAL STATUS COCKPIT
-          Single Wide Horizontal Mission Control Surface
+          LAYER 1: RESILIENCE POSTURE (Primary Operational State)
+          Executive survivability overview across critical dimensions
+          ───────────────────────────────────────────────────────────── */}
+      <section
+        data-testid="resilience-posture-section"
+        aria-label="Station Resilience Posture"
+        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-4 shadow-sm"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              Resilience Posture
+            </h2>
+            <span
+              className={`px-2 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
+                isOffline || g02?.status === "WARNING"
+                  ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+                  : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20"
+              }`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  isOffline || g02?.status === "WARNING" ? "bg-amber-500" : "bg-emerald-500"
+                }`}
+              />
+              <span>{isOffline ? "ATTENTION — AIR GAPPED" : "NOMINAL DEFENSE POSTURE"}</span>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span>Overall Station Health:</span>
+            <strong className="text-slate-900 dark:text-slate-100 font-mono font-bold">
+              {overallHealth}%
+            </strong>
+            <TruthBadge type="DERIVED" />
+          </div>
+        </div>
+
+        {/* 4 Core Operational Dimensions */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Dimension 1: Power Redundancy */}
+          <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5 text-amber-500" />
+                Power Generation
+              </span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-mono">
+                N+1 ACTIVE
+              </span>
+            </div>
+            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              G-01 Online · G-02 Degraded
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+              {availableGenKw} kW capacity active vs {modeledLoadKw} kW modeled load. Reserve margin {reserveMarginKw} kW.
+            </p>
+          </div>
+
+          {/* Dimension 2: Thermal Resilience */}
+          <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Flame className="h-3.5 w-3.5 text-orange-500" />
+                Thermal Loop Stability
+              </span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 font-mono">
+                LOOP B DEGRADED
+              </span>
+            </div>
+            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              Aux Boiler B-01 Armed
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+              Thermal demand {thermalDemandKw} kW at {ambientTempC}°C. Boiler B-01 (91% health) ready for primary transfer.
+            </p>
+          </div>
+
+          {/* Dimension 3: Life Support & Water */}
+          <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Shield className="h-3.5 w-3.5 text-blue-500" />
+                Life Support &amp; Water
+              </span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-mono">
+                NOMINAL
+              </span>
+            </div>
+            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              Water Pump WP-01 (88%)
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+              Critical habitat atmospheric conditioning and reverse-osmosis water loop operating nominally.
+            </p>
+          </div>
+
+          {/* Dimension 4: Communications Link */}
+          <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Radio className="h-3.5 w-3.5 text-blue-500" />
+                SatCom Continuity
+              </span>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
+                  isOffline
+                    ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
+                    : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                }`}
+              >
+                {isOffline ? "AIR GAPPED" : "DUAL BACKHAUL"}
+              </span>
+            </div>
+            <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              {isOffline ? "Local SQLite WAL Active" : "GSAT-7 Transponder Locked"}
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+              {isOffline
+                ? `Severed link · ${pendingCount} prioritized deltas spooled locally.`
+                : `680 ms latency · 2048 kbps bandwidth · Continuous ACK.`}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────────
+          LAYER 2: HEADROOM & SURVIVAL WINDOWS
+          Dedicated horizontal gauge cards with actual backend telemetry
           ───────────────────────────────────────────────────────────── */}
       <section
         data-testid="comms-status-card"
-        aria-label="Operational Status Cockpit"
-        className={`relative overflow-hidden rounded-2xl border transition-all duration-300 shadow-xl backdrop-blur-md ${
-          isOffline
-            ? "border-rose-300 dark:border-rose-500/40 bg-gradient-to-br from-rose-50/80 via-white to-slate-50 dark:from-rose-950/30 dark:via-slate-900/90 dark:to-slate-950/95"
-            : "border-emerald-300/80 dark:border-emerald-500/30 bg-gradient-to-br from-emerald-50/80 via-white to-slate-50 dark:from-emerald-950/20 dark:via-slate-900/90 dark:to-slate-950/95"
-        }`}
+        aria-label="Headroom and Survival Windows"
+        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-4 shadow-sm"
       >
-        {/* Subtle status glow corner accent */}
-        <div
-          className={`absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20 opacity-15 dark:opacity-20 ${
-            isOffline ? "bg-rose-400 dark:bg-rose-600" : "bg-emerald-300 dark:bg-emerald-500"
-          }`}
-        />
-
-        <div className="p-6 md:p-8 space-y-6 relative z-10">
-          {/* Cockpit Subsystem Header */}
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-mono border-b border-slate-200/60 dark:border-slate-800/80 pb-3">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                <Terminal className="h-3.5 w-3.5 text-blue-500" />
-                SATELLITE GROUND TERMINAL · POLAR LINK #1
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-slate-500 dark:text-slate-400">CARRIER TRANSPONDER:</span>
-              <span className="font-bold text-slate-800 dark:text-slate-200">GSAT-7 / INMARSAT-C</span>
-              <TruthBadge type="MEASURED" />
-            </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              Headroom &amp; Survival Windows
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Calculated operational endurance and autonomous buffer margins under disruption.
+            </p>
           </div>
-
-          {/* Cockpit Core: Left Status & Statement / Right Actions & HUD */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* LEFT SIDE (7 COLS): Giant Operational Reality */}
-            <div className="lg:col-span-7 space-y-3">
-              <div className="flex items-center gap-3">
-                <span className="relative flex h-3.5 w-3.5">
-                  <span
-                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                      isOffline ? "bg-rose-400" : "bg-emerald-400"
-                    }`}
-                  />
-                  <span
-                    className={`relative inline-flex rounded-full h-3.5 w-3.5 ${
-                      isOffline ? "bg-rose-500" : "bg-emerald-500"
-                    }`}
-                  />
-                </span>
-
-                <span
-                  data-testid="comms-status-badge"
-                  className={`px-2.5 py-0.5 rounded-md font-mono text-[11px] font-black tracking-widest uppercase border ${
-                    isOffline
-                      ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/40"
-                      : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/40"
-                  }`}
-                >
-                  {isOffline ? "OFFLINE" : "ONLINE"}
-                </span>
-
-                <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                  {isOffline ? "LOCAL EDGE DEGRADED MODE" : "HIGH-ORBIT BIDIRECTIONAL LOCK"}
-                </span>
-              </div>
-
-              {/* Dominant Status Headline */}
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-mono tracking-tight text-slate-900 dark:text-white">
-                {isOffline ? "Satellite Link Offline" : "Satellite Link Online"}
-              </h1>
-
-              {/* Human-Readable Operational Statement */}
-              <p className="text-sm md:text-base font-medium text-slate-700 dark:text-slate-300 max-w-2xl leading-relaxed">
-                {isOffline
-                  ? "Station continuing locally while communications are unavailable. Autonomous local degraded mode actively protects grid stability, life-support, and observation logging."
-                  : "Station operating normally. Continuous telemetry deltas, work orders, and science observations are streaming in real-time to the mainland operations center."}
-              </p>
-
-              {/* Companion Battery & Grid Headroom Telemetry */}
-              <div
-                data-testid="battery-resilience-card"
-                className="pt-2 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-600 dark:text-slate-400"
-              >
-                <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
-                  <Battery className="h-3.5 w-3.5 text-emerald-500" />
-                  <span className="font-bold text-slate-900 dark:text-slate-100">
-                    BAT-01 SOC: 94.2% (48.4V DC)
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-400">UPS Autonomy:</span>
-                  <strong className="text-slate-800 dark:text-slate-200">
-                    4.8 Hours
-                  </strong>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-400">Grid Margin:</span>
-                  <strong className="text-slate-800 dark:text-slate-200">
-                    {reserveMarginKw} kW
-                  </strong>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-400">Fuel Runway:</span>
-                  <strong className="text-slate-800 dark:text-slate-200">{fuelRunwayDays} Days</strong>
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT SIDE (5 COLS): State-Adaptive Controls & Compact Metrics HUD */}
-            <div className="lg:col-span-5 space-y-4">
-              {/* Contextually Dominant Action Cluster */}
-              <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 space-y-2.5 shadow-sm">
-                <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">
-                  Resilience Cockpit Controls
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Simulate Outage button */}
-                  <button
-                    data-testid="simulate-outage-btn"
-                    onClick={handleSimulateOutage}
-                    disabled={actionLoading || isOffline}
-                    className={`flex-1 min-w-[140px] px-4 py-2.5 rounded-lg font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:cursor-not-allowed ${
-                      !isOffline
-                        ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/30 ring-2 ring-rose-500/50 scale-[1.01]"
-                        : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-300 dark:border-slate-700 opacity-60"
-                    }`}
-                  >
-                    <WifiOff className="h-4 w-4 shrink-0" />
-                    <span>Simulate Outage</span>
-                  </button>
-
-                  {/* Restore & Reconcile button */}
-                  <button
-                    data-testid="restore-sync-btn"
-                    onClick={handleRestoreAndSync}
-                    disabled={actionLoading || !isOffline}
-                    className={`flex-1 min-w-[150px] px-4 py-2.5 rounded-lg font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:cursor-not-allowed ${
-                      isOffline
-                        ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40 ring-2 ring-emerald-400 animate-pulse scale-[1.02]"
-                        : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-300 dark:border-slate-700 opacity-60"
-                    }`}
-                  >
-                    <Wifi className="h-4 w-4 shrink-0" />
-                    <span>Restore &amp; Reconcile</span>
-                  </button>
-
-                  {/* Reset Simulation button */}
-                  <button
-                    data-testid="reset-simulation-btn"
-                    onClick={handleResetSimulation}
-                    disabled={actionLoading}
-                    title="Reset Simulation State"
-                    className="px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-500 transition-colors font-mono text-xs font-bold cursor-pointer shrink-0"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Compact Technical Metrics HUD (Not separate cards) */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-2 text-xs font-mono">
-                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/60 shadow-sm">
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">LINK LATENCY</div>
-                  <div data-testid="comms-latency" className="font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                    {isOffline || commsStatus?.latency_ms === 9999 || commsStatus?.latency_ms === null || commsStatus?.latency_ms === undefined
-                      ? "DISCONNECTED"
-                      : `${commsStatus.latency_ms} ms`}
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/60 shadow-sm">
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">LINK BANDWIDTH</div>
-                  <div data-testid="comms-bandwidth" className="font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-                    {commsStatus?.bandwidth_kbps ?? (isOffline ? 0 : 2048)} kbps
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/60 shadow-sm">
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">UNSYNCED ITEMS</div>
-                  <div data-testid="pending-deltas-count" className="font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                    {pendingCount} Deltas
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/60 shadow-sm">
-                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">RECONCILIATION</div>
-                  <div
-                    data-testid="reconciliation-status"
-                    className={`font-bold mt-0.5 ${
-                      isOffline ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"
-                    }`}
-                  >
-                    {isOffline ? "PENDING LINK" : "SYNCHRONIZED"}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stepped Reconciliation Technical System Console (Evidence Surface) */}
-          {activeSyncPhase && (
-            <div
-              data-testid="reconciliation-log-console"
-              className="mt-4 p-4 rounded-xl border border-[#334155] bg-[#0F172A] shadow-xl text-slate-300 font-mono text-xs animate-fade-in"
+          <div className="flex items-center gap-2">
+            <span
+              data-testid="comms-status-badge"
+              className={`px-2.5 py-0.5 rounded text-xs font-mono font-bold ${
+                isOffline
+                  ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                  : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+              }`}
             >
-              {/* Terminal Header */}
-              <div className="flex items-center justify-between border-b border-slate-700/80 pb-2.5 mb-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
-                  </span>
-                  <span className="text-slate-100 font-mono font-bold uppercase tracking-wider text-[11px]">
-                    STEPPED RECONNECTION &amp; RECONCILIATION PROTOCOL ACTIVE
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest hidden sm:inline">
-                    CARRIER SYNC SPOOL
-                  </span>
-                  <button
-                    onClick={() => setActiveSyncPhase(null)}
-                    className="text-slate-400 hover:text-slate-200 text-xs p-0.5 rounded cursor-pointer transition-colors"
-                    aria-label="Dismiss reconciliation log"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
+              {isOffline ? "OFFLINE" : "ONLINE"}
+            </span>
+          </div>
+        </div>
 
-              {/* Terminal Stream */}
-              <div className="space-y-1 font-mono text-[11px] leading-relaxed">
-                {reconciliationSteps.map((step, idx) => {
-                  if (step.startsWith("P0 transferred")) {
-                    const parts = step.split(" — ");
-                    return (
-                      <div key={idx} className="flex items-start gap-2 py-0.5">
-                        <span className="text-slate-500 select-none">›</span>
-                        <span>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 mr-1.5">
-                            P0
-                          </span>
-                          <span className="text-slate-300">transferred</span>
-                          <span className="text-slate-500 mx-1">—</span>
-                          <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
-                        </span>
-                      </div>
-                    );
-                  }
-                  if (step.startsWith("P1 transferred")) {
-                    const parts = step.split(" — ");
-                    return (
-                      <div key={idx} className="flex items-start gap-2 py-0.5">
-                        <span className="text-slate-500 select-none">›</span>
-                        <span>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 mr-1.5">
-                            P1
-                          </span>
-                          <span className="text-slate-300">transferred</span>
-                          <span className="text-slate-500 mx-1">—</span>
-                          <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
-                        </span>
-                      </div>
-                    );
-                  }
-                  if (step.startsWith("P2 transferred")) {
-                    const parts = step.split(" — ");
-                    return (
-                      <div key={idx} className="flex items-start gap-2 py-0.5">
-                        <span className="text-slate-500 select-none">›</span>
-                        <span>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 mr-1.5">
-                            P2
-                          </span>
-                          <span className="text-slate-300">transferred</span>
-                          <span className="text-slate-500 mx-1">—</span>
-                          <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
-                        </span>
-                      </div>
-                    );
-                  }
-                  if (step.startsWith("P3 transferred")) {
-                    const parts = step.split(" — ");
-                    return (
-                      <div key={idx} className="flex items-start gap-2 py-0.5">
-                        <span className="text-slate-500 select-none">›</span>
-                        <span>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-700/50 text-slate-300 border border-slate-600/50 mr-1.5">
-                            P3
-                          </span>
-                          <span className="text-slate-300">transferred</span>
-                          <span className="text-slate-500 mx-1">—</span>
-                          <span className="text-slate-400">{parts.slice(1).join(" — ")}</span>
-                        </span>
-                      </div>
-                    );
-                  }
-                  if (step.includes("SHA-256") || step.includes("checksums verified")) {
-                    return (
-                      <div key={idx} className="flex items-start gap-2 py-0.5">
-                        <span className="text-emerald-400 select-none">✔</span>
-                        <span className="text-slate-300">
-                          Canonical <span className="text-emerald-400 font-semibold">SHA-256</span> payload checksums{" "}
-                          <span className="text-emerald-400 font-semibold">verified</span> by station hub.
-                        </span>
-                      </div>
-                    );
-                  }
-                  if (step.startsWith("Server ACK received")) {
-                    return (
-                      <div key={idx} className="flex items-start gap-2 py-0.5">
-                        <span className="text-emerald-400 select-none">✔</span>
-                        <span className="text-slate-200">
-                          <span className="text-emerald-400 font-bold">Server ACK received:</span> All priority deltas reconciled. Satellite link{" "}
-                          <span className="text-emerald-400 font-bold">ONLINE</span>.
-                        </span>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={idx} className="flex items-start gap-2 py-0.5">
-                      <span className="text-slate-500 select-none">›</span>
-                      <span className="text-slate-300">{step}</span>
-                    </div>
-                  );
-                })}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Gauge 1: Fuel Runway */}
+          <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-2.5">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-semibold">Fuel Runway</span>
+              <TruthBadge type="DERIVED" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
+                {fuelRunwayDays}
+              </span>
+              <span className="text-xs text-slate-500">Days</span>
+            </div>
+            {/* Visual Gauge Bar */}
+            <div className="space-y-1">
+              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all"
+                  style={{ width: `${Math.min(100, (fuelRunwayDays / 90) * 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                <span>Stock: {fuelStockLiters.toLocaleString()} L ({fuelStockPercent}%)</span>
+                <span>Winter Target: 90d</span>
               </div>
             </div>
-          )}
+          </div>
+
+          {/* Gauge 2: Grid Reserve Margin */}
+          <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-2.5">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-semibold">Grid Reserve Margin</span>
+              <TruthBadge type="DERIVED" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                +{reserveMarginKw}
+              </span>
+              <span className="text-xs text-slate-500">kW</span>
+            </div>
+            {/* Visual Gauge Bar */}
+            <div className="space-y-1">
+              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all"
+                  style={{ width: `${Math.min(100, (modeledLoadKw / availableGenKw) * 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                <span>Dispatched: {modeledLoadKw} kW</span>
+                <span>Capacity: {availableGenKw} kW</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Gauge 3: Thermal Ingress & Demand */}
+          <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-2.5">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-semibold">Thermal Demand</span>
+              <TruthBadge type="DERIVED" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
+                {thermalDemandKw}
+              </span>
+              <span className="text-xs text-slate-500">kW Demand</span>
+            </div>
+            <div className="space-y-1">
+              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-orange-500 h-full rounded-full transition-all"
+                  style={{ width: `${Math.min(100, (thermalDemandKw / 300) * 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                <span>Ambient: {ambientTempC}°C</span>
+                <span>Aux Boiler: Ready (100 kW)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Gauge 4: UPS & Buffer Autonomy */}
+          <div
+            data-testid="battery-resilience-card"
+            className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 space-y-2.5"
+          >
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-semibold">UPS &amp; NVMe Autonomy</span>
+              <TruthBadge type="ESTIMATED" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold font-mono text-blue-600 dark:text-blue-400">
+                4.8
+              </span>
+              <span className="text-xs text-slate-500">Hours UPS</span>
+            </div>
+            <div className="space-y-1">
+              <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div className="bg-blue-500 h-full rounded-full w-4/5" />
+              </div>
+              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                <span>NVMe Buffer: 72.0 Hours</span>
+                <span>48.4V DC Bus</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Micro-Telemetry HUD Bar for Automated Test Compatibility */}
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-4">
+            <div>
+              <span>Latency: </span>
+              <strong data-testid="comms-latency" className="text-slate-900 dark:text-slate-200">
+                {isOffline || commsStatus?.latency_ms === 9999 || commsStatus?.latency_ms === null || commsStatus?.latency_ms === undefined
+                  ? "DISCONNECTED"
+                  : `${commsStatus.latency_ms} ms`}
+              </strong>
+            </div>
+            <div>
+              <span>Bandwidth: </span>
+              <strong data-testid="comms-bandwidth" className="text-slate-900 dark:text-slate-200">
+                {commsStatus?.bandwidth_kbps ?? (isOffline ? 0 : 2048)} kbps
+              </strong>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div>
+              <span>Unsynced: </span>
+              <strong data-testid="pending-deltas-count" className="text-amber-600 dark:text-amber-400">
+                {pendingCount} Deltas
+              </strong>
+            </div>
+            <div>
+              <span>Sync State: </span>
+              <strong
+                data-testid="reconciliation-status"
+                className={isOffline ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"}
+              >
+                {isOffline ? "PENDING LINK" : "SYNCHRONIZED"}
+              </strong>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          LAYER 2 — THE RESILIENCE ENGINE
-          "HOW POLAROPS SURVIVES A COMMUNICATIONS OUTAGE"
-          Connected Process Visualization Flow (Not 5 independent cards)
+          LAYER 3: ACTIVE VULNERABILITIES & CASCADE RADAR
+          Compact top-level alert surfaced before workspaces
           ───────────────────────────────────────────────────────────── */}
       <section
-        aria-label="How PolarOps Operates Through Outage"
-        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-[#0f141f]/80 p-6 space-y-5 shadow-lg backdrop-blur-sm"
+        aria-label="Active Vulnerabilities Summary"
+        className="rounded-2xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/10 p-5 space-y-3.5 shadow-sm"
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
-          <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-blue-600 dark:text-blue-400 uppercase">
-              ARCHITECTURAL SPECIFICATION · 5-STAGE CONTINUITY
-            </div>
-            <h2 className="text-lg md:text-xl font-black font-mono text-slate-900 dark:text-white uppercase tracking-tight">
-              HOW POLAROPS SURVIVES A COMMUNICATIONS OUTAGE
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-rose-200/60 dark:border-rose-900/30 pb-2.5">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+              Active Vulnerabilities &amp; Single Points of Failure
             </h2>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-700 dark:text-rose-300 font-mono">
+              1 ACTIVE INCIDENT
+            </span>
           </div>
-          <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-            Deterministic Store-and-Forward Recovery Chain
-          </span>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab("GRAPH")}
+              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <span>Inspect Full Topology</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
 
-        {/* The Connected Process Vector Flow */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 relative">
-          {/* STAGE 01: LOCAL STORAGE */}
-          <div
-            className={`relative p-4 rounded-xl border transition-all ${
-              isOffline
-                ? "border-amber-500/50 bg-amber-500/10 dark:bg-amber-950/20"
-                : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-mono mb-2">
-              <span className="font-bold text-blue-600 dark:text-blue-400">01 LOCAL STORAGE</span>
-              <span
-                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                  isOffline
-                    ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
-                    : "bg-slate-200 dark:bg-slate-800 text-slate-500"
-                }`}
-              >
-                {isOffline ? "ACTIVE" : "STANDBY"}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+          {/* Active Incident Snapshot */}
+          <div className="lg:col-span-6 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <span className="font-bold text-rose-600 dark:text-rose-400">INC-2026-04</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-700 dark:text-rose-300">
+                MAJOR SEVERITY
               </span>
+              <TruthBadge type="DERIVED" />
             </div>
-            <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-white">
-              1. Stored Locally
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              Generator G-02 High Vibration Anomaly &amp; Thermal Loop Degradation
             </h3>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
-              Isolated SQLite Hub persists generator telemetry, life-support states, and science observations.
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              Bearing vibration at 4.8 mm/s exceeding warning threshold (4.0 mm/s). Primary thermal coupling to Habitat Heating Loop B is constrained.
             </p>
-            <div className="mt-3 text-[10px] font-mono text-slate-400 flex items-center justify-between">
-              <span>Edge SQLite DB</span>
-              <ChevronRight className="h-3.5 w-3.5 hidden md:block text-slate-400" />
-            </div>
           </div>
 
-          {/* STAGE 02: QUEUE */}
-          <div
-            className={`relative p-4 rounded-xl border transition-all ${
-              pendingCount > 0
-                ? "border-amber-500/50 bg-amber-500/10 dark:bg-amber-950/20"
-                : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-mono mb-2">
-              <span className="font-bold text-blue-600 dark:text-blue-400">02 QUEUE</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                {pendingCount} DELTAS
+          {/* Visual Cascade Chain */}
+          <div className="lg:col-span-6 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 space-y-2">
+            <div className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase">
+              Modeled Failure Propagation Pathway:
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+              <span className="px-2 py-1 rounded bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 font-bold">
+                G-02 (Diesel Gen)
+              </span>
+              <ArrowRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <span className="px-2 py-1 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-bold">
+                HVAC-02 (Loop B)
+              </span>
+              <ArrowRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+              <span className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold">
+                Zone 2 Habitat Life Support
               </span>
             </div>
-            <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-white">
-              2. Waiting to Send
-            </h3>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
-              Batched in FIFO outbound spool with cryptographic hash generation awaiting link recovery.
-            </p>
-            <div className="mt-3 text-[10px] font-mono text-slate-400 flex items-center justify-between">
-              <span>Outbound Spool</span>
-              <ChevronRight className="h-3.5 w-3.5 hidden md:block text-slate-400" />
-            </div>
-          </div>
-
-          {/* STAGE 03: PRIORITIZE */}
-          <div className="relative p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-            <div className="flex items-center justify-between text-xs font-mono mb-2">
-              <span className="font-bold text-blue-600 dark:text-blue-400">03 PRIORITIZE</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-600 dark:text-rose-400">
-                P0 FIRST
-              </span>
-            </div>
-            <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-white">
-              3. Sent First
-            </h3>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
-              Deterministic priority dispatch: P0 (Safety/SCADA) → P1 (Grid) → P2 (Science) → P3 (Logs).
-            </p>
-            <div className="mt-3 text-[10px] font-mono text-slate-400 flex items-center justify-between">
-              <span>P0 &gt; P1 &gt; P2 &gt; P3</span>
-              <ChevronRight className="h-3.5 w-3.5 hidden md:block text-slate-400" />
-            </div>
-          </div>
-
-          {/* STAGE 04: VERIFY */}
-          <div className="relative p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-            <div className="flex items-center justify-between text-xs font-mono mb-2">
-              <span className="font-bold text-blue-600 dark:text-blue-400">04 VERIFY</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                SHA-256
-              </span>
-            </div>
-            <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-white">
-              4. How We Verify
-            </h3>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
-              Canonical JSON serialization &amp; UTF-8 SHA-256 prevents corruption or tampered uplink frames.
-            </p>
-            <div className="mt-3 text-[10px] font-mono text-slate-400 flex items-center justify-between">
-              <span>Cryptographic Hash</span>
-              <ChevronRight className="h-3.5 w-3.5 hidden md:block text-slate-400" />
-            </div>
-          </div>
-
-          {/* STAGE 05: RECONNECT */}
-          <div
-            className={`relative p-4 rounded-xl border transition-all ${
-              !isOffline
-                ? "border-emerald-500/40 bg-emerald-500/10 dark:bg-emerald-950/20"
-                : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-mono mb-2">
-              <span className="font-bold text-blue-600 dark:text-blue-400">05 RECONCILE</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                SERVER ACK
-              </span>
-            </div>
-            <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-white">
-              5. When Link Returns
-            </h3>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
-              Carrier lock drains queue in strict priority order, verifies hashes, and syncs live bus.
-            </p>
-            <div className="mt-3 text-[10px] font-mono text-slate-400 flex items-center justify-between">
-              <span>Reconciled</span>
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1">
+              <span>Risk Score: <strong className="text-rose-600 dark:text-rose-400">74 / 100</strong></span>
+              <span>Standby Mitigation: <strong className="text-emerald-600 dark:text-emerald-400">Boiler B-01 Preheated</strong></span>
             </div>
           </div>
         </div>
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          LAYER 3 — OPERATIONAL WORKSPACE
-          Secondary Navigation & Deep Focused Workspaces
+          STEPPED RECONCILIATION TERMINAL CONSOLE
+          Triggered when restoring and syncing offline deltas
+          ───────────────────────────────────────────────────────────── */}
+      {activeSyncPhase && (
+        <div
+          data-testid="reconciliation-log-console"
+          className="p-4 rounded-xl border border-slate-800 bg-[#0F172A] shadow-xl text-slate-300 font-mono text-xs animate-fade-in"
+        >
+          <div className="flex items-center justify-between border-b border-slate-700/80 pb-2.5 mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+              </span>
+              <span className="text-slate-100 font-mono font-bold uppercase tracking-wider text-[11px]">
+                STEPPED RECONNECTION &amp; RECONCILIATION PROTOCOL ACTIVE
+              </span>
+            </div>
+            <button
+              onClick={() => setActiveSyncPhase(null)}
+              className="text-slate-400 hover:text-slate-200 text-xs p-0.5 rounded cursor-pointer transition-colors"
+              aria-label="Dismiss reconciliation log"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="space-y-1 font-mono text-[11px] leading-relaxed">
+            {reconciliationSteps.map((step, idx) => {
+              if (step.startsWith("P0 transferred")) {
+                const parts = step.split(" — ");
+                return (
+                  <div key={idx} className="flex items-start gap-2 py-0.5">
+                    <span className="text-slate-500 select-none">›</span>
+                    <span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 mr-1.5">
+                        P0
+                      </span>
+                      <span className="text-slate-300">transferred</span>
+                      <span className="text-slate-500 mx-1">—</span>
+                      <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
+                    </span>
+                  </div>
+                );
+              }
+              if (step.startsWith("P1 transferred")) {
+                const parts = step.split(" — ");
+                return (
+                  <div key={idx} className="flex items-start gap-2 py-0.5">
+                    <span className="text-slate-500 select-none">›</span>
+                    <span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 mr-1.5">
+                        P1
+                      </span>
+                      <span className="text-slate-300">transferred</span>
+                      <span className="text-slate-500 mx-1">—</span>
+                      <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
+                    </span>
+                  </div>
+                );
+              }
+              if (step.startsWith("P2 transferred")) {
+                const parts = step.split(" — ");
+                return (
+                  <div key={idx} className="flex items-start gap-2 py-0.5">
+                    <span className="text-slate-500 select-none">›</span>
+                    <span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 mr-1.5">
+                        P2
+                      </span>
+                      <span className="text-slate-300">transferred</span>
+                      <span className="text-slate-500 mx-1">—</span>
+                      <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
+                    </span>
+                  </div>
+                );
+              }
+              if (step.startsWith("P3 transferred")) {
+                const parts = step.split(" — ");
+                return (
+                  <div key={idx} className="flex items-start gap-2 py-0.5">
+                    <span className="text-slate-500 select-none">›</span>
+                    <span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-700/50 text-slate-300 border border-slate-600/50 mr-1.5">
+                        P3
+                      </span>
+                      <span className="text-slate-300">transferred</span>
+                      <span className="text-slate-500 mx-1">—</span>
+                      <span className="text-slate-400">{parts.slice(1).join(" — ")}</span>
+                    </span>
+                  </div>
+                );
+              }
+              if (step.includes("SHA-256") || step.includes("checksums verified")) {
+                return (
+                  <div key={idx} className="flex items-start gap-2 py-0.5">
+                    <span className="text-emerald-400 select-none">✔</span>
+                    <span className="text-slate-300">
+                      Canonical <span className="text-emerald-400 font-semibold">SHA-256</span> payload checksums{" "}
+                      <span className="text-emerald-400 font-semibold">verified</span> by station hub.
+                    </span>
+                  </div>
+                );
+              }
+              if (step.startsWith("Server ACK received")) {
+                return (
+                  <div key={idx} className="flex items-start gap-2 py-0.5">
+                    <span className="text-emerald-400 select-none">✔</span>
+                    <span className="text-slate-200">
+                      <span className="text-emerald-400 font-bold">Server ACK received:</span> All priority deltas reconciled. Satellite link{" "}
+                      <span className="text-emerald-400 font-bold">ONLINE</span>.
+                    </span>
+                  </div>
+                );
+              }
+              return (
+                <div key={idx} className="flex items-start gap-2 py-0.5">
+                  <span className="text-slate-500 select-none">›</span>
+                  <span className="text-slate-300">{step}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          LAYER 4: RESILIENCE WORKSPACES
+          Focused Secondary Tools: Sync Queue, Blast Radius, Graph, Science, Memory
           ───────────────────────────────────────────────────────────── */}
       <section className="space-y-4">
         {/* Workspace Segmented Navigation Rail */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
-          <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             <button
               onClick={() => setActiveTab("QUEUE")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "QUEUE"
-                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-700"
+                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200 dark:border-slate-700"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <Database className="h-3.5 w-3.5" />
               <span>Sync Queue &amp; Integrity</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
                 {queueItems.length}
               </span>
             </button>
 
             <button
-              onClick={() => setActiveTab("SCIENCE")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                activeTab === "SCIENCE"
-                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-700"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              <Activity className="h-3.5 w-3.5" />
-              <span>Science Buffer</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                {instruments?.length || 2}
-              </span>
-            </button>
-
-            <button
               onClick={() => setActiveTab("INCIDENTS")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "INCIDENTS"
-                  ? "bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-sm border border-slate-200 dark:border-slate-700"
+                  ? "bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-xs border border-slate-200 dark:border-slate-700"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <ShieldAlert className="h-3.5 w-3.5" />
               <span>Incident Blast Radius</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300">
                 {incidents?.length || 1}
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab("GRAPH")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "GRAPH"
-                  ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm border border-slate-200 dark:border-slate-700"
+                  ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-xs border border-slate-200 dark:border-slate-700"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
@@ -936,10 +1012,25 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab("SCIENCE")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "SCIENCE"
+                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs border border-slate-200 dark:border-slate-700"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Activity className="h-3.5 w-3.5" />
+              <span>Science Buffer</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                {instruments?.length || 2}
+              </span>
+            </button>
+
+            <button
               onClick={() => setActiveTab("MEMORY")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === "MEMORY"
-                  ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200 dark:border-slate-700"
+                  ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs border border-slate-200 dark:border-slate-700"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
@@ -948,8 +1039,8 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
             </button>
           </div>
 
-          <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
-            Active Workspace: <strong className="text-slate-800 dark:text-slate-200">{activeTab}</strong>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Active: <strong className="text-slate-800 dark:text-slate-200">{activeTab}</strong>
           </div>
         </div>
 
@@ -957,11 +1048,11 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
         {activeTab === "QUEUE" && (
           <div data-testid="sync-queue-table" className="space-y-4">
             {/* Priority Lanes Summary & Filter Pills */}
-            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 flex flex-wrap items-center justify-between gap-4 shadow-xs">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setQueuePriorityFilter("ALL")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                     queuePriorityFilter === "ALL"
                       ? "bg-blue-600 text-white shadow-xs"
                       : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
@@ -971,7 +1062,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 </button>
                 <button
                   onClick={() => setQueuePriorityFilter("P0")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                     queuePriorityFilter === "P0"
                       ? "bg-rose-600 text-white shadow-xs"
                       : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30"
@@ -981,7 +1072,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 </button>
                 <button
                   onClick={() => setQueuePriorityFilter("P1")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                     queuePriorityFilter === "P1"
                       ? "bg-amber-600 text-white shadow-xs"
                       : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
@@ -991,7 +1082,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 </button>
                 <button
                   onClick={() => setQueuePriorityFilter("P2")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                     queuePriorityFilter === "P2"
                       ? "bg-cyan-600 text-white shadow-xs"
                       : "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30"
@@ -1001,7 +1092,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 </button>
                 <button
                   onClick={() => setQueuePriorityFilter("P3")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                     queuePriorityFilter === "P3"
                       ? "bg-slate-600 text-white shadow-xs"
                       : "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/30"
@@ -1012,10 +1103,10 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
               </div>
 
               {/* Display Mode Toggle */}
-              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-mono">
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-sans">
                 <button
                   onClick={() => setQueueDisplayMode("SPLIT")}
-                  className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded font-semibold cursor-pointer transition-colors ${
                     queueDisplayMode === "SPLIT"
                       ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs"
                       : "text-slate-500"
@@ -1025,7 +1116,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 </button>
                 <button
                   onClick={() => setQueueDisplayMode("TABLE")}
-                  className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-colors ${
+                  className={`px-2.5 py-1 rounded font-semibold cursor-pointer transition-colors ${
                     queueDisplayMode === "TABLE"
                       ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs"
                       : "text-slate-500"
@@ -1040,10 +1131,10 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
             {queueDisplayMode === "SPLIT" ? (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 {/* LEFT PANE (5 COLS): Priority Spool List */}
-                <div className="lg:col-span-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-4 space-y-2.5 shadow-sm max-h-[620px] overflow-y-auto">
-                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-500 dark:text-slate-400 pb-2 border-b border-slate-200 dark:border-slate-800">
-                    <span>DISPATCH ORDER (P0 &gt; P1 &gt; P2 &gt; P3)</span>
-                    <span>{filteredQueueItems.length} records</span>
+                <div className="lg:col-span-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-4 space-y-2.5 shadow-xs max-h-[620px] overflow-y-auto">
+                  <div className="flex items-center justify-between text-xs font-sans font-semibold text-slate-500 dark:text-slate-400 pb-2 border-b border-slate-200 dark:border-slate-800">
+                    <span>Dispatch Priority Order</span>
+                    <span className="font-mono text-[11px]">{filteredQueueItems.length} records</span>
                   </div>
 
                   {filteredQueueItems.map((item) => {
@@ -1055,14 +1146,14 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                         onClick={() => setSelectedQueueItemId(item.id)}
                         className={`p-3 rounded-lg border transition-all cursor-pointer space-y-1.5 ${
                           isSelected
-                            ? "border-blue-500 bg-blue-500/10 shadow-sm"
-                            : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700"
+                            ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 shadow-xs"
+                            : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 hover:border-slate-300 dark:hover:border-slate-700"
                         }`}
                       >
-                        <div className="flex items-center justify-between text-xs font-mono">
+                        <div className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
                                 item.priority_label === "P0"
                                   ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30"
                                   : item.priority_label === "P1"
@@ -1074,12 +1165,12 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                             >
                               {item.priority_label}
                             </span>
-                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                            <span className="font-bold font-mono text-slate-900 dark:text-slate-100">
                               {item.id}
                             </span>
                           </div>
                           <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
                               item.status === "RECONCILED"
                                 ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
                                 : "bg-amber-500/20 text-amber-600 dark:text-amber-400"
@@ -1089,11 +1180,11 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                           </span>
                         </div>
 
-                        <div className="text-xs font-mono text-slate-700 dark:text-slate-300 font-semibold truncate">
+                        <div className="text-xs text-slate-700 dark:text-slate-300 font-medium truncate font-sans">
                           {item.event_type}
                         </div>
 
-                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-200/60 dark:border-slate-800/60">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-200/60 dark:border-slate-800/60">
                           <span
                             data-testid="checksum-hash"
                             className="truncate max-w-[220px] font-mono text-[10px] text-slate-500 dark:text-slate-400"
@@ -1102,7 +1193,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                           </span>
                           <span
                             data-testid="checksum-verified-badge"
-                            className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 shrink-0 ml-2"
+                            className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 shrink-0 ml-2 font-mono text-[10px]"
                           >
                             <CheckCircle2 className="h-3 w-3" />
                             VERIFIED
@@ -1114,7 +1205,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 </div>
 
                 {/* RIGHT PANE (7 COLS): Selected Queue Item Deep Inspector */}
-                <div className="lg:col-span-7 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-5 space-y-4 shadow-sm">
+                <div className="lg:col-span-7 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-4 shadow-xs">
                   {activeQueueItem ? (
                     <>
                       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
@@ -1131,14 +1222,14 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                                   : "bg-slate-500/20 text-slate-600 dark:text-slate-400 border border-slate-500/30"
                               }`}
                             >
-                              PRIORITY {activeQueueItem.priority_label}
+                              Priority {activeQueueItem.priority_label}
                             </span>
                             <span className="text-base font-bold font-mono text-slate-900 dark:text-white">
                               {activeQueueItem.id}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                            Event Type: <strong>{activeQueueItem.event_type}</strong>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-sans">
+                            Event Type: <strong className="font-mono">{activeQueueItem.event_type}</strong>
                           </p>
                         </div>
 
@@ -1146,7 +1237,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                           <button
                             onClick={() => handleRetryQueueItem(activeQueueItem.id)}
                             disabled={actionLoading}
-                            className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 font-mono text-xs font-bold cursor-pointer transition-colors"
+                            className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 text-xs font-semibold cursor-pointer transition-colors"
                           >
                             Reverify
                           </button>
@@ -1154,15 +1245,15 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       </div>
 
                       {/* Cryptographic SHA-256 Inspection Card */}
-                      <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 space-y-1.5">
-                        <div className="flex items-center justify-between text-xs font-mono">
-                          <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs font-sans">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                             <Lock className="h-3.5 w-3.5 text-emerald-500" />
                             Canonical Payload SHA-256 Checksum
                           </span>
                           <span
                             data-testid="checksum-verified-badge"
-                            className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-1"
+                            className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-1"
                           >
                             <CheckCircle2 className="h-3 w-3" />
                             VERIFIED
@@ -1174,19 +1265,19 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                         >
                           {activeQueueItem.checksum_sha256}
                         </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center justify-between">
-                          <span>UTF-8 Normalized JSON hash</span>
-                          <span>Timestamp: {new Date(activeQueueItem.created_at).toUTCString()}</span>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between font-sans">
+                          <span>Normalized UTF-8 RFC 8259 Hash</span>
+                          <span className="font-mono">{new Date(activeQueueItem.created_at).toUTCString()}</span>
                         </div>
                       </div>
 
-                      {/* Formatted JSON Payload Inspector */}
+                      {/* Formatted JSON Payload Inspector with Crisp Framing */}
                       <div className="space-y-1.5">
-                        <div className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                          <span>Structured Event Payload (RFC 8259 Canonical Format)</span>
-                          <span className="text-[10px] text-slate-400">Strict Nonce &amp; State</span>
+                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between font-sans">
+                          <span>Structured Event Payload</span>
+                          <span className="text-[10px] text-slate-400 font-mono">RFC 8259 Canonical Format</span>
                         </div>
-                        <pre className="p-4 rounded-xl bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto border border-slate-800 leading-relaxed shadow-inner">
+                        <pre className="p-4 rounded-xl bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto border border-slate-700 dark:border-slate-800 leading-relaxed shadow-inner">
                           {(() => {
                             try {
                               return JSON.stringify(JSON.parse(activeQueueItem.payload_json), null, 2);
@@ -1198,28 +1289,28 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       </div>
                     </>
                   ) : (
-                    <div className="p-8 text-center text-slate-400 font-mono text-xs">
+                    <div className="p-8 text-center text-slate-400 font-sans text-xs">
                       No queue item selected
                     </div>
                   )}
                 </div>
               </div>
             ) : (
-              /* Full Table Mode (Accessible when needed) */
-              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-4 overflow-x-auto shadow-sm">
-                <table className="w-full text-left text-xs font-mono">
+              /* Full Table Mode */
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-4 overflow-x-auto shadow-xs">
+                <table className="w-full text-left text-xs font-sans">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 pb-2">
-                      <th className="p-2.5 font-bold">PRIORITY</th>
-                      <th className="p-2.5 font-bold">QUEUE ID</th>
-                      <th className="p-2.5 font-bold">EVENT TYPE &amp; PAYLOAD</th>
-                      <th className="p-2.5 font-bold">STATUS</th>
-                      <th className="p-2.5 font-bold">CANONICAL SHA-256 HASH</th>
-                      <th className="p-2.5 font-bold">INTEGRITY</th>
-                      <th className="p-2.5 font-bold text-right">ACTION</th>
+                      <th className="p-2.5 font-bold">Priority</th>
+                      <th className="p-2.5 font-bold">Queue ID</th>
+                      <th className="p-2.5 font-bold">Event Type &amp; Payload</th>
+                      <th className="p-2.5 font-bold">Status</th>
+                      <th className="p-2.5 font-bold">Canonical SHA-256 Hash</th>
+                      <th className="p-2.5 font-bold">Integrity</th>
+                      <th className="p-2.5 font-bold text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
                     {filteredQueueItems.map((item) => (
                       <tr
                         key={item.id}
@@ -1228,7 +1319,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       >
                         <td className="p-2.5">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
                               item.priority_label === "P0"
                                 ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30"
                                 : item.priority_label === "P1"
@@ -1241,16 +1332,16 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                             {item.priority_label}
                           </span>
                         </td>
-                        <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{item.id}</td>
+                        <td className="p-2.5 font-bold font-mono text-slate-900 dark:text-slate-100">{item.id}</td>
                         <td className="p-2.5 max-w-xs">
-                          <div className="font-bold text-slate-800 dark:text-slate-200">{item.event_type}</div>
-                          <div className="text-[10px] text-slate-500 truncate">
+                          <div className="font-semibold text-slate-800 dark:text-slate-200">{item.event_type}</div>
+                          <div className="text-[10px] text-slate-500 truncate font-mono">
                             {item.payload_json}
                           </div>
                         </td>
                         <td className="p-2.5">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
                               item.status === "RECONCILED"
                                 ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
                                 : "bg-amber-500/20 text-amber-600 dark:text-amber-400"
@@ -1267,7 +1358,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                         <td className="p-2.5">
                           <span
                             data-testid="checksum-verified-badge"
-                            className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 w-max"
+                            className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 w-max"
                           >
                             <CheckCircle2 className="h-3 w-3" />
                             VERIFIED
@@ -1276,7 +1367,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                         <td className="p-2.5 text-right">
                           <button
                             onClick={() => handleRetryQueueItem(item.id)}
-                            className="text-blue-600 hover:text-blue-500 font-bold text-xs"
+                            className="text-blue-600 hover:text-blue-500 font-semibold text-xs"
                           >
                             Reverify
                           </button>
@@ -1290,159 +1381,16 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
           </div>
         )}
 
-        {/* ── WORKSPACE 2: SCIENCE BUFFER VIEW ────────────────────── */}
-        {activeTab === "SCIENCE" && (
-          <div data-testid="science-instruments-card" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              {/* LEFT PANE (4 COLS): Scientific Instrument Deck */}
-              <div className="lg:col-span-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-4 space-y-3 shadow-sm">
-                <div className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-                  STATION SCIENCE PAYLOADS ({instruments?.length || 2})
-                </div>
-
-                <div className="space-y-2">
-                  {instruments?.map((inst) => {
-                    const instCode = inst.code || inst.id;
-                    const isSelected = activeInstrument && (activeInstrument.code || activeInstrument.id) === instCode;
-                    return (
-                      <div
-                        key={inst.id}
-                        data-testid={`instrument-list-item-${instCode}`}
-                        onClick={() => setSelectedInstrumentCode(instCode)}
-                        className={`p-3.5 rounded-lg border transition-all cursor-pointer space-y-1.5 ${
-                          isSelected
-                            ? "border-blue-500 bg-blue-500/10 shadow-sm"
-                            : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between text-xs font-mono">
-                          <div className="flex items-center gap-2">
-                            <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-[10px]">
-                              {instCode}
-                            </span>
-                            <span className="font-bold text-slate-900 dark:text-slate-100">
-                              {inst.name}
-                            </span>
-                          </div>
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              inst.health === "NOMINAL"
-                                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-                                : "bg-amber-500/20 text-amber-600 dark:text-amber-400"
-                            }`}
-                          >
-                            {inst.health}
-                          </span>
-                        </div>
-
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
-                          Buffer: <strong>{inst.buffered_observations_count} queued</strong> · Power:{" "}
-                          <strong>{inst.power_status}</strong>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* RIGHT PANE (8 COLS): Hero Instrument Operational Monitor */}
-              <div className="lg:col-span-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-5 space-y-5 shadow-sm">
-                {activeInstrument ? (
-                  <div data-testid={`instrument-${activeInstrument.code || activeInstrument.id}`} className="space-y-5">
-                    {/* Header */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
-                      <div>
-                        <div className="flex items-center gap-2 text-xs font-mono">
-                          <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold">
-                            {activeInstrument.code || activeInstrument.id}
-                          </span>
-                          <span className="text-slate-500 font-semibold">{activeInstrument.instrument_type}</span>
-                          <TruthBadge type="MEASURED" />
-                        </div>
-                        <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
-                          {activeInstrument.name}
-                        </h3>
-                      </div>
-
-                      {/* Buffer Action */}
-                      <button
-                        data-testid="buffer-observation-btn"
-                        onClick={() => handleBufferObservation(activeInstrument.id || activeInstrument.code || "INST-S17-RADAR")}
-                        disabled={actionLoading}
-                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-2"
-                      >
-                        <HardDrive className="h-4 w-4" />
-                        <span>Buffer Observation</span>
-                      </button>
-                    </div>
-
-                    {/* Telemetry Readouts Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                        <div className="text-[10px] text-slate-500">BUFFER POSTURE</div>
-                        <div className="font-bold text-base text-blue-600 dark:text-blue-400 mt-0.5">
-                          {activeInstrument.buffered_observations_count} queued
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-1">Circular Spool</div>
-                      </div>
-
-                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                        <div className="text-[10px] text-slate-500">POWER ALLOCATION</div>
-                        <div className="font-bold text-base text-slate-900 dark:text-slate-100 mt-0.5">
-                          {activeInstrument.power_status}
-                        </div>
-                        <div className="text-[10px] text-emerald-500 mt-1">Bus: Active Feed</div>
-                      </div>
-
-                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                        <div className="text-[10px] text-slate-500">INSTRUMENT HEALTH</div>
-                        <div className="font-bold text-base text-emerald-600 dark:text-emerald-400 mt-0.5">
-                          {activeInstrument.health}
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-1">Telemetry Valid</div>
-                      </div>
-
-                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
-                        <div className="text-[10px] text-slate-500">BUFFER RETENTION</div>
-                        <div className="font-bold text-base text-slate-900 dark:text-slate-100 mt-0.5">
-                          72 Hours
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-1">Retention Guarantee</div>
-                      </div>
-                    </div>
-
-                    {/* Scientific Continuity Statement */}
-                    <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 dark:bg-blue-950/20 space-y-1.5 text-xs font-mono">
-                      <div className="font-bold text-blue-700 dark:text-blue-300">
-                        Observation Continuity Protection Under Link Disruption:
-                      </div>
-                      <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-                        Ionospheric scintillation and polar auroral radar arrays log directly to high-reliability
-                        NVMe local buffers during communication outages. Data is preserved with SHA-256 cryptographic
-                        fingerprints and queued as P2 telemetry to ensure zero scientific data loss.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-8 text-center text-slate-400 font-mono text-xs">
-                    Select an instrument to view telemetry
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── WORKSPACE 3: INCIDENT BLAST RADIUS VIEW ──────────────── */}
+        {/* ── WORKSPACE 2: INCIDENT BLAST RADIUS VIEW ──────────────── */}
         {activeTab === "INCIDENTS" && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
             {/* LEFT (3 COLS): Incident List */}
             <div
               data-testid="incidents-list"
-              className="lg:col-span-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-4 space-y-2.5 shadow-sm"
+              className="lg:col-span-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-4 space-y-2.5 shadow-xs"
             >
-              <div className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
-                ACTIVE INCIDENTS ({incidents?.length || 1})
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
+                Active Incidents ({incidents?.length || 1})
               </div>
 
               {incidents?.map((inc) => {
@@ -1453,20 +1401,20 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                     onClick={() => setSelectedIncidentId(inc.id)}
                     className={`p-3 rounded-lg border transition-all cursor-pointer space-y-1 ${
                       isSelected
-                        ? "border-rose-500 bg-rose-500/10 shadow-sm"
-                        : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700"
+                        ? "border-rose-500 bg-rose-500/10 shadow-xs"
+                        : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 hover:border-slate-300 dark:hover:border-slate-700"
                     }`}
                   >
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="font-bold text-rose-600 dark:text-rose-400">{inc.id}</span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-600 dark:text-rose-400">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold font-mono text-rose-600 dark:text-rose-400">{inc.id}</span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-rose-500/20 text-rose-600 dark:text-rose-400">
                         {inc.severity}
                       </span>
                     </div>
-                    <div className="text-xs font-bold font-mono text-slate-900 dark:text-white truncate">
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                       {inc.title}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-500 flex items-center justify-between">
+                    <div className="text-[10px] text-slate-500 flex items-center justify-between">
                       <span>Status: {inc.status}</span>
                       <span>Actions: {inc.actions_count}</span>
                     </div>
@@ -1478,20 +1426,20 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
             {/* CENTER (5 COLS): Selected Incident & Blast Radius */}
             <div
               data-testid="incident-detail-panel"
-              className="lg:col-span-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-5 space-y-4 shadow-sm"
+              className="lg:col-span-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-4 shadow-xs"
             >
               {activeIncident ? (
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
                     <div>
-                      <div className="flex items-center gap-2 text-xs font-mono">
-                        <span className="font-bold text-rose-600 dark:text-rose-400">{activeIncident.id}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-600">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="font-bold font-mono text-rose-600 dark:text-rose-400">{activeIncident.id}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-rose-500/20 text-rose-600">
                           {activeIncident.severity}
                         </span>
                         <TruthBadge type="DERIVED" />
                       </div>
-                      <h3 className="text-base font-bold font-mono text-slate-900 dark:text-white mt-1">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1">
                         {activeIncident.title}
                       </h3>
                     </div>
@@ -1501,7 +1449,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                         <button
                           data-testid="resolve-incident-btn"
                           onClick={() => handleUpdateStatus("RESOLVED")}
-                          className="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-mono font-bold cursor-pointer"
+                          className="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold cursor-pointer"
                         >
                           Resolve Incident
                         </button>
@@ -1509,7 +1457,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                       <button
                         data-testid="record-memory-btn"
                         onClick={() => setIsMemoryModalOpen(true)}
-                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-blue-700 dark:text-blue-300 border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-blue-700 dark:text-blue-300 border border-slate-300 dark:border-slate-700 text-xs font-semibold cursor-pointer"
                       >
                         Record to Memory
                       </button>
@@ -1518,21 +1466,21 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
 
                   {/* Blast Radius Context Container */}
                   <div data-testid="incident-blast-radius" className="space-y-3">
-                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-1.5 text-xs font-mono">
-                      <div className="text-[10px] text-slate-500 uppercase font-bold">MODELED RISK SCORE</div>
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-1.5 text-xs">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">Modeled Risk Score</div>
                       <div className="flex items-center justify-between">
                         <span className="text-slate-600 dark:text-slate-400">Day 2 Risk Engine Score:</span>
                         <span
                           data-testid="incident-risk-score"
-                          className="text-base font-bold text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30"
+                          className="text-base font-bold font-mono text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30"
                         >
                           {activeIncident.modeled_risk_score} / 100
                         </span>
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-1.5 text-xs font-mono">
-                      <div className="text-[10px] text-slate-500 uppercase font-bold">AFFECTED EQUIPMENT (BLAST RADIUS)</div>
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-1.5 text-xs">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">Affected Equipment (Blast Radius)</div>
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         {activeIncident.affected_assets.map((ast) => (
                           <span
@@ -1551,14 +1499,14 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                   </div>
                 </>
               ) : (
-                <div className="p-8 text-center text-slate-400 font-mono text-xs">No incident selected</div>
+                <div className="p-8 text-center text-slate-400 font-sans text-xs">No incident selected</div>
               )}
             </div>
 
             {/* RIGHT (4 COLS): Operator Action Logging & Audit Trail */}
-            <div className="lg:col-span-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-5 space-y-4 shadow-sm">
-              <div className="text-xs font-mono font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-2">
-                HUMAN-IN-THE-LOOP ACTION LOGGING
+            <div className="lg:col-span-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-4 shadow-xs">
+              <div className="text-xs font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-2">
+                Human-in-the-Loop Action Logging
               </div>
 
               <form data-testid="log-action-form" onSubmit={handleLogAction} className="space-y-3">
@@ -1568,7 +1516,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                   placeholder="Action Code (e.g. EXPEDITE_VALVE_PURGE)"
                   value={newActionCode}
                   onChange={(e) => setNewActionCode(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-hidden focus:border-blue-500"
                   required
                 />
                 <textarea
@@ -1577,14 +1525,14 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                   value={newActionDesc}
                   onChange={(e) => setNewActionDesc(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-sans text-slate-900 dark:text-slate-100 focus:outline-hidden focus:border-blue-500"
                   required
                 />
                 <button
                   data-testid="submit-action-btn"
                   type="submit"
                   disabled={actionLoading}
-                  className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-colors cursor-pointer"
+                  className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors cursor-pointer"
                 >
                   Log Response Action
                 </button>
@@ -1592,7 +1540,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
 
               {/* Audit Trail */}
               <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                <div className="text-[11px] font-mono text-slate-500 font-bold uppercase">
+                <div className="text-[11px] font-semibold text-slate-500 uppercase">
                   Audit Trail ({activeIncident?.actions.length || 0})
                 </div>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
@@ -1600,15 +1548,15 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                     <div
                       key={act.id}
                       data-testid="action-item"
-                      className="p-2 rounded bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-[11px] font-mono space-y-0.5"
+                      className="p-2 rounded bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-[11px] space-y-0.5"
                     >
-                      <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+                      <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200 font-mono">
                         <span>{act.action_code}</span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-slate-400 font-normal">
                           {new Date(act.executed_at).toLocaleTimeString()}
                         </span>
                       </div>
-                      <p className="text-slate-600 dark:text-slate-400 text-[10px]">{act.description}</p>
+                      <p className="text-slate-600 dark:text-slate-400 text-[11px] font-sans">{act.description}</p>
                     </div>
                   ))}
                 </div>
@@ -1617,16 +1565,16 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
           </div>
         )}
 
-        {/* ── WORKSPACE 4: BLAST RADIUS GRAPH (HERO) ──────────────── */}
+        {/* ── WORKSPACE 3: BLAST RADIUS GRAPH (HERO TOPOLOGY) ─────── */}
         {activeTab === "GRAPH" && (
           <div className="space-y-4">
-            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 space-y-2">
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
                 <div>
-                  <h3 className="text-sm font-bold font-mono text-slate-900 dark:text-white uppercase tracking-wider">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     Full-Width Blast Radius &amp; Operational Dependency Cascade
                   </h3>
-                  <p className="text-xs font-mono text-slate-500">
+                  <p className="text-xs text-slate-500">
                     Propagating failure pathway: Generator G-02 → Secondary Thermal/Power Bus → Critical Services
                   </p>
                 </div>
@@ -1645,18 +1593,159 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
           </div>
         )}
 
+        {/* ── WORKSPACE 4: SCIENCE BUFFER VIEW ────────────────────── */}
+        {activeTab === "SCIENCE" && (
+          <div data-testid="science-instruments-card" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* LEFT PANE (4 COLS): Scientific Instrument Deck */}
+              <div className="lg:col-span-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-4 space-y-3 shadow-xs">
+                <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
+                  Station Science Payloads ({instruments?.length || 2})
+                </div>
+
+                <div className="space-y-2">
+                  {instruments?.map((inst) => {
+                    const instCode = inst.code || inst.id;
+                    const isSelected = activeInstrument && (activeInstrument.code || activeInstrument.id) === instCode;
+                    return (
+                      <div
+                        key={inst.id}
+                        data-testid={`instrument-list-item-${instCode}`}
+                        onClick={() => setSelectedInstrumentCode(instCode)}
+                        className={`p-3.5 rounded-lg border transition-all cursor-pointer space-y-1.5 ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 shadow-xs"
+                            : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 hover:border-slate-300 dark:hover:border-slate-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold font-mono text-[10px]">
+                              {instCode}
+                            </span>
+                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                              {inst.name}
+                            </span>
+                          </div>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold font-mono ${
+                              inst.health === "NOMINAL"
+                                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                : "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                            }`}
+                          >
+                            {inst.health}
+                          </span>
+                        </div>
+
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          Buffer: <strong>{inst.buffered_observations_count} queued</strong> · Power:{" "}
+                          <strong>{inst.power_status}</strong>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* RIGHT PANE (8 COLS): Selected Instrument Monitor */}
+              <div className="lg:col-span-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-5 shadow-xs">
+                {activeInstrument ? (
+                  <div data-testid={`instrument-${activeInstrument.code || activeInstrument.id}`} className="space-y-5">
+                    {/* Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+                      <div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold font-mono">
+                            {activeInstrument.code || activeInstrument.id}
+                          </span>
+                          <span className="text-slate-500 font-semibold">{activeInstrument.instrument_type}</span>
+                          <TruthBadge type="MEASURED" />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+                          {activeInstrument.name}
+                        </h3>
+                      </div>
+
+                      {/* Buffer Action */}
+                      <button
+                        data-testid="buffer-observation-btn"
+                        onClick={() => handleBufferObservation(activeInstrument.id || activeInstrument.code || "INST-S17-RADAR")}
+                        disabled={actionLoading}
+                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all shadow-xs cursor-pointer flex items-center gap-2"
+                      >
+                        <HardDrive className="h-4 w-4" />
+                        <span>Buffer Observation</span>
+                      </button>
+                    </div>
+
+                    {/* Telemetry Readouts Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+                        <div className="text-[10px] text-slate-500 uppercase font-semibold">Buffer Posture</div>
+                        <div className="font-bold font-mono text-base text-blue-600 dark:text-blue-400 mt-0.5">
+                          {activeInstrument.buffered_observations_count} queued
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1">Circular Spool</div>
+                      </div>
+
+                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+                        <div className="text-[10px] text-slate-500 uppercase font-semibold">Power Allocation</div>
+                        <div className="font-bold font-mono text-base text-slate-900 dark:text-slate-100 mt-0.5">
+                          {activeInstrument.power_status}
+                        </div>
+                        <div className="text-[10px] text-emerald-500 mt-1">Bus: Active Feed</div>
+                      </div>
+
+                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+                        <div className="text-[10px] text-slate-500 uppercase font-semibold">Instrument Health</div>
+                        <div className="font-bold font-mono text-base text-emerald-600 dark:text-emerald-400 mt-0.5">
+                          {activeInstrument.health}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1">Telemetry Valid</div>
+                      </div>
+
+                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40">
+                        <div className="text-[10px] text-slate-500 uppercase font-semibold">Buffer Retention</div>
+                        <div className="font-bold font-mono text-base text-slate-900 dark:text-slate-100 mt-0.5">
+                          72 Hours
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1">Retention Guarantee</div>
+                      </div>
+                    </div>
+
+                    {/* Scientific Continuity Statement */}
+                    <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20 space-y-1.5 text-xs">
+                      <div className="font-semibold text-blue-700 dark:text-blue-300">
+                        Observation Continuity Under Link Disruption:
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-400 leading-relaxed font-sans">
+                        Observations stream directly to local high-reliability NVMe ring buffers during outages. Records receive SHA-256 cryptographic fingerprints and are prioritized as P2 telemetry for deterministic bulk reconciliation upon carrier restoration.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-slate-400 font-sans text-xs">
+                    Select an instrument to view telemetry
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── WORKSPACE 5: OPERATIONAL MEMORY VIEW ─────────────────── */}
         {activeTab === "MEMORY" && (
           <div
             data-testid="operational-memory-panel"
-            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-5 space-y-5 shadow-sm"
+            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 p-5 space-y-5 shadow-xs"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
               <div>
-                <div className="text-[10px] font-mono font-bold tracking-widest text-emerald-600 dark:text-emerald-400 uppercase">
-                  INSTITUTIONAL KNOWLEDGE ARCHIVE
+                <div className="text-[10px] font-bold tracking-widest text-emerald-600 dark:text-emerald-400 uppercase">
+                  Institutional Knowledge Archive
                 </div>
-                <h3 className="text-lg font-bold font-mono text-slate-900 dark:text-white">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                   Station Operational Memory &amp; Post-Mortem Records
                 </h3>
               </div>
@@ -1670,7 +1759,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                   placeholder="Search memory (e.g. 'Boiler')..."
                   value={memorySearchQuery}
                   onChange={(e) => setMemorySearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                  className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-xs font-sans text-slate-900 dark:text-slate-100 focus:outline-hidden focus:border-blue-500"
                 />
               </div>
             </div>
@@ -1681,16 +1770,16 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 <div
                   key={item.id}
                   data-testid="memory-card"
-                  className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-2.5 text-xs font-mono"
+                  className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/40 space-y-2.5 text-xs"
                 >
                   <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-                    <span className="font-bold text-blue-600 dark:text-blue-400">{item.title}</span>
-                    <span className="text-[10px] text-slate-400">
+                    <span className="font-bold text-blue-600 dark:text-blue-400 font-sans">{item.title}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">
                       {new Date(item.created_at).toLocaleDateString()}
                     </span>
                   </div>
 
-                  <div className="space-y-1.5 text-[11px]">
+                  <div className="space-y-1.5 text-[11px] font-sans">
                     <div>
                       <strong className="text-slate-700 dark:text-slate-300">Decision:</strong>{" "}
                       <span className="text-slate-600 dark:text-slate-400">{item.decision}</span>
@@ -1714,63 +1803,12 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
         )}
       </section>
 
-      {/* ─────────────────────────────────────────────────────────────
-          LAYER 4 — CONTEXTUAL STATION RESILIENCE SUMMARY
-          Compact Operational Summary at Bottom of Main Page
-          ───────────────────────────────────────────────────────────── */}
-      <section
-        aria-label="Station Resilience Summary"
-        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-[#0c1017]/80 p-5 shadow-inner backdrop-blur-sm"
-      >
-        <div className="text-[10px] font-mono font-bold tracking-widest text-slate-500 dark:text-slate-400 uppercase mb-3">
-          STATION RESILIENCE OPERATIONAL SUMMARY
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
-          <div className="space-y-0.5">
-            <span className="text-[10px] text-slate-500 uppercase">LOCAL OPERATIONS</span>
-            <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-              <span
-                className={`h-2 w-2 rounded-full ${isOffline ? "bg-amber-500" : "bg-emerald-500"}`}
-              />
-              <span>{isOffline ? "Autonomous Degraded" : "Normal Connected"}</span>
-            </div>
-            <p className="text-[10px] text-slate-500">Life-support &amp; microgrid autonomous</p>
-          </div>
-
-          <div className="space-y-0.5">
-            <span className="text-[10px] text-slate-500 uppercase">SYNC SPOOL QUEUE</span>
-            <div className="font-bold text-amber-600 dark:text-amber-400">
-              {pendingCount} Pending Deltas
-            </div>
-            <p className="text-[10px] text-slate-500">Strict deterministic P0–P3 queue</p>
-          </div>
-
-          <div className="space-y-0.5">
-            <span className="text-[10px] text-slate-500 uppercase">DATA INTEGRITY</span>
-            <div className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3" />
-              <span>SHA-256 Verified</span>
-            </div>
-            <p className="text-[10px] text-slate-500">Canonical JSON payload checksums</p>
-          </div>
-
-          <div className="space-y-0.5">
-            <span className="text-[10px] text-slate-500 uppercase">SCIENCE CONTINUITY</span>
-            <div className="font-bold text-blue-600 dark:text-blue-400">
-              S-17 Nominal ({totalScienceBuffered} queued)
-            </div>
-            <p className="text-[10px] text-slate-500">Circular NVMe observation buffers</p>
-          </div>
-        </div>
-      </section>
-
       {/* Record Memory Modal */}
       {isMemoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#121724] border border-slate-300 dark:border-slate-700 p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="text-sm font-bold font-mono text-slate-900 dark:text-white">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 Record Incident Post-Mortem to Operational Memory
               </h3>
               <button
@@ -1781,47 +1819,47 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveMemory} className="space-y-3 font-mono text-xs">
+            <form onSubmit={handleSaveMemory} className="space-y-3 text-xs font-sans">
               <div>
-                <label className="text-[10px] text-slate-500 block mb-1">DECISION TAKEN</label>
+                <label className="text-[10px] text-slate-500 font-semibold block mb-1 uppercase">Decision Taken</label>
                 <input
                   type="text"
                   value={memDecision}
                   onChange={(e) => setMemDecision(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   required
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-slate-500 block mb-1">OPERATIONAL ACTION</label>
+                <label className="text-[10px] text-slate-500 font-semibold block mb-1 uppercase">Operational Action</label>
                 <input
                   type="text"
                   value={memAction}
                   onChange={(e) => setMemAction(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   required
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-slate-500 block mb-1">OUTCOME</label>
+                <label className="text-[10px] text-slate-500 font-semibold block mb-1 uppercase">Outcome</label>
                 <input
                   type="text"
                   value={memOutcome}
                   onChange={(e) => setMemOutcome(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   required
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-slate-500 block mb-1">LESSON LEARNED</label>
+                <label className="text-[10px] text-slate-500 font-semibold block mb-1 uppercase">Lesson Learned</label>
                 <textarea
                   value={memLesson}
                   onChange={(e) => setMemLesson(e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   required
                 />
               </div>
@@ -1830,14 +1868,14 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsMemoryModalOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold"
+                  className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold"
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold cursor-pointer"
                 >
                   Save to Archive
                 </button>

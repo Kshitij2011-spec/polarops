@@ -155,33 +155,41 @@ export function SettingsPage() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-12">
       {/* ── Page Header ── */}
-      <div className="border-b border-slate-200 dark:border-slate-800 pb-5">
-        <div className="text-[11px] font-mono tracking-widest text-[#369ACC] dark:text-[#46B9C7] font-bold uppercase mb-1">
-          OPERATIONAL CONFIGURATION
-        </div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold font-sans text-slate-900 dark:text-white tracking-tight">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-sans text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-blue-600 dark:text-blue-400">
               System Settings
-            </h1>
-            <p className="text-sm font-sans text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-              Configure local client environment, appearance, operational preferences, and telemetry filters.
-            </p>
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">·</span>
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              Operational Configuration
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowResetConfirm(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-sans font-medium hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-colors cursor-pointer shadow-xs focus-visible:ring-2 focus-visible:ring-[#369ACC]"
-              title="Reset all local client settings to factory defaults"
-            >
-              <RotateCcw size={13} className="text-slate-500" />
-              <span>Restore Defaults</span>
-            </button>
+          <div className="flex items-center gap-2.5">
+            <Sliders className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              System Settings
+            </h1>
           </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl">
+            Configure local client environment, appearance, operational preferences, and telemetry filters.
+          </p>
         </div>
-      </div>
+
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowResetConfirm(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-sans font-medium hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-colors cursor-pointer shadow-xs focus-visible:ring-2 focus-visible:ring-blue-500"
+            title="Reset all local client settings to factory defaults"
+          >
+            <RotateCcw size={13} className="text-slate-500" />
+            <span>Restore Defaults</span>
+          </button>
+        </div>
+      </header>
 
       {/* ── Live Notification Feedback Banner (notice) ── */}
       {feedback && (

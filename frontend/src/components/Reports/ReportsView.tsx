@@ -331,30 +331,32 @@ Weather: ${overview?.ambient_weather?.conditions ?? "BLIZZARD"} (${overview?.amb
   return (
     <div className="space-y-2.5 max-w-[1600px] mx-auto pb-10">
       {/* ── 1. COMPACT HEADER ────────────────────────────────────── */}
-      <div className="border-b border-slate-200/80 dark:border-slate-800 pb-2 flex flex-col md:flex-row md:items-center justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <span className="text-xs font-mono font-bold tracking-widest text-[#369ACC] dark:text-[#46B9C7] uppercase">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-sans text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-blue-600 dark:text-blue-400 font-mono text-[11px] tracking-wider uppercase">
               MISSION RECORD
             </span>
-            <span className="text-slate-300 dark:text-slate-700 text-xs">·</span>
-            <span className="text-xs font-semibold font-sans text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <Radio className="h-3 w-3 text-[#369ACC]" />
+            <span className="text-slate-300 dark:text-slate-700">·</span>
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase">
               {activeStationId.replace(/^STATION-/, "")} BASE
             </span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold font-sans tracking-tight text-slate-900 dark:text-white leading-tight">
-            Operational Reports
-          </h1>
-          <p className="text-xs sm:text-sm font-sans text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">
-            Review and export station status, incident and simulation records.
+          <div className="flex items-center gap-2.5">
+            <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Operational Reports
+            </h1>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl">
+            Review and export station status, incident logs, and simulation records.
           </p>
         </div>
 
         {/* Header Right Status & Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 text-xs font-sans shadow-2xs">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 text-xs font-sans shadow-2xs">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
@@ -362,7 +364,7 @@ Weather: ${overview?.ambient_weather?.conditions ?? "BLIZZARD"} (${overview?.amb
             <span className="font-semibold text-slate-900 dark:text-slate-100">
               Telemetry Online
             </span>
-            <span className="text-slate-500 dark:text-slate-400 font-mono">· {totalCount} Archives Synced</span>
+            <span className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">· {totalCount} Archives Synced</span>
           </div>
 
           <TruthBadge type="DERIVED" />
@@ -370,7 +372,8 @@ Weather: ${overview?.ambient_weather?.conditions ?? "BLIZZARD"} (${overview?.amb
           <button
             onClick={handleRefreshAll}
             title="Refresh All Report Telemetry"
-            className="p-1 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer shadow-2xs"
+            aria-label="Refresh all report telemetry"
+            className="p-2 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer shadow-2xs"
           >
             <RefreshCw
               className={`h-3.5 w-3.5 ${
@@ -379,7 +382,7 @@ Weather: ${overview?.ambient_weather?.conditions ?? "BLIZZARD"} (${overview?.amb
             />
           </button>
         </div>
-      </div>
+      </header>
 
       {/* ── FEEDBACK NOTICE (Preserves existing notice message) ───── */}
       {msg && (

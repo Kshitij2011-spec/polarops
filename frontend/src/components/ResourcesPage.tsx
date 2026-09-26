@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useSearch, useNavigate } from "@tanstack/react-router";
 import {
   Flame,
+  Fuel,
   Zap,
   Package,
   Ship,
@@ -157,9 +158,10 @@ export function ResourcesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="BHARATI STATION · OPERATIONAL RESOURCE & RECOVERY COMMAND"
-        title="Resource & Logistics Command"
-        subtitle="Autonomous capacity modeling, critical spare inventory, fuel endurance projections, and multi-station mutual aid."
+        eyebrow={`Operational Resource Command · ${stationId === "STATION-MAITRI" ? "Maitri Base" : "Bharati Station"}`}
+        title="Resource & Logistics"
+        subtitle="Current station resources, consumption and operational reserves."
+        icon={Fuel}
         status={
           fuel
             ? `${fuel.projected_runway_days}d RUNWAY · ${fuel.resupply_gap_days > 0 ? "GAP IDENTIFIED" : "NOMINAL"}`

@@ -184,43 +184,50 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
   );
 
   return (
-    <div className="space-y-12 animate-fade-in pb-24 font-sans text-slate-800 dark:text-slate-200" data-testid="stations-view">
+    <div className="space-y-6 animate-fade-in pb-20 font-sans text-slate-800 dark:text-slate-200" data-testid="stations-view">
       {/* ── LEVEL 1: Header ────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-200/80 dark:border-slate-800/80 pb-6">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 mb-2">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-sans text-slate-500 dark:text-slate-400">
             <button
               onClick={onBack}
               aria-label="Return to Station Command Center"
               data-testid="stations-back-btn"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="flex items-center gap-1 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors cursor-pointer"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back to Command Center</span>
+              <span>Command Center</span>
             </button>
-            <span className="text-muted-foreground/40 text-xs">/</span>
-            <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+            <span className="text-slate-300 dark:text-slate-700">/</span>
+            <span className="font-semibold text-blue-600 dark:text-blue-400">
+              Stations
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">·</span>
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
               Antarctic Station Network
             </span>
           </div>
 
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-            STATIONS
-          </h1>
-          <p className="text-base text-muted-foreground">
+          <div className="flex items-center gap-2.5">
+            <Radio className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              STATIONS
+            </h1>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl">
             Cross-station operational overview and resource headroom.
           </p>
         </div>
 
         {/* Header Right Status & Controls */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 text-xs shadow-2xs">
-            <span className="relative flex h-2.5 w-2.5">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 text-xs shadow-2xs">
+            <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
             <span className="font-semibold text-slate-900 dark:text-slate-100">Network Online</span>
-            <span className="text-muted-foreground">· 2 Bases Monitored</span>
+            <span className="text-muted-foreground font-mono text-[11px]">· 2 Bases Monitored</span>
           </div>
 
           <TruthBadge type="DERIVED" />
@@ -234,7 +241,7 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
               }
             }}
             data-testid="stations-explain-btn"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium text-primary bg-primary/10 hover:bg-primary/15 border border-primary/25 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/15 border border-blue-500/25 transition-colors cursor-pointer"
           >
             <HelpCircle className="h-3.5 w-3.5" />
             <span>Comparison Context</span>
@@ -243,12 +250,13 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
           <button
             onClick={loadComparison}
             title="Refresh Station Telemetry"
-            className="p-2 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shadow-2xs"
+            aria-label="Refresh station telemetry"
+            className="p-2 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shadow-2xs"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
-      </div>
+      </header>
 
       {/* ── LEVEL 2: Primary Station Cards (2-Column Grid) ───────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

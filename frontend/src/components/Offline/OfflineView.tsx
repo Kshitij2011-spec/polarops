@@ -56,63 +56,68 @@ export function OfflineView() {
   return (
     <div className="space-y-4 animate-in fade-in duration-150">
       {/* ========================================================
-          COMPACT OPERATIONAL HEADER (Font size preserved exactly)
+          PAGE HEADER: COMPACT OPERATIONAL REFERENCE
           ======================================================== */}
-      <header className="pb-2 pt-0 border-b border-slate-200 dark:border-slate-800 select-none">
-        {/* ROW 1: Title & Grouped Right Context Area */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <h1 className="page-title text-slate-900 dark:text-white">
-            Offline Operations
-          </h1>
-
-          {/* Grouped Right Context Area */}
-          <div className="inline-flex items-center gap-2 sm:gap-2.5 px-3 py-1.5 rounded-lg bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 text-xs shrink-0">
-            {/* Connection Status Badge */}
-            <div className="inline-flex items-center gap-1.5 font-sans font-semibold">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  offline ? "bg-slate-400 dark:bg-slate-500" : "bg-emerald-500"
-                }`}
-                aria-hidden="true"
-              />
-              <span className={offline ? "text-slate-700 dark:text-slate-300" : "text-emerald-700 dark:text-emerald-400"}>
-                {offline ? "OFFLINE" : "ONLINE LINK"}
-              </span>
-            </div>
-
-            <span className="text-slate-300 dark:text-slate-600 font-light select-none" aria-hidden="true">|</span>
-
-            {/* Dynamic Station Context */}
-            <div className="inline-flex items-center gap-1">
-              <span className="font-sans font-medium text-slate-800 dark:text-slate-200">
-                {activeStation.name.replace("Station", "").trim()}
-              </span>
-              <span className="font-mono text-xs font-semibold text-[#369ACC] dark:text-[#46B9C7]">
-                [{activeStation.code}]
-              </span>
-            </div>
-
-            <span className="text-slate-300 dark:text-slate-600 font-light select-none" aria-hidden="true">|</span>
-
-            {/* Last Synchronized Timestamp */}
-            <div className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-              <Clock size={12} className="text-slate-400 shrink-0" />
-              <span className="font-sans">Sync:</span>
-              <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
-                {demoOfflineState.lastAcknowledged}
-              </span>
-            </div>
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-sans text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-blue-600 dark:text-blue-400">
+              Offline Operations
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">·</span>
+            <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+              Resilient Local-First
+            </span>
           </div>
+
+          <div className="flex items-center gap-2.5">
+            <CloudOff className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Offline Operations
+            </h1>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl">
+            Station operational picture remains fully accessible during satellite and network degradation.
+          </p>
         </div>
 
-        {/* ROW 2: Context Eyebrow + Unified Operational Description */}
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-slate-600 dark:text-slate-400 text-[15px] sm:text-[16px] leading-normal font-normal font-sans">
-          <span className="eyebrow text-[#369ACC] dark:text-[#46B9C7] inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold tracking-wide uppercase shrink-0">
-            <Radio size={13} className="shrink-0" />
-            <span>RESILIENT LOCAL-FIRST OPERATIONS</span>
-          </span>
-          <span className="text-slate-300 dark:text-slate-700 hidden sm:inline select-none" aria-hidden="true">·</span>
-          <span>Station operational picture remains fully accessible during satellite/network degradation.</span>
+        {/* Grouped Right Context Area */}
+        <div className="inline-flex items-center gap-2 sm:gap-2.5 px-3 py-1.5 rounded-lg bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/80 text-xs shrink-0 flex-wrap">
+          {/* Connection Status Badge */}
+          <div className="inline-flex items-center gap-1.5 font-sans font-semibold">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                offline ? "bg-slate-400 dark:bg-slate-500" : "bg-emerald-500"
+              }`}
+              aria-hidden="true"
+            />
+            <span className={offline ? "text-slate-700 dark:text-slate-300" : "text-emerald-700 dark:text-emerald-400"}>
+              {offline ? "OFFLINE" : "ONLINE LINK"}
+            </span>
+          </div>
+
+          <span className="text-slate-300 dark:text-slate-600 font-light select-none" aria-hidden="true">|</span>
+
+          {/* Dynamic Station Context */}
+          <div className="inline-flex items-center gap-1">
+            <span className="font-sans font-medium text-slate-800 dark:text-slate-200">
+              {activeStation.name.replace("Station", "").trim()}
+            </span>
+            <span className="font-mono text-xs font-semibold text-[#369ACC] dark:text-[#46B9C7]">
+              [{activeStation.code}]
+            </span>
+          </div>
+
+          <span className="text-slate-300 dark:text-slate-600 font-light select-none" aria-hidden="true">|</span>
+
+          {/* Last Synchronized Timestamp */}
+          <div className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+            <Clock size={12} className="text-slate-400 shrink-0" />
+            <span className="font-sans">Sync:</span>
+            <span className="font-mono font-medium text-slate-700 dark:text-slate-300">
+              {demoOfflineState.lastAcknowledged}
+            </span>
+          </div>
         </div>
       </header>
 

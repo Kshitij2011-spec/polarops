@@ -75,44 +75,43 @@ export function CommandCenterView() {
   return (
     <div className="space-y-5 max-w-[1600px] mx-auto font-sans pb-10">
       {/* ── 01: COMPACT OPERATIONAL HEADER ───────────────────────────────── */}
-      <header className="border-b border-slate-200/80 dark:border-slate-800 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-3 font-sans">
-        <div>
-          <div className="text-[10px] font-sans tracking-wider text-primary font-semibold uppercase flex items-center gap-2">
-            <span>COMMAND CENTER</span>
-            <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
-            <span className="text-slate-400 dark:text-slate-500 font-mono text-[10px]">
-              {stationId === "STATION-MAITRI"
-                ? "MAITRI · 70°46′S 11°44′E"
-                : "STATION BHARATI · WINTER OPERATIONS"}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs font-sans text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-blue-600 dark:text-blue-400">
+              Command Center
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">/</span>
+            <span className="font-medium text-slate-800 dark:text-slate-200">
+              {stationId === "STATION-MAITRI" ? "Maitri Base" : "Bharati Station"}
+            </span>
+            <span className="text-slate-300 dark:text-slate-700">·</span>
+            <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+              {stationId === "STATION-MAITRI" ? "70°46′S 11°44′E" : "Winter Operations"}
             </span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight mt-0.5">
-            Operational Command Center
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
+          <div className="flex items-center gap-2.5">
+            <Activity className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Operational Command Center
+            </h1>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl">
             High-priority attention items, active deviations, and immediate operational controls.
           </p>
         </div>
 
-        {/* Operational Context Badges */}
-        <div className="flex items-center gap-2 font-sans text-xs">
-          {/* Station Selector context */}
-          <div className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 text-xs font-medium">
-            <Compass className="w-3.5 h-3.5 text-primary" />
-            <span className="text-slate-700 dark:text-slate-300 font-semibold">
-              {stationId === "STATION-MAITRI" ? "Maitri Base" : "Bharati Station"}
-            </span>
-          </div>
-
+        {/* Operational Controls & Status Toolbar */}
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {/* Telemetry link status */}
-          <div className="px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 text-xs font-medium">
+          <div className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 text-xs font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="font-mono text-[11px] font-semibold">SAT-1 LIVE</span>
           </div>
 
           {/* Overall Station Status */}
           <div
-            className={`px-2.5 py-1 rounded-xl border text-xs font-semibold flex items-center gap-1.5 ${
+            className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 ${
               (stationStatus as string) === "CRITICAL"
                 ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30"
                 : (stationStatus as string) === "WATCH" || (stationStatus as string) === "WARNING"
@@ -131,6 +130,16 @@ export function CommandCenterView() {
             />
             <span className="font-sans font-bold">STATUS: {stationStatus}</span>
           </div>
+
+          {/* Refresh Action */}
+          <button
+            onClick={retryAll}
+            title="Refresh All Feeds"
+            aria-label="Refresh operational telemetry"
+            className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${overviewLoading ? "animate-spin" : ""}`} />
+          </button>
         </div>
       </header>
 

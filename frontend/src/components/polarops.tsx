@@ -1,5 +1,5 @@
-﻿import { Link, useRouterState, useSearch, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { Link, useRouterState, useSearch, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, useCallback, useLayoutEffect, useMemo, type ReactNode } from "react";
 import { Activity, AlertTriangle, ArrowDown, ArrowRight, BarChart3, Bell, Boxes, ChevronDown, ChevronRight, CircleGauge, ClipboardCheck, Clock, CloudOff, Download, Droplets, FileText, Fuel, Grid3X3, Menu, Minus, Moon, Plus, Radio, RefreshCw, RotateCcw, Satellite, Settings, ShieldAlert, ShieldCheck, Sun, UserRound, Users, UtensilsCrossed, Wrench, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -69,60 +69,58 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return "light";
   });
 
-  const [dark, setDark] = useState<boolean>(() => {
+  const [systemDark, setSystemDark] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      const savedMode = localStorage.getItem("polarops-theme-mode");
-      if (savedMode === "dark") return true;
-      if (savedMode === "light") return false;
-      if (savedMode === "system") {
-        return window.matchMedia("(prefers-color-scheme: dark)").matches;
-      }
-      const saved = localStorage.getItem("polarops-theme");
-      if (saved) return saved === "dark";
-      if (document.documentElement.classList.contains("dark")) return true;
       return window.matchMedia("(prefers-color-scheme: dark)").matches;
     }
     return false;
   });
 
-  // Apply theme to DOM and keep localStorage in sync
-  useEffect(() => {
-    const applyTheme = (isDark: boolean) => {
-      document.documentElement.classList.toggle("dark", isDark);
-      localStorage.setItem("polarops-theme", isDark ? "dark" : "light");
-    };
+  // Calculate resolved dark flag synchronously without delay
+  const dark = themeMode === "system" ? systemDark : themeMode === "dark";
 
-    if (themeMode === "system") {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const handleChange = (e: MediaQueryListEvent) => {
-        setDark(e.matches);
-        applyTheme(e.matches);
-      };
-      const initialMatches = mediaQuery.matches;
-      setDark(initialMatches);
-      applyTheme(initialMatches);
-      mediaQuery.addEventListener("change", handleChange);
-      return () => mediaQuery.removeEventListener("change", handleChange);
-    } else {
-      const isDark = themeMode === "dark";
-      setDark(isDark);
-      applyTheme(isDark);
-    }
+  // Listen to system preference changes if mode is system
+  useEffect(() => {
+    if (themeMode !== "system") return;
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (e: MediaQueryListEvent) => {
+      setSystemDark(e.matches);
+    };
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, [themeMode]);
 
-  const toggle = () => {
-    const nextMode: ThemeMode = dark ? "light" : "dark";
-    setThemeModeState(nextMode);
-    localStorage.setItem("polarops-theme-mode", nextMode);
-  };
+  // Synchronously apply theme class to DOM before paint to prevent visual flash/lag
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("polarops-theme", dark ? "dark" : "light");
+    localStorage.setItem("polarops-theme-mode", themeMode);
+  }, [dark, themeMode]);
 
-  const setThemeMode = (mode: ThemeMode) => {
-    setThemeModeState(mode);
+  const toggle = useCallback(() => {
+    const nextMode: ThemeMode = dark ? "light" : "dark";
+    // Synchronously mutate DOM class immediately before React render
+    document.documentElement.classList.toggle("dark", nextMode === "dark");
+    localStorage.setItem("polarops-theme", nextMode);
+    localStorage.setItem("polarops-theme-mode", nextMode);
+    setThemeModeState(nextMode);
+  }, [dark]);
+
+  const setThemeMode = useCallback((mode: ThemeMode) => {
+    const nextDark = mode === "system" ? (typeof window !== "undefined" ? window.matchMedia("(prefers-color-scheme: dark)").matches : false) : mode === "dark";
+    document.documentElement.classList.toggle("dark", nextDark);
+    localStorage.setItem("polarops-theme", nextDark ? "dark" : "light");
     localStorage.setItem("polarops-theme-mode", mode);
-  };
+    setThemeModeState(mode);
+  }, []);
+
+  const value = useMemo(
+    () => ({ dark, themeMode, toggle, setThemeMode }),
+    [dark, themeMode, toggle, setThemeMode]
+  );
 
   return (
-    <ThemeContext.Provider value={{ dark, themeMode, toggle, setThemeMode }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );
@@ -205,7 +203,53 @@ export function LandingPage() {
 }
 
 export function StatusBadge({ value, className = "" }: { value: string; className?: string }) { const k = value.toLowerCase(); return <span className={`status-badge status-${k} ${className}`}>{value}</span>; }
-export function PageHeader({ eyebrow, title, subtitle, status, statusClassName = "text-[12.5px] font-semibold" }: { eyebrow?: string; title: string; subtitle: string; status?: string; statusClassName?: string }) { return <div className="mb-7 flex flex-col sm:flex-row sm:items-end justify-between gap-4"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h1 className="page-title">{title}</h1><p className="text-muted-foreground mt-2 max-w-4xl text-[16px] sm:text-[17px] leading-relaxed font-normal">{subtitle}</p></div>{status && <StatusBadge value={status} className={statusClassName} />}</div>; }
+export function PageHeader({
+  eyebrow,
+  title,
+  subtitle,
+  status,
+  statusClassName = "text-xs font-semibold",
+  icon: Icon,
+  actions,
+}: {
+  eyebrow?: string;
+  title: string;
+  subtitle: string;
+  status?: string;
+  statusClassName?: string;
+  icon?: React.ElementType;
+  actions?: ReactNode;
+}) {
+  return (
+    <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4 mb-6">
+      <div className="space-y-1">
+        {eyebrow && (
+          <div className="flex items-center gap-2 text-xs font-sans text-slate-500 dark:text-slate-400">
+            <span className="font-semibold text-blue-600 dark:text-blue-400">
+              {eyebrow}
+            </span>
+          </div>
+        )}
+        <div className="flex items-center gap-2.5">
+          {Icon && <Icon className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />}
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            {title}
+          </h1>
+        </div>
+        <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl">
+          {subtitle}
+        </p>
+      </div>
+
+      {(status || actions) && (
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {status && <StatusBadge value={status} className={statusClassName} />}
+          {actions}
+        </div>
+      )}
+    </header>
+  );
+}
 export function Panel({ title, subtitle, children, className = "", action }: { title: string; subtitle?: string; children: ReactNode; className?: string; action?: ReactNode }) { return <section className={`panel ${className}`}><div className="panel-head"><div><h2 className="panel-title">{title}</h2>{subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}</div>{action}</div><div className="p-5">{children}</div></section>; }
 
 export function Topology({ large = false, selected, onSelect }: { large?: boolean; selected?: string; onSelect?: (id: string) => void }) {
@@ -409,7 +453,7 @@ export function ResourcesPage() {
   // 4. Water Metrics (from real life support subsystem)
   const lifeSupport = overview?.subsystem_summary?.find((s) => s.code === "LIFE_SUPPORT");
   const waterPercent = lifeSupport?.health_score ?? (isMaitri ? 98 : 88);
-  const waterConsumption = isMaitri ? "2.8 m┬│/day" : "4.2 m┬│/day";
+  const waterConsumption = isMaitri ? "2.8 m³/day" : "4.2 m³/day";
   const waterReserve = isMaitri ? "45 days (melt tank)" : "31 days (RO plant)";
 
   // 5. Food Metrics (from rations registry)
@@ -447,8 +491,11 @@ export function ResourcesPage() {
       category: "Energy",
       icon: Zap,
       display: `${powerLoadKw} kW`,
+      interpretation: `${powerReserveKw} kW reserve headroom`,
       percent: powerPercent,
       status: powerStatus,
+      accentBorder: "border-t-cyan-500",
+      iconBg: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
       meta1Label: "Load / capacity",
       meta1Value: `${powerLoadKw} / ${powerCapKw} kW`,
       meta1Sub: undefined,
@@ -465,8 +512,11 @@ export function ResourcesPage() {
       category: "Propulsion & Heat",
       icon: Fuel,
       display: `${fuelPercent}%`,
+      interpretation: `${fuelRunwayDays} runway`,
       percent: fuelPercent,
       status: fuelStatus,
+      accentBorder: fuelStatus === "WARNING" ? "border-t-amber-500" : "border-t-emerald-500",
+      iconBg: fuelStatus === "WARNING" ? "bg-amber-500/10 text-amber-600 dark:text-amber-400" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
       meta1Label: "Consumption",
       meta1Value: fuelBurnDay,
       meta1Sub: undefined,
@@ -483,8 +533,11 @@ export function ResourcesPage() {
       category: "Expedition Crew",
       icon: Users,
       display: `${personnelCount} / ${personnelCapacity}`,
+      interpretation: `${personnelCapacity - personnelCount} berths available`,
       percent: personnelPercent,
       status: "NOMINAL",
+      accentBorder: "border-t-emerald-500",
+      iconBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
       meta1Label: "Complement",
       meta1Value: `${personnelCount} station crew`,
       meta1Sub: undefined,
@@ -501,8 +554,11 @@ export function ResourcesPage() {
       category: "Life Support",
       icon: Droplets,
       display: `${waterPercent}%`,
+      interpretation: isMaitri ? "45 days buffer (melt tank)" : "31 days buffer (RO plant)",
       percent: waterPercent,
       status: lifeSupport?.status ?? "NOMINAL",
+      accentBorder: "border-t-sky-500",
+      iconBg: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
       meta1Label: "Consumption",
       meta1Value: waterConsumption,
       meta1Sub: undefined,
@@ -519,8 +575,11 @@ export function ResourcesPage() {
       category: "Sustenance",
       icon: UtensilsCrossed,
       display: foodDisplay,
+      interpretation: "Winter sustenance reserve",
       percent: foodPercent,
       status: "NOMINAL",
+      accentBorder: "border-t-emerald-500",
+      iconBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
       meta1Label: "Daily rations",
       meta1Value: foodConsumption,
       meta1Sub: undefined,
@@ -537,8 +596,11 @@ export function ResourcesPage() {
       category: "Maritime & Air",
       icon: Boxes,
       display: logisticsDisplay,
+      interpretation: isMaitri ? "Air traverse active" : "Inbound resupply vessel",
       percent: logisticsPercent,
       status: logisticsStatus,
+      accentBorder: logisticsStatus === "NOMINAL" ? "border-t-emerald-500" : "border-t-amber-500",
+      iconBg: logisticsStatus === "NOMINAL" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400",
       meta1Label: "Inbound movements",
       meta1Value: logisticsMovement,
       meta1Sub: undefined,
@@ -555,8 +617,11 @@ export function ResourcesPage() {
       category: "Equipment Inventory",
       icon: Wrench,
       display: sparesDisplay,
+      interpretation: sparesAvailable === 0 ? "Stockout — work orders blocked" : "Stocked in M-2 locker",
       percent: sparesAvailable > 0 ? 100 : 0,
       status: sparesStatus,
+      accentBorder: sparesStatus === "CRITICAL" ? "border-t-rose-500" : "border-t-emerald-500",
+      iconBg: sparesStatus === "CRITICAL" ? "bg-rose-500/10 text-rose-600 dark:text-rose-400" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
       meta1Label: "Primary part",
       meta1Value: spareItem ? spareItem.part_number : "Data unavailable",
       meta1Sub: "Generator oil filter",
@@ -573,8 +638,11 @@ export function ResourcesPage() {
       category: "Maintenance Assurance",
       icon: RefreshCw,
       display: recoveryDisplay,
+      interpretation: isMaitri ? "Dual N+1 backup operational" : "Reduced N+1 redundancy",
       percent: recoveryPercent,
       status: recoveryStatus,
+      accentBorder: recoveryStatus === "NOMINAL" ? "border-t-emerald-500" : "border-t-amber-500",
+      iconBg: recoveryStatus === "NOMINAL" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-500/10 text-amber-600 dark:text-amber-400",
       meta1Label: "Target asset",
       meta1Value: isMaitri ? "GEN-01" : "G-02",
       meta1Sub: isMaitri ? "100% health" : "4.8 mm/s vibration",
@@ -591,38 +659,91 @@ export function ResourcesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="SUPPLY & SUSTAINMENT"
+        eyebrow={`Supply & Sustainment · ${isMaitri ? "Maitri Base" : "Bharati Station"}`}
         title="Resource & Logistics"
-        subtitle={`Current station resources, consumption and operational reserves ┬╖ ${stationId}`}
+        subtitle="Current station resources, consumption and operational reserves."
+        icon={Fuel}
         status={overview?.status || "NOMINAL"}
-        statusClassName="text-[12px] font-semibold"
+        statusClassName="text-xs font-semibold px-2.5 py-1"
       />
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
         {resourcesList.map((res) => {
           const Icon = res.icon;
+          const isTechId = (val?: string) =>
+            val ? /^(SK-\d+|MWO-[\d-]+|G-\d+|GEN-\d+)$/.test(val.trim()) : false;
+
+          const renderSubText = (text?: string) => {
+            if (!text) return null;
+            if (text.includes("mm/s")) {
+              const parts = text.split("mm/s");
+              return (
+                <span className="text-[12px] text-muted-foreground/75 block truncate mt-0.5" title={text}>
+                  <span className="font-mono text-[11.5px] font-medium">{parts[0]}mm/s</span>
+                  {parts[1]}
+                </span>
+              );
+            }
+            return (
+              <span className="text-[12px] text-muted-foreground/75 block truncate mt-0.5" title={text}>
+                {text}
+              </span>
+            );
+          };
+
           return (
-            <div className="resource-card" key={res.name}>
-              {/* Card Header: Category + Status Badge, followed by prominent Resource Name */}
-              <div className="flex items-start justify-between gap-2 mb-0.5">
-                <div className="min-w-0 flex-1 pr-1">
-                  <div className="flex items-center gap-1 text-[10.5px] font-medium text-muted-foreground/80 mb-1">
-                    {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />}
-                    <span className="truncate" title={res.category}>{res.category}</span>
+            <div
+              className={`resource-card border-t-2 ${res.accentBorder}`}
+              key={res.name}
+            >
+              {/* Card Header: Category + Domain Icon (L) | Status Badge (R) */}
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-1">
+                  <div className={`w-4.5 h-4.5 rounded flex items-center justify-center shrink-0 ${res.iconBg}`}>
+                    {Icon && <Icon className="w-3 h-3" />}
                   </div>
-                  <h2 className="text-[1.25rem] font-bold text-foreground tracking-tight leading-snug">
-                    {res.name}
-                  </h2>
+                  <span
+                    className="text-[11px] font-medium text-muted-foreground/80 uppercase tracking-normal font-sans select-none truncate"
+                    title={res.category}
+                  >
+                    {res.category}
+                  </span>
                 </div>
-                <StatusBadge value={res.status} className="shrink-0 text-[11px] font-semibold tracking-wider px-2 py-0.5" />
+                <StatusBadge
+                  value={res.status}
+                  className="shrink-0 text-[11px] font-semibold tracking-normal px-2 py-0.5"
+                />
               </div>
 
-              {/* Primary Value: Large focal point */}
-              <div className={`resource-number ${res.display.length > 8 ? "!text-[1.85rem]" : ""}`}>
-                {res.display}
+              {/* Resource Name: Inter 17-18px */}
+              <h2 className="text-[17px] sm:text-[18px] font-bold text-foreground font-sans tracking-tight leading-snug">
+                {res.name}
+              </h2>
+
+              {/* Primary Value: Balanced 28-32px desktop, font-weight 600 */}
+              <div className="mt-1.5 mb-1">
+                <div
+                  className={`resource-number font-sans font-semibold text-foreground tracking-tight !my-0 ${
+                    res.display.length >= 10
+                      ? "!text-[28px] sm:!text-[30px]"
+                      : res.display.length >= 7
+                      ? "!text-[29px] sm:!text-[31px]"
+                      : "!text-[30px] sm:!text-[32px]"
+                  }`}
+                >
+                  {res.display}
+                </div>
+                {res.interpretation && (
+                  <div className="text-[13px] font-normal text-muted-foreground font-sans mt-0.5 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
+                    <span className="truncate" title={res.interpretation}>
+                      {res.interpretation}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* Progress Bar: Kept exactly as-is with comfortable vertical spacing */}
-              <div className="my-3">
+              {/* Progress Bar (Existing BatteryIndicator preserved 100%) */}
+              <div className="my-2.5 sm:my-3">
                 <BatteryIndicator
                   value={res.percent}
                   status={res.status}
@@ -630,44 +751,55 @@ export function ResourcesPage() {
                 />
               </div>
 
-              {/* 2 Key Supporting Metrics: Clean flat 2-column mini-grid */}
-              <div className="grid grid-cols-2 gap-3 py-3 border-t border-border/40">
+              {/* Key Supporting Metrics: Clean 2-column layout (Label 11.5px, Value 14-15px, Sub 12px) */}
+              <div className="grid grid-cols-2 gap-3 py-2 border-t border-border/40 font-sans">
                 <div className="min-w-0">
-                  <span className="text-[11.5px] font-medium text-muted-foreground block leading-tight mb-1" title={res.meta1Label}>
+                  <span
+                    className="text-[11.5px] font-medium text-muted-foreground block leading-tight mb-0.5"
+                    title={res.meta1Label}
+                  >
                     {res.meta1Label}
                   </span>
-                  <strong className="text-[13.5px] font-semibold text-foreground block leading-snug line-clamp-2" title={res.meta1Title || res.meta1Value}>
+                  <strong
+                    className={`text-[14.5px] text-foreground block leading-snug break-words ${
+                      isTechId(res.meta1Value) ? "font-mono text-[14px] font-medium" : "font-sans font-semibold"
+                    }`}
+                    title={res.meta1Title || res.meta1Value}
+                  >
                     {res.meta1Value}
                   </strong>
-                  {res.meta1Sub && (
-                    <span className="text-[11px] text-muted-foreground/80 block truncate mt-0.5" title={res.meta1Sub}>
-                      {res.meta1Sub}
-                    </span>
-                  )}
+                  {renderSubText(res.meta1Sub)}
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[11.5px] font-medium text-muted-foreground block leading-tight mb-1" title={res.meta2Label}>
+                  <span
+                    className="text-[11.5px] font-medium text-muted-foreground block leading-tight mb-0.5"
+                    title={res.meta2Label}
+                  >
                     {res.meta2Label}
                   </span>
-                  <strong className="text-[13.5px] font-semibold text-foreground block leading-snug line-clamp-2" title={res.meta2Title || res.meta2Value}>
+                  <strong
+                    className={`text-[14.5px] text-foreground block leading-snug break-words ${
+                      isTechId(res.meta2Value) ? "font-mono text-[14px] font-medium" : "font-sans font-semibold"
+                    }`}
+                    title={res.meta2Title || res.meta2Value}
+                  >
                     {res.meta2Value}
                   </strong>
-                  {res.meta2Sub && (
-                    <span className="text-[11px] text-muted-foreground/80 block truncate mt-0.5" title={res.meta2Sub}>
-                      {res.meta2Sub}
-                    </span>
-                  )}
+                  {renderSubText(res.meta2Sub)}
                 </div>
               </div>
 
-              {/* Technical Source: Subtle bottom metadata */}
-              <div className="mt-auto pt-2.5 border-t border-border/30 flex items-center justify-between text-[11.5px] text-muted-foreground/80">
-                <span className="inline-flex items-center gap-1.5 min-w-0">
-                  <span className="font-sans font-medium text-foreground/80 text-[11.5px]">
+              {/* Technical Source: Subtle quiet bottom metadata (10.5px) */}
+              <div className="mt-auto pt-2 border-t border-border/30 flex items-center justify-between text-[10.5px] text-muted-foreground/60 font-sans">
+                <span className="inline-flex items-center min-w-0">
+                  <span className="font-sans font-normal text-[10.5px] text-muted-foreground/75">
                     {res.truth === "MEASURED" ? "Measured" : "Derived"}
                   </span>
-                  <span className="text-muted-foreground/40">┬╖</span>
-                  <span className="font-mono text-[11px] text-muted-foreground/75 truncate" title={res.source}>
+                  <span className="text-muted-foreground/35 text-[9px] mx-1">·</span>
+                  <span
+                    className="font-mono text-[10.5px] text-muted-foreground/60 truncate"
+                    title={res.source}
+                  >
                     {res.source}
                   </span>
                 </span>
@@ -764,9 +896,10 @@ export function AlertsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="EVENT MANAGEMENT"
+        eyebrow={`Event Management · ${activeStationId.replace(/^STATION-/, "")} Station`}
         title="Operational Alerts"
-        subtitle={`Prioritized conditions and telemetry threshold events requiring operator review ┬╖ ${activeStationId}`}
+        subtitle="Prioritized conditions and telemetry threshold events requiring operator review."
+        icon={ShieldAlert}
       />
 
       {/* Operational Metric Strip */}
