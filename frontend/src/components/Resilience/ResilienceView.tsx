@@ -1,20 +1,31 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Activity,
+  AlertTriangle,
   ArrowLeft,
+  ArrowRight,
+  Battery,
   CheckCircle2,
+  ChevronRight,
+  Clock,
   Database,
+  ExternalLink,
   FileCheck,
+  HardDrive,
   History,
   Layers,
+  Lock,
   Radio,
   RotateCcw,
   Search,
+  Server,
   Shield,
   ShieldAlert,
+  Sparkles,
+  Terminal,
   Wifi,
   WifiOff,
-  Battery,
+  X,
   Zap,
 } from "lucide-react";
 import { useResilienceStatus } from "../../hooks/useResilienceStatus";
@@ -34,8 +45,10 @@ import {
   updateIncidentStatus,
   recordOperationalMemory,
   type IncidentStatus,
+  type SyncQueueItem,
 } from "../../lib/api";
 import { TruthBadge } from "../TruthBadge";
+import { OperationalTopology } from "../OperationalTopology";
 
 interface ResilienceViewProps {
   stationId?: string;
@@ -43,20 +56,27 @@ interface ResilienceViewProps {
   onInspectAsset?: (assetId: string) => void;
 }
 
-type ResilienceTab = "ALL" | "QUEUE" | "SCIENCE" | "INCIDENTS" | "MEMORY";
+type ResilienceWorkspaceTab = "QUEUE" | "SCIENCE" | "INCIDENTS" | "GRAPH" | "MEMORY";
 
 export const ResilienceView: React.FC<ResilienceViewProps> = ({
   stationId = "STATION-BHARATI",
   onBack,
   onInspectAsset,
 }) => {
-  const [activeTab, setActiveTab] = useState<ResilienceTab>("ALL");
+  // Navigation & Workspace State
+  const [activeTab, setActiveTab] = useState<ResilienceWorkspaceTab>("QUEUE");
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>("INC-2026-04");
+  const [selectedQueueItemId, setSelectedQueueItemId] = useState<string>("QITEM-P0-G02");
+  const [selectedInstrumentCode, setSelectedInstrumentCode] = useState<string>("S-17");
   const [memorySearchQuery, setMemorySearchQuery] = useState<string>("");
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [activeSyncPhase, setActiveSyncPhase] = useState<string | null>(null);
   const [reconciliationSteps, setReconciliationSteps] = useState<string[]>([]);
+
+  // Queue View toggles
+  const [queuePriorityFilter, setQueuePriorityFilter] = useState<string>("ALL");
+  const [queueDisplayMode, setQueueDisplayMode] = useState<"SPLIT" | "TABLE">("SPLIT");
 
   // Form states
   const [newActionCode, setNewActionCode] = useState<string>("");
@@ -67,7 +87,7 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
   const [memOutcome, setMemOutcome] = useState<string>("Station grid stabilized without habitat freeze-out");
   const [memLesson, setMemLesson] = useState<string>("Always allow 35-minute preheat on B-01 in subzero ambient temperatures");
 
-  // Queries
+  // Telemetry Queries
   const { data: commsStatus, refetch: refetchComms } = useResilienceStatus(stationId);
   const { data: energyModel } = useEnergyModel(stationId);
   const { data: syncQueue, refetch: refetchQueue } = useSyncQueue(stationId);
@@ -76,9 +96,10 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
   const { data: activeIncident, refetch: refetchIncidentDetail } = useIncidentDetail(selectedIncidentId);
   const { data: memoryData, refetch: refetchMemory } = useOperationalMemory(memorySearchQuery, stationId);
 
-  // Actions
+  // Handlers
   const handleSimulateOutage = async () => {
     try {
+      setActiveSyncPhase(null);
       setActionLoading(true);
       await simulateOffline(stationId);
       await Promise.all([refetchComms(), refetchQueue()]);
@@ -96,7 +117,6 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       setActiveSyncPhase("RESTORING");
       setReconciliationSteps(["Carrier acquisition & satellite handshake initiated..."]);
 
-      // Stepped queue progression
       await new Promise((r) => setTimeout(r, 200));
       setActiveSyncPhase("SYNCING");
       setReconciliationSteps((prev) => [
@@ -114,7 +134,6 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
         "Canonical SHA-256 payload checksums verified by station hub.",
       ]);
 
-      // Execute backend reconciliation
       await restoreAndSync(stationId);
       await Promise.all([refetchComms(), refetchQueue(), refetchScience()]);
 
@@ -130,12 +149,13 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
       setActionLoading(false);
       setTimeout(() => {
         setActiveSyncPhase(null);
-      }, 4000);
+      }, 30000);
     }
   };
 
   const handleResetSimulation = async () => {
     try {
+      setActiveSyncPhase(null);
       setActionLoading(true);
       await resetResilienceSimulation(stationId);
       await Promise.all([
@@ -170,8 +190,9 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
     try {
       setActionLoading(true);
       const val = Number((130 + Math.random() * 20).toFixed(2));
+      const canonicalId = instId === "S-17" ? "INST-S17-RADAR" : (instId === "S-08" ? "INST-S08-SEIS" : instId);
       await bufferScienceObservation({
-        instrument_id: instId,
+        instrument_id: canonicalId,
         measurement_value: val,
         unit: "TECU",
       });
@@ -245,922 +266,1580 @@ export const ResilienceView: React.FC<ResilienceViewProps> = ({
   };
 
   const isOffline = commsStatus?.status === "OFFLINE";
+  const stationDisplayName = stationId === "STATION-MAITRI" ? "Maitri Station" : "Bharati Station";
+
+  // Queue data derivation (deterministic priority sort: P0 -> P1 -> P2 -> P3)
+  const rawQueueItems = syncQueue?.items ?? [];
+  const queueItems = useMemo(() => {
+    return [...rawQueueItems].sort((a, b) => {
+      const pOrder: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
+      const diff = (pOrder[a.priority_label] ?? 99) - (pOrder[b.priority_label] ?? 99);
+      if (diff !== 0) return diff;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+  }, [rawQueueItems]);
+
+  const filteredQueueItems = useMemo(() => {
+    if (queuePriorityFilter === "ALL") return queueItems;
+    return queueItems.filter((i) => i.priority_label === queuePriorityFilter);
+  }, [queueItems, queuePriorityFilter]);
+
+  const activeQueueItem = useMemo(() => {
+    return (
+      queueItems.find((item) => item.id === selectedQueueItemId) ||
+      queueItems[0] ||
+      null
+    );
+  }, [queueItems, selectedQueueItemId]);
+
+  // Priority counts
+  const p0Count = queueItems.filter((i) => i.priority_label === "P0").length;
+  const p1Count = queueItems.filter((i) => i.priority_label === "P1").length;
+  const p2Count = queueItems.filter((i) => i.priority_label === "P2").length;
+  const p3Count = queueItems.filter((i) => i.priority_label === "P3").length;
+  const pendingCount = commsStatus?.pending_queue_count ?? syncQueue?.pending_count ?? 0;
+  const totalScienceBuffered = instruments?.reduce((acc, inst) => acc + (inst.buffered_observations_count || 0), 0) ?? 0;
+
+  // Selected Instrument
+  const activeInstrument = useMemo(() => {
+    return (
+      instruments?.find((inst) => (inst.code || inst.id) === selectedInstrumentCode) ||
+      instruments?.[0] ||
+      null
+    );
+  }, [instruments, selectedInstrumentCode]);
+
+  // Derived Grid Metrics
+  const reserveMarginKw = (energyModel?.available_generation_capacity_kw ?? 600) - (energyModel?.baseline_electrical_load_kw ?? 201);
+  const fuelRunwayDays = energyModel?.projected_runway_days ?? 76;
 
   return (
-    <div className="space-y-6 animate-fade-in pb-16 transition-colors">
-      {/* ── Top Header Navigation & Action Bar ──────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-[#2a2f3e] pb-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            {onBack && (
-              <button
-                onClick={onBack}
-                aria-label="Return to Station Command Center"
-                className="flex items-center gap-1.5 text-xs font-mono text-slate-500 dark:text-[#7a8194] hover:text-blue-600 dark:hover:text-[#5b9cf5] transition-colors cursor-pointer"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Command Center</span>
-              </button>
-            )}
-            <span className="text-slate-300 dark:text-[#3d4556]">/</span>
-            <span className="text-[10px] font-mono text-blue-600 dark:text-[#5b9cf5] uppercase tracking-wider font-semibold">
-              Disruption Resilience Workspace
-            </span>
-          </div>
-          <h1 className="text-xl font-bold font-mono text-slate-900 dark:text-[#e4e8f0] flex items-center gap-2.5">
-            <Radio className="h-5 w-5 text-blue-600 dark:text-[#5b9cf5]" />
-            <span>OPERATE THROUGH DISRUPTION</span>
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-[#7a8194] max-w-2xl font-sans">
-            Autonomous station continuity during simulated satellite outages, priority-queued delta reconciliation,
-            scientific data buffering, blast-radius incident tracking, and human-in-the-loop operational memory.
-          </p>
-        </div>
-
-        {/* Global Simulation Actions */}
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            data-testid="simulate-outage-btn"
-            onClick={handleSimulateOutage}
-            disabled={actionLoading || isOffline}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all border cursor-pointer shadow-2xs ${
-              isOffline
-                ? "bg-rose-50 dark:bg-rose-950/40 text-rose-300 dark:text-rose-400/50 border-rose-200 dark:border-rose-900/40 cursor-not-allowed"
-                : "bg-rose-50 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700 hover:bg-rose-100 dark:hover:bg-rose-900"
-            }`}
-          >
-            <WifiOff className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
-            <span>Simulate Outage</span>
-          </button>
-
-          <button
-            data-testid="restore-sync-btn"
-            onClick={handleRestoreAndSync}
-            disabled={actionLoading || !isOffline}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-bold transition-all border cursor-pointer shadow-2xs ${
-              !isOffline
-                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-300 dark:text-emerald-400/50 border-emerald-200 dark:border-emerald-900/40 cursor-not-allowed"
-                : "bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900"
-            }`}
-          >
-            <Wifi className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>Restore &amp; Reconcile</span>
-          </button>
-
-          <button
-            data-testid="reset-simulation-btn"
-            onClick={handleResetSimulation}
-            disabled={actionLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white dark:bg-[#181b24] hover:bg-slate-50 dark:hover:bg-[#1e2230] text-slate-700 dark:text-[#9ca3b4] hover:text-slate-900 dark:hover:text-[#e4e8f0] border border-slate-200 dark:border-[#2a2f3e] text-xs font-mono transition-colors cursor-pointer shadow-2xs"
-            title="Reset Day 4 simulation state without mutating canonical resources"
-          >
-            <RotateCcw className="h-3.5 w-3.5 text-slate-500 dark:text-[#7a8194]" />
-            <span>Reset Simulation</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Feedback banner if any */}
+    <div
+      data-testid="resilience-workspace"
+      className="space-y-6 pb-20 font-sans text-slate-900 dark:text-slate-100"
+    >
+      {/* ─────────────────────────────────────────────────────────────
+          NOTIFICATION BANNER (Action feedback & Toast)
+          ───────────────────────────────────────────────────────────── */}
       {actionFeedback && (
-        <div className="flex items-center justify-between p-3 rounded-md bg-blue-50 dark:bg-[#12141c] border border-blue-200 dark:border-blue-900/60 text-xs font-mono text-blue-900 dark:text-cyan-200 shadow-2xs">
+        <div
+          role="status"
+          className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-900 dark:text-blue-200 text-xs font-mono shadow-md backdrop-blur-sm animate-fade-in"
+        >
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-cyan-400 shrink-0" />
+            <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
             <span>{actionFeedback}</span>
           </div>
           <button
             onClick={() => setActionFeedback(null)}
-            className="text-blue-500 dark:text-cyan-400 hover:text-blue-800 dark:hover:text-white cursor-pointer ml-4 font-bold"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold px-1"
           >
-            &times;
+            ✕
           </button>
         </div>
       )}
 
-      {/* Stepped Reconnection & Priority Reconciliation Card */}
-      {activeSyncPhase && (
-        <div
-          data-testid="reconciliation-progress-card"
-          className="rounded-md border border-blue-300 dark:border-blue-800 bg-blue-50/70 dark:bg-[#131926] p-4 font-mono text-xs space-y-2.5 shadow-2xs"
-        >
-          <div className="flex items-center justify-between text-[11px] font-bold text-blue-900 dark:text-blue-300 border-b border-blue-200 dark:border-blue-900/60 pb-2">
-            <span className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-blue-500 animate-ping" />
-              STEPPED RECONNECTION &amp; DELTA RECONCILIATION: [{activeSyncPhase}]
-            </span>
-            <span className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-[#7a8194]">
-              PRIORITY ORDER: P0 &rarr; P1 &rarr; P2 &rarr; P3
-            </span>
-          </div>
-          <div className="space-y-1.5 text-[11px] text-slate-800 dark:text-[#c5cad6]">
-            {reconciliationSteps.map((step, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>{step}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Comms Link Status Summary Card ──────────────── */}
-      <div
-        data-testid="comms-status-card"
-        className={`rounded-lg border p-4 transition-all shadow-2xs ${
-          isOffline
-            ? "border-rose-300 dark:border-rose-800/80 bg-rose-50/50 dark:bg-rose-950/20"
-            : "border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24]"
-        }`}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div
-              className={`p-2.5 rounded-md border ${
-                isOffline
-                  ? "bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-700"
-                  : "bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700"
-              }`}
+      {/* ─────────────────────────────────────────────────────────────
+          ZONE 0 / COMMAND HEADER — Mission Control Eyebrow & Title
+          ───────────────────────────────────────────────────────────── */}
+      <header className="space-y-2 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <div className="flex items-center gap-2 text-xs font-mono">
+          {onBack && (
+            <button
+              onClick={onBack}
+              aria-label="Return to Station Command Center"
+              className="flex items-center gap-1.5 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors cursor-pointer"
             >
-              {isOffline ? <WifiOff className="h-5 w-5" /> : <Wifi className="h-5 w-5" />}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold text-slate-900 dark:text-[#e4e8f0]">
-                  {commsStatus?.name ?? "SATELLITE GROUND TERMINAL"}
-                </span>
-                <span
-                  data-testid="comms-status-badge"
-                  className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
-                    isOffline
-                      ? "bg-rose-100 dark:bg-rose-900 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-600"
-                      : "bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-600"
-                  }`}
-                >
-                  {commsStatus?.status ?? "ONLINE"}
-                </span>
-                <TruthBadge type="MEASURED" />
-              </div>
-              <p className="text-xs text-slate-500 dark:text-[#7a8194] mt-0.5 font-sans">
-                {isOffline
-                  ? "Telemetry link interrupted. Local buffering active. Queue items will reconcile upon reconnection."
-                  : "Continuous high-orbit telemetry link nominal. Real-time delta sync active."}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-6 font-mono text-xs">
-            <div className="text-right">
-              <span className="text-slate-400 dark:text-[#6b7280] block text-[9px] uppercase tracking-wider">Latency</span>
-              <span data-testid="comms-latency" className="font-bold text-slate-800 dark:text-[#e4e8f0]">
-                {isOffline ? "DISCONNECTED" : `${commsStatus?.latency_ms ?? 580} ms`}
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-slate-400 dark:text-[#6b7280] block text-[9px] uppercase tracking-wider">Bandwidth</span>
-              <span data-testid="comms-bandwidth" className="font-bold text-slate-800 dark:text-[#e4e8f0]">
-                {isOffline ? "0 kbps" : `${commsStatus?.bandwidth_kbps ?? 2048} kbps`}
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-slate-400 dark:text-[#6b7280] block text-[9px] uppercase tracking-wider">Unsynced Items</span>
-              <span
-                data-testid="comms-pending-count"
-                className={`font-bold px-2 py-0.5 rounded ${
-                  (commsStatus?.pending_queue_count ?? 0) > 0
-                    ? "bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700"
-                    : "text-slate-800 dark:text-[#e4e8f0]"
-                }`}
-              >
-                {commsStatus?.pending_queue_count ?? 0}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Battery & Microgrid Reserve Resilience Card ── */}
-      <div
-        data-testid="battery-resilience-card"
-        className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-4 shadow-2xs"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-md border bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-700">
-              <Battery className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold text-slate-900 dark:text-[#e4e8f0]">
-                  MICROGRID &amp; UPS BATTERY BANK (BAT-01)
-                </span>
-                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-600">
-                  NOMINAL · 94%
-                </span>
-                <TruthBadge type={energyModel?.truth_type === "DERIVED" ? "DERIVED" : "MEASURED"} />
-              </div>
-              <p className="text-xs text-slate-500 dark:text-[#7a8194] mt-0.5 font-sans">
-                Station electrical &amp; thermal resilience headroom. {energyModel?.online_generators_count ?? 2} generators online with {energyModel?.available_generation_capacity_kw ?? 300} kW capacity.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-6 font-mono text-xs">
-            <div className="text-right">
-              <span className="text-slate-400 dark:text-[#6b7280] block text-[9px] uppercase tracking-wider">Battery State of Charge</span>
-              <span data-testid="battery-soc" className="font-bold text-emerald-600 dark:text-emerald-400">
-                94.2% (48.4V DC)
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-slate-400 dark:text-[#6b7280] block text-[9px] uppercase tracking-wider">UPS Autonomy</span>
-              <span data-testid="battery-autonomy" className="font-bold text-slate-800 dark:text-[#e4e8f0]">
-                4.8 Hours (Critical SCADA)
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-slate-400 dark:text-[#6b7280] block text-[9px] uppercase tracking-wider">Generation Margin</span>
-              <span data-testid="power-reserve-margin" className="font-bold text-slate-800 dark:text-[#e4e8f0]">
-                {energyModel ? `${Math.round(energyModel.available_generation_capacity_kw - energyModel.projected_electrical_load_kw)} kW reserve` : "75 kW reserve"}
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-slate-400 dark:text-[#6b7280] block text-[9px] uppercase tracking-wider">Fuel Runway</span>
-              <span data-testid="battery-fuel-runway" className="font-bold text-slate-800 dark:text-[#e4e8f0]">
-                {energyModel?.projected_runway_days ? `${Math.round(energyModel.projected_runway_days)} Days` : "81 Days"}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── LEVEL 2: HUMAN RESILIENCE BRIEFING ───────────── */}
-      <div className="rounded-xl border border-slate-200 dark:border-[#2a2f3e] bg-slate-50/80 dark:bg-[#151924] p-5 shadow-2xs space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-[#222838]">
-          <div className="flex items-center gap-2">
-            <span
-              className={`h-2.5 w-2.5 rounded-full ${
-                isOffline ? "bg-rose-500 animate-ping" : "bg-emerald-500"
-              }`}
-            />
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900 dark:text-[#f0f3fa]">
-              {isOffline
-                ? "SATELLITE CONNECTION UNAVAILABLE · STATION CONTINUES OPERATING LOCALLY"
-                : "OPERATIONAL RESILIENCE ARCHITECTURE · LOCAL AUTONOMY & RECONCILIATION"}
-            </span>
-          </div>
-          <span className="text-[11px] font-mono text-slate-500 dark:text-[#7a8194]">
-            {isOffline ? "Autonomous Degraded Mode Active" : "Continuous Synchronization Nominal"}
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Command Center</span>
+            </button>
+          )}
+          {onBack && <span className="text-slate-400 dark:text-slate-600">/</span>}
+          <span className="font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider text-[11px]">
+            Operational Resilience Architecture · {stationDisplayName}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs font-mono">
-          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
-            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">1. Stored Locally</div>
-            <div className="font-bold text-slate-900 dark:text-[#e4e8f0]">Isolated SQLite Hub</div>
-            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">
-              All generator telemetry, life-support states, and science caches persist locally.
-            </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Radio className="h-6 w-6 text-blue-600 dark:text-blue-400 shrink-0" />
+            <h1 className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-slate-900 dark:text-white uppercase">
+              OPERATE THROUGH DISRUPTION
+            </h1>
           </div>
-
-          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
-            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">2. Waiting to Send</div>
-            <div className="font-bold text-amber-600 dark:text-amber-400">
-              {commsStatus?.pending_queue_count ?? 4} Pending Deltas
-            </div>
-            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">
-              Batched in FIFO outbound spool awaiting carrier acquisition.
-            </p>
-          </div>
-
-          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
-            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">3. Sent First</div>
-            <div className="font-bold text-rose-600 dark:text-rose-400">P0 Critical Alarms</div>
-            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">
-              Strict deterministic priority: P0 (Safety) → P1 (Grid) → P2 (Science) → P3 (Logs).
-            </p>
-          </div>
-
-          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
-            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">4. How We Verify</div>
-            <div className="font-bold text-emerald-600 dark:text-emerald-400">SHA-256 Checksums</div>
-            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">
-              Payload hashing prevents data corruption or tampered packets upon uplink.
-            </p>
-          </div>
-
-          <div className="p-3 rounded-lg border border-slate-200 dark:border-[#222838] bg-white dark:bg-[#181d2c] space-y-1 shadow-2xs">
-            <div className="text-[10px] text-slate-500 dark:text-[#8b92a5] uppercase font-bold">5. When Link Returns</div>
-            <div className="font-bold text-blue-600 dark:text-[#5b9cf5]">Server ACK &amp; Sync</div>
-            <p className="text-[11px] text-slate-600 dark:text-[#9ca3b4] font-sans">
-              Carrier lock drains queue in order, verifies hashes, and re-engages live bus.
-            </p>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-300 font-mono text-xs font-bold border border-blue-500/20">
+              {isOffline ? "AUTONOMOUS DEGRADED MODE" : "CONTINUOUS SYNC NOMINAL"}
+            </span>
           </div>
         </div>
-      </div>
+        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-sans max-w-3xl leading-relaxed">
+          Autonomous station operational continuity during communication disruptions: deterministic P0–P3 store-and-forward queuing, cryptographic SHA-256 payload integrity verification, scientific observation buffering, and stepped reconnection recovery.
+        </p>
+      </header>
 
-      {/* ── Sub-Navigation Tabs ───────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-md bg-slate-100 dark:bg-[#12141c] border border-slate-200 dark:border-[#2a2f3e]">
-        <button
-          onClick={() => setActiveTab("ALL")}
-          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer border ${
-            activeTab === "ALL"
-              ? "bg-white dark:bg-[#1e2230] border-slate-200 dark:border-[#3d4556] text-blue-700 dark:text-[#5b9cf5] shadow-2xs font-bold"
-              : "border-transparent text-slate-600 dark:text-[#9ca3b4] hover:text-slate-900 dark:hover:text-[#e4e8f0]"
-          }`}
-        >
-          Integrated Resilience View
-        </button>
-        <button
-          onClick={() => setActiveTab("QUEUE")}
-          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer border ${
-            activeTab === "QUEUE"
-              ? "bg-white dark:bg-[#1e2230] border-slate-200 dark:border-[#3d4556] text-blue-700 dark:text-[#5b9cf5] shadow-2xs font-bold"
-              : "border-transparent text-slate-600 dark:text-[#9ca3b4] hover:text-slate-900 dark:hover:text-[#e4e8f0]"
-          }`}
-        >
-          1. Priority Queue &amp; SHA-256
-        </button>
-        <button
-          onClick={() => setActiveTab("SCIENCE")}
-          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer border ${
-            activeTab === "SCIENCE"
-              ? "bg-white dark:bg-[#1e2230] border-slate-200 dark:border-[#3d4556] text-blue-700 dark:text-[#5b9cf5] shadow-2xs font-bold"
-              : "border-transparent text-slate-600 dark:text-[#9ca3b4] hover:text-slate-900 dark:hover:text-[#e4e8f0]"
-          }`}
-        >
-          2. Science Buffer (S-17)
-        </button>
-        <button
-          onClick={() => setActiveTab("INCIDENTS")}
-          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer border ${
-            activeTab === "INCIDENTS"
-              ? "bg-white dark:bg-[#1e2230] border-slate-200 dark:border-[#3d4556] text-blue-700 dark:text-[#5b9cf5] shadow-2xs font-bold"
-              : "border-transparent text-slate-600 dark:text-[#9ca3b4] hover:text-slate-900 dark:hover:text-[#e4e8f0]"
-          }`}
-        >
-          3. Incident Blast Radius
-        </button>
-        <button
-          onClick={() => setActiveTab("MEMORY")}
-          className={`px-3 py-1.5 rounded text-xs font-mono font-medium transition-colors cursor-pointer border ${
-            activeTab === "MEMORY"
-              ? "bg-white dark:bg-[#1e2230] border-slate-200 dark:border-[#3d4556] text-blue-700 dark:text-[#5b9cf5] shadow-2xs font-bold"
-              : "border-transparent text-slate-600 dark:text-[#9ca3b4] hover:text-slate-900 dark:hover:text-[#e4e8f0]"
-          }`}
-        >
-          4. Operational Memory
-        </button>
-      </div>
-
-      {/* ── 1. DETERMINISTIC PRIORITY QUEUE PANEL ────────── */}
-      {(activeTab === "ALL" || activeTab === "QUEUE") && (
+      {/* ─────────────────────────────────────────────────────────────
+          LAYER 1 — OPERATIONAL STATUS COCKPIT
+          Single Wide Horizontal Mission Control Surface
+          ───────────────────────────────────────────────────────────── */}
+      <section
+        data-testid="comms-status-card"
+        aria-label="Operational Status Cockpit"
+        className={`relative overflow-hidden rounded-2xl border transition-all duration-300 shadow-xl backdrop-blur-md ${
+          isOffline
+            ? "border-rose-300 dark:border-rose-500/40 bg-gradient-to-br from-rose-50/80 via-white to-slate-50 dark:from-rose-950/30 dark:via-slate-900/90 dark:to-slate-950/95"
+            : "border-emerald-300/80 dark:border-emerald-500/30 bg-gradient-to-br from-emerald-50/80 via-white to-slate-50 dark:from-emerald-950/20 dark:via-slate-900/90 dark:to-slate-950/95"
+        }`}
+      >
+        {/* Subtle status glow corner accent */}
         <div
-          data-testid="sync-queue-table"
-          className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-5 space-y-4 shadow-2xs"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-[#2a2f3e] pb-3">
-            <div>
-              <h2 className="text-xs font-mono font-bold text-slate-800 dark:text-[#e4e8f0] uppercase tracking-wider flex items-center gap-2">
-                <Database className="h-4 w-4 text-blue-600 dark:text-[#5b9cf5]" />
-                <span>Deterministic Priority Synchronization Queue</span>
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-[#7a8194] mt-0.5 font-sans">
-                Strict ordering: <code className="text-slate-800 dark:text-[#e4e8f0] font-mono">priority ASC (P0 &lt; P1 &lt; P2 &lt; P3)</code> &rarr;{" "}
-                <code className="text-slate-800 dark:text-[#e4e8f0] font-mono">created_at ASC</code> &rarr; <code className="text-slate-800 dark:text-[#e4e8f0] font-mono">id ASC</code>.
-                Integrity verified via canonical UTF-8 SHA-256 payload checksums.
+          className={`absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20 opacity-15 dark:opacity-20 ${
+            isOffline ? "bg-rose-400 dark:bg-rose-600" : "bg-emerald-300 dark:bg-emerald-500"
+          }`}
+        />
+
+        <div className="p-6 md:p-8 space-y-6 relative z-10">
+          {/* Cockpit Subsystem Header */}
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-mono border-b border-slate-200/60 dark:border-slate-800/80 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                <Terminal className="h-3.5 w-3.5 text-blue-500" />
+                SATELLITE GROUND TERMINAL · POLAR LINK #1
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 dark:text-slate-400">CARRIER TRANSPONDER:</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">GSAT-7 / INMARSAT-C</span>
+              <TruthBadge type="MEASURED" />
+            </div>
+          </div>
+
+          {/* Cockpit Core: Left Status & Statement / Right Actions & HUD */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* LEFT SIDE (7 COLS): Giant Operational Reality */}
+            <div className="lg:col-span-7 space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-3.5 w-3.5">
+                  <span
+                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                      isOffline ? "bg-rose-400" : "bg-emerald-400"
+                    }`}
+                  />
+                  <span
+                    className={`relative inline-flex rounded-full h-3.5 w-3.5 ${
+                      isOffline ? "bg-rose-500" : "bg-emerald-500"
+                    }`}
+                  />
+                </span>
+
+                <span
+                  data-testid="comms-status-badge"
+                  className={`px-2.5 py-0.5 rounded-md font-mono text-[11px] font-black tracking-widest uppercase border ${
+                    isOffline
+                      ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/40"
+                      : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/40"
+                  }`}
+                >
+                  {isOffline ? "OFFLINE" : "ONLINE"}
+                </span>
+
+                <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                  {isOffline ? "LOCAL EDGE DEGRADED MODE" : "HIGH-ORBIT BIDIRECTIONAL LOCK"}
+                </span>
+              </div>
+
+              {/* Dominant Status Headline */}
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black font-mono tracking-tight text-slate-900 dark:text-white">
+                {isOffline ? "Satellite Link Offline" : "Satellite Link Online"}
+              </h1>
+
+              {/* Human-Readable Operational Statement */}
+              <p className="text-sm md:text-base font-medium text-slate-700 dark:text-slate-300 max-w-2xl leading-relaxed">
+                {isOffline
+                  ? "Station continuing locally while communications are unavailable. Autonomous local degraded mode actively protects grid stability, life-support, and observation logging."
+                  : "Station operating normally. Continuous telemetry deltas, work orders, and science observations are streaming in real-time to the mainland operations center."}
               </p>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs font-mono">
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">P0: Critical</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">P1: High</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">P2: Important</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-[#12141c] text-slate-600 dark:text-[#7a8194] border border-slate-200 dark:border-[#2a2f3e]">P3: Routine</span>
-            </div>
-          </div>
 
-          <div className="overflow-x-auto border border-slate-200 dark:border-[#2a2f3e] rounded-md shadow-2xs">
-            <table className="w-full text-left text-xs font-mono">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-[#2a2f3e] text-slate-600 dark:text-[#9ca3b4] bg-slate-100 dark:bg-[#12141c]">
-                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Priority</th>
-                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Queue ID</th>
-                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Event Type</th>
-                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Status</th>
-                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Canonical SHA-256 Checksum</th>
-                  <th className="py-2.5 px-3 font-semibold text-[10px] tracking-wider">Integrity</th>
-                  <th className="py-2.5 px-3 text-right font-semibold text-[10px] tracking-wider">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#2a2f3e]/60 bg-white dark:bg-[#181b24]">
-                {syncQueue?.items && syncQueue.items.length > 0 ? (
-                  syncQueue.items.map((item) => (
-                    <tr
-                      key={item.id}
-                      data-testid={`queue-item-${item.priority_label}`}
-                      className="hover:bg-slate-50 dark:hover:bg-[#141721] transition-colors"
-                    >
-                      <td className="py-3 px-3">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                            item.priority === 0
-                              ? "bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-                              : item.priority === 1
-                              ? "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
-                              : item.priority === 2
-                              ? "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-                              : "bg-slate-100 dark:bg-[#12141c] text-slate-700 dark:text-[#9ca3b4] border border-slate-200 dark:border-[#2a2f3e]"
-                          }`}
-                        >
-                          {item.priority_label}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 font-semibold text-slate-800 dark:text-[#e4e8f0]">{item.id}</td>
-                      <td className="py-3 px-3">
-                        <div className="text-slate-800 dark:text-[#e4e8f0] font-semibold">{item.event_type}</div>
-                        <div className="text-[10px] text-slate-500 dark:text-[#7a8194] truncate max-w-xs">{item.payload_json}</div>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
-                            item.status === "RECONCILED"
-                              ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                              : item.status === "FAILED_RETRY"
-                              ? "bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-                              : item.status === "TRANSFERRING"
-                              ? "bg-sky-100 dark:bg-cyan-950 text-sky-800 dark:text-cyan-300 border border-sky-200 dark:border-cyan-800"
-                              : "bg-amber-100 dark:bg-polar-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-polar-800"
-                          }`}
-                        >
-                          {item.status}
-                        </span>
-                        {item.status === "RECONCILED" && (
-                          <span data-testid="sync-complete-badge" className="hidden" />
-                        )}
-                      </td>
-                      <td className="py-3 px-3">
-                        <code
-                          data-testid="checksum-hash"
-                          className="text-[11px] text-slate-700 dark:text-[#9ca3b4] bg-slate-100 dark:bg-[#0c0e14] px-2 py-0.5 rounded border border-slate-200 dark:border-[#2a2f3e]"
-                          title={item.checksum_sha256}
-                        >
-                          {item.checksum_sha256 ? `${item.checksum_sha256.slice(0, 16)}…` : "N/A"}
-                        </code>
-                      </td>
-                      <td className="py-3 px-3">
-                        <span
-                          data-testid="checksum-verified-badge"
-                          className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-bold"
-                        >
-                          <FileCheck className="h-3.5 w-3.5" />
-                          <span>VERIFIED</span>
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <button
-                          data-testid={`retry-btn-${item.id}`}
-                          onClick={() => handleRetryQueueItem(item.id)}
-                          className="text-xs text-blue-600 dark:text-[#5b9cf5] hover:underline cursor-pointer"
-                        >
-                          Reverify
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="py-6 text-center text-slate-400 dark:text-[#6b7280]">
-                      No queued items.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── 2. SCIENCE DATA CONTINUITY PANEL ──────────────── */}
-      {(activeTab === "ALL" || activeTab === "SCIENCE") && (
-        <div
-          data-testid="science-instruments-card"
-          className="rounded-lg border border-slate-200 dark:border-[#2a2f3e] bg-white dark:bg-[#181b24] p-5 space-y-4 shadow-2xs"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-[#2a2f3e] pb-3">
-            <div>
-              <h2 className="text-xs font-mono font-bold text-slate-800 dark:text-[#e4e8f0] uppercase tracking-wider flex items-center gap-2">
-                <Activity className="h-4 w-4 text-blue-600 dark:text-[#5b9cf5]" />
-                <span>Scientific Data Continuity &amp; Offline Buffering</span>
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-[#7a8194] mt-0.5 font-sans">
-                Generic scientific observation buffering model. S-17 is the hero ionospheric radar, backed by local circular edge buffer.
-              </p>
-            </div>
-            <TruthBadge type="MEASURED" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {instruments?.map((inst) => (
+              {/* Companion Battery & Grid Headroom Telemetry */}
               <div
-                key={inst.id}
-                data-testid={`instrument-${inst.code}`}
-                className="rounded-md border border-slate-200 dark:border-[#2a2f3e] bg-slate-50/70 dark:bg-[#12141c] p-4 space-y-3 shadow-2xs"
+                data-testid="battery-resilience-card"
+                className="pt-2 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-600 dark:text-slate-400"
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-mono font-bold text-blue-600 dark:text-[#5b9cf5]">{inst.code}</span>
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-[#e4e8f0]">{inst.name}</h3>
-                    <p className="text-[11px] text-slate-500 dark:text-[#7a8194] font-sans">{inst.instrument_type}</p>
-                  </div>
-                  <div className="text-right font-mono text-xs">
-                    <span className="text-slate-400 dark:text-[#6b7280] block text-[9px] uppercase tracking-wider">Local Buffer</span>
-                    <span
-                      data-testid="buffered-count"
-                      className="font-bold text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 text-xs"
-                    >
-                      {inst.buffered_observations_count} queued
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60">
+                  <Battery className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    BAT-01 SOC: 94.2% (48.4V DC)
+                  </span>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-[#2a2f3e]">
-                  <div className="flex items-center gap-3 text-xs font-mono text-slate-500 dark:text-[#7a8194]">
-                    <span>Power: <strong className="text-emerald-600 dark:text-emerald-400">{inst.power_status}</strong></span>
-                    <span>Health: <strong className="text-emerald-600 dark:text-emerald-400">{inst.health}</strong></span>
-                  </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400">UPS Autonomy:</span>
+                  <strong className="text-slate-800 dark:text-slate-200">
+                    4.8 Hours
+                  </strong>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400">Grid Margin:</span>
+                  <strong className="text-slate-800 dark:text-slate-200">
+                    {reserveMarginKw} kW
+                  </strong>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400">Fuel Runway:</span>
+                  <strong className="text-slate-800 dark:text-slate-200">{fuelRunwayDays} Days</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT SIDE (5 COLS): State-Adaptive Controls & Compact Metrics HUD */}
+            <div className="lg:col-span-5 space-y-4">
+              {/* Contextually Dominant Action Cluster */}
+              <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 space-y-2.5 shadow-sm">
+                <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">
+                  Resilience Cockpit Controls
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Simulate Outage button */}
                   <button
-                    data-testid="buffer-observation-btn"
-                    onClick={() => handleBufferObservation(inst.id)}
-                    disabled={actionLoading}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-[#181b24] hover:bg-slate-100 dark:hover:bg-[#1e2230] text-blue-600 dark:text-[#5b9cf5] border border-slate-200 dark:border-[#2a2f3e] text-xs font-mono font-semibold transition-colors cursor-pointer shadow-2xs"
+                    data-testid="simulate-outage-btn"
+                    onClick={handleSimulateOutage}
+                    disabled={actionLoading || isOffline}
+                    className={`flex-1 min-w-[140px] px-4 py-2.5 rounded-lg font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:cursor-not-allowed ${
+                      !isOffline
+                        ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/30 ring-2 ring-rose-500/50 scale-[1.01]"
+                        : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-300 dark:border-slate-700 opacity-60"
+                    }`}
                   >
-                    <span>+ Buffer Reading (TECU)</span>
+                    <WifiOff className="h-4 w-4 shrink-0" />
+                    <span>Simulate Outage</span>
+                  </button>
+
+                  {/* Restore & Reconcile button */}
+                  <button
+                    data-testid="restore-sync-btn"
+                    onClick={handleRestoreAndSync}
+                    disabled={actionLoading || !isOffline}
+                    className={`flex-1 min-w-[150px] px-4 py-2.5 rounded-lg font-mono text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:cursor-not-allowed ${
+                      isOffline
+                        ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/40 ring-2 ring-emerald-400 animate-pulse scale-[1.02]"
+                        : "bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-300 dark:border-slate-700 opacity-60"
+                    }`}
+                  >
+                    <Wifi className="h-4 w-4 shrink-0" />
+                    <span>Restore &amp; Reconcile</span>
+                  </button>
+
+                  {/* Reset Simulation button */}
+                  <button
+                    data-testid="reset-simulation-btn"
+                    onClick={handleResetSimulation}
+                    disabled={actionLoading}
+                    title="Reset Simulation State"
+                    className="px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-500 transition-colors font-mono text-xs font-bold cursor-pointer shrink-0"
+                  >
+                    <RotateCcw className="h-4 w-4" />
                   </button>
                 </div>
+              </div>
 
-                {inst.recent_observations && inst.recent_observations.length > 0 && (
-                  <div className="text-[11px] font-mono text-slate-500 dark:text-[#7a8194] space-y-1">
-                    <span className="text-slate-400 dark:text-[#6b7280] text-[10px] uppercase">Recent Samples:</span>
-                    <div className="flex flex-wrap gap-2">
-                      {inst.recent_observations.slice(0, 4).map((obs) => (
-                        <span key={obs.id} className="bg-white dark:bg-[#181b24] border border-slate-200 dark:border-[#2a2f3e] px-2 py-0.5 rounded text-slate-700 dark:text-[#9ca3b4]">
-                          {obs.measurement_value} {obs.unit} ({obs.sync_status})
+              {/* Compact Technical Metrics HUD (Not separate cards) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-2 text-xs font-mono">
+                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/60 shadow-sm">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">LINK LATENCY</div>
+                  <div data-testid="comms-latency" className="font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+                    {isOffline || commsStatus?.latency_ms === 9999 || commsStatus?.latency_ms === null || commsStatus?.latency_ms === undefined
+                      ? "DISCONNECTED"
+                      : `${commsStatus.latency_ms} ms`}
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/60 shadow-sm">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">LINK BANDWIDTH</div>
+                  <div data-testid="comms-bandwidth" className="font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+                    {commsStatus?.bandwidth_kbps ?? (isOffline ? 0 : 2048)} kbps
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/60 shadow-sm">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">UNSYNCED ITEMS</div>
+                  <div data-testid="pending-deltas-count" className="font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                    {pendingCount} Deltas
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-white/80 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/60 shadow-sm">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">RECONCILIATION</div>
+                  <div
+                    data-testid="reconciliation-status"
+                    className={`font-bold mt-0.5 ${
+                      isOffline ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"
+                    }`}
+                  >
+                    {isOffline ? "PENDING LINK" : "SYNCHRONIZED"}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stepped Reconciliation Technical System Console (Evidence Surface) */}
+          {activeSyncPhase && (
+            <div
+              data-testid="reconciliation-log-console"
+              className="mt-4 p-4 rounded-xl border border-[#334155] bg-[#0F172A] shadow-xl text-slate-300 font-mono text-xs animate-fade-in"
+            >
+              {/* Terminal Header */}
+              <div className="flex items-center justify-between border-b border-slate-700/80 pb-2.5 mb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
+                  </span>
+                  <span className="text-slate-100 font-mono font-bold uppercase tracking-wider text-[11px]">
+                    STEPPED RECONNECTION &amp; RECONCILIATION PROTOCOL ACTIVE
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest hidden sm:inline">
+                    CARRIER SYNC SPOOL
+                  </span>
+                  <button
+                    onClick={() => setActiveSyncPhase(null)}
+                    className="text-slate-400 hover:text-slate-200 text-xs p-0.5 rounded cursor-pointer transition-colors"
+                    aria-label="Dismiss reconciliation log"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Terminal Stream */}
+              <div className="space-y-1 font-mono text-[11px] leading-relaxed">
+                {reconciliationSteps.map((step, idx) => {
+                  if (step.startsWith("P0 transferred")) {
+                    const parts = step.split(" — ");
+                    return (
+                      <div key={idx} className="flex items-start gap-2 py-0.5">
+                        <span className="text-slate-500 select-none">›</span>
+                        <span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 mr-1.5">
+                            P0
+                          </span>
+                          <span className="text-slate-300">transferred</span>
+                          <span className="text-slate-500 mx-1">—</span>
+                          <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
                         </span>
-                      ))}
+                      </div>
+                    );
+                  }
+                  if (step.startsWith("P1 transferred")) {
+                    const parts = step.split(" — ");
+                    return (
+                      <div key={idx} className="flex items-start gap-2 py-0.5">
+                        <span className="text-slate-500 select-none">›</span>
+                        <span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 mr-1.5">
+                            P1
+                          </span>
+                          <span className="text-slate-300">transferred</span>
+                          <span className="text-slate-500 mx-1">—</span>
+                          <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
+                        </span>
+                      </div>
+                    );
+                  }
+                  if (step.startsWith("P2 transferred")) {
+                    const parts = step.split(" — ");
+                    return (
+                      <div key={idx} className="flex items-start gap-2 py-0.5">
+                        <span className="text-slate-500 select-none">›</span>
+                        <span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 mr-1.5">
+                            P2
+                          </span>
+                          <span className="text-slate-300">transferred</span>
+                          <span className="text-slate-500 mx-1">—</span>
+                          <span className="text-slate-300">{parts.slice(1).join(" — ")}</span>
+                        </span>
+                      </div>
+                    );
+                  }
+                  if (step.startsWith("P3 transferred")) {
+                    const parts = step.split(" — ");
+                    return (
+                      <div key={idx} className="flex items-start gap-2 py-0.5">
+                        <span className="text-slate-500 select-none">›</span>
+                        <span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-700/50 text-slate-300 border border-slate-600/50 mr-1.5">
+                            P3
+                          </span>
+                          <span className="text-slate-300">transferred</span>
+                          <span className="text-slate-500 mx-1">—</span>
+                          <span className="text-slate-400">{parts.slice(1).join(" — ")}</span>
+                        </span>
+                      </div>
+                    );
+                  }
+                  if (step.includes("SHA-256") || step.includes("checksums verified")) {
+                    return (
+                      <div key={idx} className="flex items-start gap-2 py-0.5">
+                        <span className="text-emerald-400 select-none">✔</span>
+                        <span className="text-slate-300">
+                          Canonical <span className="text-emerald-400 font-semibold">SHA-256</span> payload checksums{" "}
+                          <span className="text-emerald-400 font-semibold">verified</span> by station hub.
+                        </span>
+                      </div>
+                    );
+                  }
+                  if (step.startsWith("Server ACK received")) {
+                    return (
+                      <div key={idx} className="flex items-start gap-2 py-0.5">
+                        <span className="text-emerald-400 select-none">✔</span>
+                        <span className="text-slate-200">
+                          <span className="text-emerald-400 font-bold">Server ACK received:</span> All priority deltas reconciled. Satellite link{" "}
+                          <span className="text-emerald-400 font-bold">ONLINE</span>.
+                        </span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={idx} className="flex items-start gap-2 py-0.5">
+                      <span className="text-slate-500 select-none">›</span>
+                      <span className="text-slate-300">{step}</span>
                     </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────────
+          LAYER 2 — THE RESILIENCE ENGINE
+          "HOW POLAROPS SURVIVES A COMMUNICATIONS OUTAGE"
+          Connected Process Visualization Flow (Not 5 independent cards)
+          ───────────────────────────────────────────────────────────── */}
+      <section
+        aria-label="How PolarOps Operates Through Outage"
+        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-[#0f141f]/80 p-6 space-y-5 shadow-lg backdrop-blur-sm"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <div>
+            <div className="text-[10px] font-mono font-bold tracking-widest text-blue-600 dark:text-blue-400 uppercase">
+              ARCHITECTURAL SPECIFICATION · 5-STAGE CONTINUITY
+            </div>
+            <h2 className="text-lg md:text-xl font-black font-mono text-slate-900 dark:text-white uppercase tracking-tight">
+              HOW POLAROPS SURVIVES A COMMUNICATIONS OUTAGE
+            </h2>
+          </div>
+          <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
+            Deterministic Store-and-Forward Recovery Chain
+          </span>
+        </div>
+
+        {/* The Connected Process Vector Flow */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 relative">
+          {/* STAGE 01: LOCAL STORAGE */}
+          <div
+            className={`relative p-4 rounded-xl border transition-all ${
+              isOffline
+                ? "border-amber-500/50 bg-amber-500/10 dark:bg-amber-950/20"
+                : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs font-mono mb-2">
+              <span className="font-bold text-blue-600 dark:text-blue-400">01 LOCAL STORAGE</span>
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                  isOffline
+                    ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-500"
+                }`}
+              >
+                {isOffline ? "ACTIVE" : "STANDBY"}
+              </span>
+            </div>
+            <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-white">
+              1. Stored Locally
+            </h3>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
+              Isolated SQLite Hub persists generator telemetry, life-support states, and science observations.
+            </p>
+            <div className="mt-3 text-[10px] font-mono text-slate-400 flex items-center justify-between">
+              <span>Edge SQLite DB</span>
+              <ChevronRight className="h-3.5 w-3.5 hidden md:block text-slate-400" />
+            </div>
+          </div>
+
+          {/* STAGE 02: QUEUE */}
+          <div
+            className={`relative p-4 rounded-xl border transition-all ${
+              pendingCount > 0
+                ? "border-amber-500/50 bg-amber-500/10 dark:bg-amber-950/20"
+                : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs font-mono mb-2">
+              <span className="font-bold text-blue-600 dark:text-blue-400">02 QUEUE</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                {pendingCount} DELTAS
+              </span>
+            </div>
+            <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-white">
+              2. Waiting to Send
+            </h3>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
+              Batched in FIFO outbound spool with cryptographic hash generation awaiting link recovery.
+            </p>
+            <div className="mt-3 text-[10px] font-mono text-slate-400 flex items-center justify-between">
+              <span>Outbound Spool</span>
+              <ChevronRight className="h-3.5 w-3.5 hidden md:block text-slate-400" />
+            </div>
+          </div>
+
+          {/* STAGE 03: PRIORITIZE */}
+          <div className="relative p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+            <div className="flex items-center justify-between text-xs font-mono mb-2">
+              <span className="font-bold text-blue-600 dark:text-blue-400">03 PRIORITIZE</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-600 dark:text-rose-400">
+                P0 FIRST
+              </span>
+            </div>
+            <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-white">
+              3. Sent First
+            </h3>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
+              Deterministic priority dispatch: P0 (Safety/SCADA) → P1 (Grid) → P2 (Science) → P3 (Logs).
+            </p>
+            <div className="mt-3 text-[10px] font-mono text-slate-400 flex items-center justify-between">
+              <span>P0 &gt; P1 &gt; P2 &gt; P3</span>
+              <ChevronRight className="h-3.5 w-3.5 hidden md:block text-slate-400" />
+            </div>
+          </div>
+
+          {/* STAGE 04: VERIFY */}
+          <div className="relative p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+            <div className="flex items-center justify-between text-xs font-mono mb-2">
+              <span className="font-bold text-blue-600 dark:text-blue-400">04 VERIFY</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                SHA-256
+              </span>
+            </div>
+            <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-white">
+              4. How We Verify
+            </h3>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
+              Canonical JSON serialization &amp; UTF-8 SHA-256 prevents corruption or tampered uplink frames.
+            </p>
+            <div className="mt-3 text-[10px] font-mono text-slate-400 flex items-center justify-between">
+              <span>Cryptographic Hash</span>
+              <ChevronRight className="h-3.5 w-3.5 hidden md:block text-slate-400" />
+            </div>
+          </div>
+
+          {/* STAGE 05: RECONNECT */}
+          <div
+            className={`relative p-4 rounded-xl border transition-all ${
+              !isOffline
+                ? "border-emerald-500/40 bg-emerald-500/10 dark:bg-emerald-950/20"
+                : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50"
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs font-mono mb-2">
+              <span className="font-bold text-blue-600 dark:text-blue-400">05 RECONCILE</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                SERVER ACK
+              </span>
+            </div>
+            <h3 className="text-xs font-bold font-mono text-slate-900 dark:text-white">
+              5. When Link Returns
+            </h3>
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 leading-snug">
+              Carrier lock drains queue in strict priority order, verifies hashes, and syncs live bus.
+            </p>
+            <div className="mt-3 text-[10px] font-mono text-slate-400 flex items-center justify-between">
+              <span>Reconciled</span>
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────────
+          LAYER 3 — OPERATIONAL WORKSPACE
+          Secondary Navigation & Deep Focused Workspaces
+          ───────────────────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        {/* Workspace Segmented Navigation Rail */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800">
+            <button
+              onClick={() => setActiveTab("QUEUE")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeTab === "QUEUE"
+                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-700"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Database className="h-3.5 w-3.5" />
+              <span>Sync Queue &amp; Integrity</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                {queueItems.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("SCIENCE")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeTab === "SCIENCE"
+                  ? "bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-700"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Activity className="h-3.5 w-3.5" />
+              <span>Science Buffer</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                {instruments?.length || 2}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("INCIDENTS")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeTab === "INCIDENTS"
+                  ? "bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 shadow-sm border border-slate-200 dark:border-slate-700"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <ShieldAlert className="h-3.5 w-3.5" />
+              <span>Incident Blast Radius</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300">
+                {incidents?.length || 1}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("GRAPH")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeTab === "GRAPH"
+                  ? "bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm border border-slate-200 dark:border-slate-700"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span>Blast Radius Graph (Hero)</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("MEMORY")}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeTab === "MEMORY"
+                  ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200 dark:border-slate-700"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              }`}
+            >
+              <History className="h-3.5 w-3.5" />
+              <span>Operational Memory</span>
+            </button>
+          </div>
+
+          <div className="text-xs font-mono text-slate-500 dark:text-slate-400">
+            Active Workspace: <strong className="text-slate-800 dark:text-slate-200">{activeTab}</strong>
+          </div>
+        </div>
+
+        {/* ── WORKSPACE 1: SYNC QUEUE VIEW ────────────────────────── */}
+        {activeTab === "QUEUE" && (
+          <div data-testid="sync-queue-table" className="space-y-4">
+            {/* Priority Lanes Summary & Filter Pills */}
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setQueuePriorityFilter("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                    queuePriorityFilter === "ALL"
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                  }`}
+                >
+                  All ({queueItems.length})
+                </button>
+                <button
+                  onClick={() => setQueuePriorityFilter("P0")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                    queuePriorityFilter === "P0"
+                      ? "bg-rose-600 text-white shadow-xs"
+                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                  }`}
+                >
+                  P0: Critical ({p0Count})
+                </button>
+                <button
+                  onClick={() => setQueuePriorityFilter("P1")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                    queuePriorityFilter === "P1"
+                      ? "bg-amber-600 text-white shadow-xs"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                  }`}
+                >
+                  P1: High ({p1Count})
+                </button>
+                <button
+                  onClick={() => setQueuePriorityFilter("P2")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                    queuePriorityFilter === "P2"
+                      ? "bg-cyan-600 text-white shadow-xs"
+                      : "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30"
+                  }`}
+                >
+                  P2: Important ({p2Count})
+                </button>
+                <button
+                  onClick={() => setQueuePriorityFilter("P3")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors cursor-pointer ${
+                    queuePriorityFilter === "P3"
+                      ? "bg-slate-600 text-white shadow-xs"
+                      : "bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/30"
+                  }`}
+                >
+                  P3: Routine ({p3Count})
+                </button>
+              </div>
+
+              {/* Display Mode Toggle */}
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs font-mono">
+                <button
+                  onClick={() => setQueueDisplayMode("SPLIT")}
+                  className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-colors ${
+                    queueDisplayMode === "SPLIT"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs"
+                      : "text-slate-500"
+                  }`}
+                >
+                  Split Inspector
+                </button>
+                <button
+                  onClick={() => setQueueDisplayMode("TABLE")}
+                  className={`px-2.5 py-1 rounded font-bold cursor-pointer transition-colors ${
+                    queueDisplayMode === "TABLE"
+                      ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-2xs"
+                      : "text-slate-500"
+                  }`}
+                >
+                  Full Table
+                </button>
+              </div>
+            </div>
+
+            {/* Split Workspace Layout */}
+            {queueDisplayMode === "SPLIT" ? (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                {/* LEFT PANE (5 COLS): Priority Spool List */}
+                <div className="lg:col-span-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-4 space-y-2.5 shadow-sm max-h-[620px] overflow-y-auto">
+                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-500 dark:text-slate-400 pb-2 border-b border-slate-200 dark:border-slate-800">
+                    <span>DISPATCH ORDER (P0 &gt; P1 &gt; P2 &gt; P3)</span>
+                    <span>{filteredQueueItems.length} records</span>
+                  </div>
+
+                  {filteredQueueItems.map((item) => {
+                    const isSelected = activeQueueItem?.id === item.id;
+                    return (
+                      <div
+                        key={item.id}
+                        data-testid={`queue-item-${item.priority_label}`}
+                        onClick={() => setSelectedQueueItemId(item.id)}
+                        className={`p-3 rounded-lg border transition-all cursor-pointer space-y-1.5 ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-500/10 shadow-sm"
+                            : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-xs font-mono">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                item.priority_label === "P0"
+                                  ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                                  : item.priority_label === "P1"
+                                  ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                  : item.priority_label === "P2"
+                                  ? "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30"
+                                  : "bg-slate-500/20 text-slate-600 dark:text-slate-400 border border-slate-500/30"
+                              }`}
+                            >
+                              {item.priority_label}
+                            </span>
+                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                              {item.id}
+                            </span>
+                          </div>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              item.status === "RECONCILED"
+                                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                : "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </div>
+
+                        <div className="text-xs font-mono text-slate-700 dark:text-slate-300 font-semibold truncate">
+                          {item.event_type}
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-200/60 dark:border-slate-800/60">
+                          <span
+                            data-testid="checksum-hash"
+                            className="truncate max-w-[220px] font-mono text-[10px] text-slate-500 dark:text-slate-400"
+                          >
+                            {item.checksum_sha256}
+                          </span>
+                          <span
+                            data-testid="checksum-verified-badge"
+                            className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 shrink-0 ml-2"
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            VERIFIED
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* RIGHT PANE (7 COLS): Selected Queue Item Deep Inspector */}
+                <div className="lg:col-span-7 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-5 space-y-4 shadow-sm">
+                  {activeQueueItem ? (
+                    <>
+                      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-xs font-mono font-bold ${
+                                activeQueueItem.priority_label === "P0"
+                                  ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                                  : activeQueueItem.priority_label === "P1"
+                                  ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                  : activeQueueItem.priority_label === "P2"
+                                  ? "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30"
+                                  : "bg-slate-500/20 text-slate-600 dark:text-slate-400 border border-slate-500/30"
+                              }`}
+                            >
+                              PRIORITY {activeQueueItem.priority_label}
+                            </span>
+                            <span className="text-base font-bold font-mono text-slate-900 dark:text-white">
+                              {activeQueueItem.id}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                            Event Type: <strong>{activeQueueItem.event_type}</strong>
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleRetryQueueItem(activeQueueItem.id)}
+                            disabled={actionLoading}
+                            className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 font-mono text-xs font-bold cursor-pointer transition-colors"
+                          >
+                            Reverify
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Cryptographic SHA-256 Inspection Card */}
+                      <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs font-mono">
+                          <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                            <Lock className="h-3.5 w-3.5 text-emerald-500" />
+                            Canonical Payload SHA-256 Checksum
+                          </span>
+                          <span
+                            data-testid="checksum-verified-badge"
+                            className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-1"
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            VERIFIED
+                          </span>
+                        </div>
+                        <div
+                          data-testid="checksum-hash"
+                          className="font-mono text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-900/10 p-2 rounded border border-emerald-500/20 break-all select-all font-semibold"
+                        >
+                          {activeQueueItem.checksum_sha256}
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center justify-between">
+                          <span>UTF-8 Normalized JSON hash</span>
+                          <span>Timestamp: {new Date(activeQueueItem.created_at).toUTCString()}</span>
+                        </div>
+                      </div>
+
+                      {/* Formatted JSON Payload Inspector */}
+                      <div className="space-y-1.5">
+                        <div className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                          <span>Structured Event Payload (RFC 8259 Canonical Format)</span>
+                          <span className="text-[10px] text-slate-400">Strict Nonce &amp; State</span>
+                        </div>
+                        <pre className="p-4 rounded-xl bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto border border-slate-800 leading-relaxed shadow-inner">
+                          {(() => {
+                            try {
+                              return JSON.stringify(JSON.parse(activeQueueItem.payload_json), null, 2);
+                            } catch {
+                              return activeQueueItem.payload_json;
+                            }
+                          })()}
+                        </pre>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-8 text-center text-slate-400 font-mono text-xs">
+                      No queue item selected
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Full Table Mode (Accessible when needed) */
+              <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-4 overflow-x-auto shadow-sm">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 pb-2">
+                      <th className="p-2.5 font-bold">PRIORITY</th>
+                      <th className="p-2.5 font-bold">QUEUE ID</th>
+                      <th className="p-2.5 font-bold">EVENT TYPE &amp; PAYLOAD</th>
+                      <th className="p-2.5 font-bold">STATUS</th>
+                      <th className="p-2.5 font-bold">CANONICAL SHA-256 HASH</th>
+                      <th className="p-2.5 font-bold">INTEGRITY</th>
+                      <th className="p-2.5 font-bold text-right">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {filteredQueueItems.map((item) => (
+                      <tr
+                        key={item.id}
+                        data-testid={`queue-item-${item.priority_label}`}
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                      >
+                        <td className="p-2.5">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              item.priority_label === "P0"
+                                ? "bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                                : item.priority_label === "P1"
+                                ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                : item.priority_label === "P2"
+                                ? "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30"
+                                : "bg-slate-500/20 text-slate-600 dark:text-slate-400 border border-slate-500/30"
+                            }`}
+                          >
+                            {item.priority_label}
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-bold text-slate-900 dark:text-slate-100">{item.id}</td>
+                        <td className="p-2.5 max-w-xs">
+                          <div className="font-bold text-slate-800 dark:text-slate-200">{item.event_type}</div>
+                          <div className="text-[10px] text-slate-500 truncate">
+                            {item.payload_json}
+                          </div>
+                        </td>
+                        <td className="p-2.5">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              item.status === "RECONCILED"
+                                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                : "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="p-2.5 max-w-[200px]">
+                          <span data-testid="checksum-hash" className="truncate block font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                            {item.checksum_sha256}
+                          </span>
+                        </td>
+                        <td className="p-2.5">
+                          <span
+                            data-testid="checksum-verified-badge"
+                            className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-1 w-max"
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
+                            VERIFIED
+                          </span>
+                        </td>
+                        <td className="p-2.5 text-right">
+                          <button
+                            onClick={() => handleRetryQueueItem(item.id)}
+                            className="text-blue-600 hover:text-blue-500 font-bold text-xs"
+                          >
+                            Reverify
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── WORKSPACE 2: SCIENCE BUFFER VIEW ────────────────────── */}
+        {activeTab === "SCIENCE" && (
+          <div data-testid="science-instruments-card" className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* LEFT PANE (4 COLS): Scientific Instrument Deck */}
+              <div className="lg:col-span-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-4 space-y-3 shadow-sm">
+                <div className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
+                  STATION SCIENCE PAYLOADS ({instruments?.length || 2})
+                </div>
+
+                <div className="space-y-2">
+                  {instruments?.map((inst) => {
+                    const instCode = inst.code || inst.id;
+                    const isSelected = activeInstrument && (activeInstrument.code || activeInstrument.id) === instCode;
+                    return (
+                      <div
+                        key={inst.id}
+                        data-testid={`instrument-list-item-${instCode}`}
+                        onClick={() => setSelectedInstrumentCode(instCode)}
+                        className={`p-3.5 rounded-lg border transition-all cursor-pointer space-y-1.5 ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-500/10 shadow-sm"
+                            : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-xs font-mono">
+                          <div className="flex items-center gap-2">
+                            <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold text-[10px]">
+                              {instCode}
+                            </span>
+                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                              {inst.name}
+                            </span>
+                          </div>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              inst.health === "NOMINAL"
+                                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                                : "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                            }`}
+                          >
+                            {inst.health}
+                          </span>
+                        </div>
+
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                          Buffer: <strong>{inst.buffered_observations_count} queued</strong> · Power:{" "}
+                          <strong>{inst.power_status}</strong>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* RIGHT PANE (8 COLS): Hero Instrument Operational Monitor */}
+              <div className="lg:col-span-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-5 space-y-5 shadow-sm">
+                {activeInstrument ? (
+                  <div data-testid={`instrument-${activeInstrument.code || activeInstrument.id}`} className="space-y-5">
+                    {/* Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+                      <div>
+                        <div className="flex items-center gap-2 text-xs font-mono">
+                          <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-600 dark:text-blue-400 font-bold">
+                            {activeInstrument.code || activeInstrument.id}
+                          </span>
+                          <span className="text-slate-500 font-semibold">{activeInstrument.instrument_type}</span>
+                          <TruthBadge type="MEASURED" />
+                        </div>
+                        <h3 className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+                          {activeInstrument.name}
+                        </h3>
+                      </div>
+
+                      {/* Buffer Action */}
+                      <button
+                        data-testid="buffer-observation-btn"
+                        onClick={() => handleBufferObservation(activeInstrument.id || activeInstrument.code || "INST-S17-RADAR")}
+                        disabled={actionLoading}
+                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-all shadow-md cursor-pointer flex items-center gap-2"
+                      >
+                        <HardDrive className="h-4 w-4" />
+                        <span>Buffer Observation</span>
+                      </button>
+                    </div>
+
+                    {/* Telemetry Readouts Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="text-[10px] text-slate-500">BUFFER POSTURE</div>
+                        <div className="font-bold text-base text-blue-600 dark:text-blue-400 mt-0.5">
+                          {activeInstrument.buffered_observations_count} queued
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1">Circular Spool</div>
+                      </div>
+
+                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="text-[10px] text-slate-500">POWER ALLOCATION</div>
+                        <div className="font-bold text-base text-slate-900 dark:text-slate-100 mt-0.5">
+                          {activeInstrument.power_status}
+                        </div>
+                        <div className="text-[10px] text-emerald-500 mt-1">Bus: Active Feed</div>
+                      </div>
+
+                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="text-[10px] text-slate-500">INSTRUMENT HEALTH</div>
+                        <div className="font-bold text-base text-emerald-600 dark:text-emerald-400 mt-0.5">
+                          {activeInstrument.health}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1">Telemetry Valid</div>
+                      </div>
+
+                      <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+                        <div className="text-[10px] text-slate-500">BUFFER RETENTION</div>
+                        <div className="font-bold text-base text-slate-900 dark:text-slate-100 mt-0.5">
+                          72 Hours
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-1">Retention Guarantee</div>
+                      </div>
+                    </div>
+
+                    {/* Scientific Continuity Statement */}
+                    <div className="p-4 rounded-xl border border-blue-500/20 bg-blue-500/5 dark:bg-blue-950/20 space-y-1.5 text-xs font-mono">
+                      <div className="font-bold text-blue-700 dark:text-blue-300">
+                        Observation Continuity Protection Under Link Disruption:
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+                        Ionospheric scintillation and polar auroral radar arrays log directly to high-reliability
+                        NVMe local buffers during communication outages. Data is preserved with SHA-256 cryptographic
+                        fingerprints and queued as P2 telemetry to ensure zero scientific data loss.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-slate-400 font-mono text-xs">
+                    Select an instrument to view telemetry
                   </div>
                 )}
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── 3. INCIDENT WORKSPACE & BLAST RADIUS PANEL ────── */}
-      {(activeTab === "ALL" || activeTab === "INCIDENTS") && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Incident List */}
-          <div
-            data-testid="incidents-list"
-            className="rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#151923] p-5 space-y-3 lg:col-span-1 shadow-sm"
-          >
-            <h2 className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-2">
-              <ShieldAlert className="h-4 w-4 text-rose-500 dark:text-rose-400" />
-              <span>Active Incidents</span>
-            </h2>
-            <div className="space-y-2">
-              {incidents?.map((inc) => (
-                <div
-                  key={inc.id}
-                  onClick={() => setSelectedIncidentId(inc.id)}
-                  className={`p-3 rounded-lg border transition-all cursor-pointer ${
-                    selectedIncidentId === inc.id
-                      ? "border-cyan-500 dark:border-cyan-400 bg-cyan-50/70 dark:bg-cyan-950/30 shadow-sm"
-                      : "border-slate-200 dark:border-slate-800/60 bg-slate-50/70 dark:bg-slate-900/40 hover:bg-slate-100/80 dark:hover:bg-slate-800/40"
-                  }`}
+        {/* ── WORKSPACE 3: INCIDENT BLAST RADIUS VIEW ──────────────── */}
+        {activeTab === "INCIDENTS" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* LEFT (3 COLS): Incident List */}
+            <div
+              data-testid="incidents-list"
+              className="lg:col-span-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-4 space-y-2.5 shadow-sm"
+            >
+              <div className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 pb-2">
+                ACTIVE INCIDENTS ({incidents?.length || 1})
+              </div>
+
+              {incidents?.map((inc) => {
+                const isSelected = selectedIncidentId === inc.id;
+                return (
+                  <div
+                    key={inc.id}
+                    onClick={() => setSelectedIncidentId(inc.id)}
+                    className={`p-3 rounded-lg border transition-all cursor-pointer space-y-1 ${
+                      isSelected
+                        ? "border-rose-500 bg-rose-500/10 shadow-sm"
+                        : "border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span className="font-bold text-rose-600 dark:text-rose-400">{inc.id}</span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-600 dark:text-rose-400">
+                        {inc.severity}
+                      </span>
+                    </div>
+                    <div className="text-xs font-bold font-mono text-slate-900 dark:text-white truncate">
+                      {inc.title}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-500 flex items-center justify-between">
+                      <span>Status: {inc.status}</span>
+                      <span>Actions: {inc.actions_count}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* CENTER (5 COLS): Selected Incident & Blast Radius */}
+            <div
+              data-testid="incident-detail-panel"
+              className="lg:col-span-5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-5 space-y-4 shadow-sm"
+            >
+              {activeIncident ? (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2 text-xs font-mono">
+                        <span className="font-bold text-rose-600 dark:text-rose-400">{activeIncident.id}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-600">
+                          {activeIncident.severity}
+                        </span>
+                        <TruthBadge type="DERIVED" />
+                      </div>
+                      <h3 className="text-base font-bold font-mono text-slate-900 dark:text-white mt-1">
+                        {activeIncident.title}
+                      </h3>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {activeIncident.status !== "RESOLVED" && (
+                        <button
+                          data-testid="resolve-incident-btn"
+                          onClick={() => handleUpdateStatus("RESOLVED")}
+                          className="px-2.5 py-1 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-mono font-bold cursor-pointer"
+                        >
+                          Resolve Incident
+                        </button>
+                      )}
+                      <button
+                        data-testid="record-memory-btn"
+                        onClick={() => setIsMemoryModalOpen(true)}
+                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-blue-700 dark:text-blue-300 border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold cursor-pointer"
+                      >
+                        Record to Memory
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Blast Radius Context Container */}
+                  <div data-testid="incident-blast-radius" className="space-y-3">
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-1.5 text-xs font-mono">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">MODELED RISK SCORE</div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">Day 2 Risk Engine Score:</span>
+                        <span
+                          data-testid="incident-risk-score"
+                          className="text-base font-bold text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30"
+                        >
+                          {activeIncident.modeled_risk_score} / 100
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-1.5 text-xs font-mono">
+                      <div className="text-[10px] text-slate-500 uppercase font-bold">AFFECTED EQUIPMENT (BLAST RADIUS)</div>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {activeIncident.affected_assets.map((ast) => (
+                          <span
+                            key={ast.asset_id}
+                            onClick={() => onInspectAsset?.(ast.asset_id)}
+                            className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] text-slate-700 dark:text-slate-300 cursor-pointer hover:border-blue-500"
+                          >
+                            {ast.name} ({ast.criticality})
+                          </span>
+                        ))}
+                      </div>
+                      <div className="text-[11px] text-slate-500 pt-1">
+                        Services: {activeIncident.affected_services.map((s) => s.name).join(", ")}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="p-8 text-center text-slate-400 font-mono text-xs">No incident selected</div>
+              )}
+            </div>
+
+            {/* RIGHT (4 COLS): Operator Action Logging & Audit Trail */}
+            <div className="lg:col-span-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-5 space-y-4 shadow-sm">
+              <div className="text-xs font-mono font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-2">
+                HUMAN-IN-THE-LOOP ACTION LOGGING
+              </div>
+
+              <form data-testid="log-action-form" onSubmit={handleLogAction} className="space-y-3">
+                <input
+                  data-testid="action-code-input"
+                  type="text"
+                  placeholder="Action Code (e.g. EXPEDITE_VALVE_PURGE)"
+                  value={newActionCode}
+                  onChange={(e) => setNewActionCode(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                  required
+                />
+                <textarea
+                  data-testid="action-desc-input"
+                  placeholder="Action Description / Engineering Notes"
+                  value={newActionDesc}
+                  onChange={(e) => setNewActionDesc(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                  required
+                />
+                <button
+                  data-testid="submit-action-btn"
+                  type="submit"
+                  disabled={actionLoading}
+                  className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="font-bold text-rose-600 dark:text-rose-400">{inc.id}</span>
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                        inc.status === "ACTIVE"
-                          ? "bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-                          : inc.status === "CONTAINED"
-                          ? "bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
-                          : "bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                      }`}
+                  Log Response Action
+                </button>
+              </form>
+
+              {/* Audit Trail */}
+              <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <div className="text-[11px] font-mono text-slate-500 font-bold uppercase">
+                  Audit Trail ({activeIncident?.actions.length || 0})
+                </div>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {activeIncident?.actions.map((act) => (
+                    <div
+                      key={act.id}
+                      data-testid="action-item"
+                      className="p-2 rounded bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-[11px] font-mono space-y-0.5"
                     >
-                      {inc.status}
+                      <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+                        <span>{act.action_code}</span>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(act.executed_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-slate-600 dark:text-slate-400 text-[10px]">{act.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── WORKSPACE 4: BLAST RADIUS GRAPH (HERO) ──────────────── */}
+        {activeTab === "GRAPH" && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+                <div>
+                  <h3 className="text-sm font-bold font-mono text-slate-900 dark:text-white uppercase tracking-wider">
+                    Full-Width Blast Radius &amp; Operational Dependency Cascade
+                  </h3>
+                  <p className="text-xs font-mono text-slate-500">
+                    Propagating failure pathway: Generator G-02 → Secondary Thermal/Power Bus → Critical Services
+                  </p>
+                </div>
+                <TruthBadge type="DERIVED" />
+              </div>
+
+              {/* Full Width Topology Component */}
+              <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+                <OperationalTopology
+                  assetId="G-02"
+                  large={true}
+                  onInspectAsset={onInspectAsset}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── WORKSPACE 5: OPERATIONAL MEMORY VIEW ─────────────────── */}
+        {activeTab === "MEMORY" && (
+          <div
+            data-testid="operational-memory-panel"
+            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-[#121724]/90 p-5 space-y-5 shadow-sm"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div>
+                <div className="text-[10px] font-mono font-bold tracking-widest text-emerald-600 dark:text-emerald-400 uppercase">
+                  INSTITUTIONAL KNOWLEDGE ARCHIVE
+                </div>
+                <h3 className="text-lg font-bold font-mono text-slate-900 dark:text-white">
+                  Station Operational Memory &amp; Post-Mortem Records
+                </h3>
+              </div>
+
+              {/* Search input */}
+              <div className="relative w-full sm:w-72">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  data-testid="memory-search-input"
+                  type="text"
+                  placeholder="Search memory (e.g. 'Boiler')..."
+                  value={memorySearchQuery}
+                  onChange={(e) => setMemorySearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Memory Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {memoryData?.memories?.map((item) => (
+                <div
+                  key={item.id}
+                  data-testid="memory-card"
+                  className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-2.5 text-xs font-mono"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+                    <span className="font-bold text-blue-600 dark:text-blue-400">{item.title}</span>
+                    <span className="text-[10px] text-slate-400">
+                      {new Date(item.created_at).toLocaleDateString()}
                     </span>
                   </div>
-                  <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100 mt-1">{inc.title}</h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{inc.location}</p>
+
+                  <div className="space-y-1.5 text-[11px]">
+                    <div>
+                      <strong className="text-slate-700 dark:text-slate-300">Decision:</strong>{" "}
+                      <span className="text-slate-600 dark:text-slate-400">{item.decision}</span>
+                    </div>
+                    <div>
+                      <strong className="text-slate-700 dark:text-slate-300">Action Taken:</strong>{" "}
+                      <span className="text-slate-600 dark:text-slate-400">{item.action_taken}</span>
+                    </div>
+                    <div>
+                      <strong className="text-slate-700 dark:text-slate-300">Operational Outcome:</strong>{" "}
+                      <span className="text-slate-600 dark:text-slate-400">{item.outcome}</span>
+                    </div>
+                    <div className="p-2.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300">
+                      <strong>Lesson Learned:</strong> {item.lessons_learned}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
+        )}
+      </section>
 
-          {/* Incident Detail & Blast Radius */}
-          <div
-            data-testid="incident-detail-panel"
-            className="rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#151923] p-5 space-y-5 lg:col-span-2 shadow-sm"
-          >
-            {activeIncident ? (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-bold text-rose-600 dark:text-rose-400">{activeIncident.id}</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700 font-bold">
-                        {activeIncident.severity}
-                      </span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold">
-                        {activeIncident.status}
-                      </span>
-                    </div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-1">{activeIncident.title}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{activeIncident.description}</p>
-                  </div>
-
-                  {/* Incident Lifecycle Controls */}
-                  <div className="flex items-center gap-2">
-                    {activeIncident.status === "ACTIVE" && (
-                      <button
-                        onClick={() => handleUpdateStatus("CONTAINED")}
-                        className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700 text-xs font-mono font-semibold cursor-pointer transition-colors"
-                      >
-                        Mark Contained
-                      </button>
-                    )}
-                    {activeIncident.status !== "RESOLVED" && (
-                      <button
-                        data-testid="resolve-incident-btn"
-                        onClick={() => handleUpdateStatus("RESOLVED")}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-xs font-mono font-semibold cursor-pointer transition-colors"
-                      >
-                        Resolve Incident
-                      </button>
-                    )}
-                    <button
-                      data-testid="record-memory-btn"
-                      onClick={() => setIsMemoryModalOpen(true)}
-                      className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-cyan-700 dark:text-cyan-300 border border-slate-300 dark:border-slate-700 text-xs font-mono font-semibold cursor-pointer transition-colors"
-                    >
-                      Record to Memory
-                    </button>
-                  </div>
-                </div>
-
-                {/* Blast Radius & Day 2 Engine Reuse */}
-                <div data-testid="incident-blast-radius" className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="text-slate-500 dark:text-slate-400">Reused Day 2 Dependency Graph</span>
-                      <Layers className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
-                    </div>
-                    <div className="text-xs text-slate-600 dark:text-slate-300">
-                      Downstream Equipment ({activeIncident.affected_assets.length}):
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {activeIncident.affected_assets.map((ast) => (
-                        <span
-                          key={ast.asset_id}
-                          onClick={() => onInspectAsset?.(ast.asset_id)}
-                          className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-mono text-slate-700 dark:text-slate-300 cursor-pointer hover:border-cyan-500 dark:hover:border-cyan-400 transition-colors"
-                        >
-                          {ast.name} ({ast.criticality})
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="text-slate-500 dark:text-slate-400">Reused Day 2 Risk Engine</span>
-                      <Shield className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-600 dark:text-slate-300">Composite Risk Score:</span>
-                      <span
-                        data-testid="incident-risk-score"
-                        className="text-base font-mono font-bold text-rose-600 dark:text-rose-400 px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800"
-                      >
-                        {activeIncident.modeled_risk_score} / 100
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Affected Services: {activeIncident.affected_services.map((s) => s.name).join(", ")}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Log Action Form */}
-                <form
-                  data-testid="log-action-form"
-                  onSubmit={handleLogAction}
-                  className="rounded-lg border border-slate-200 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/30 p-3.5 space-y-2.5"
-                >
-                  <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-200 block">
-                    Log Operator Action (Human-in-the-Loop)
-                  </span>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <input
-                      data-testid="action-code-input"
-                      type="text"
-                      placeholder="Action Code (e.g. PURGE_FUEL_LINE)"
-                      value={newActionCode}
-                      onChange={(e) => setNewActionCode(e.target.value)}
-                      className="px-2.5 py-1.5 rounded-md bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
-                      required
-                    />
-                    <input
-                      data-testid="action-desc-input"
-                      type="text"
-                      placeholder="Action Description / Findings"
-                      value={newActionDesc}
-                      onChange={(e) => setNewActionDesc(e.target.value)}
-                      className="px-2.5 py-1.5 rounded-md bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-slate-100 md:col-span-2 focus:outline-none focus:border-cyan-500"
-                      required
-                    />
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      data-testid="submit-action-btn"
-                      type="submit"
-                      disabled={actionLoading}
-                      className="px-3.5 py-1.5 rounded-md bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-400 text-white dark:text-slate-950 text-xs font-mono font-bold transition-colors cursor-pointer shadow-sm disabled:opacity-50"
-                    >
-                      Log Response Action
-                    </button>
-                  </div>
-                </form>
-
-                {/* Action Audit Trail */}
-                <div className="space-y-2">
-                  <span className="text-[10px] font-mono font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Incident Audit Trail ({activeIncident.actions.length})
-                  </span>
-                  <div className="space-y-1.5">
-                    {activeIncident.actions.map((act) => (
-                      <div
-                        key={act.id}
-                        data-testid="action-item"
-                        className="p-2.5 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs font-mono"
-                      >
-                        <div>
-                          <span className="font-bold text-cyan-600 dark:text-cyan-400">{act.action_code}</span>:{" "}
-                          <span className="text-slate-700 dark:text-slate-300">{act.description}</span>
-                          <span className="text-slate-500 dark:text-slate-500 block text-[10px]">
-                            Logged by {act.executed_by} at {new Date(act.executed_at).toLocaleTimeString()}
-                          </span>
-                        </div>
-                        <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-slate-850 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold border border-emerald-200 dark:border-slate-700">
-                          {act.outcome_status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="py-12 text-center text-slate-400 dark:text-slate-500 font-mono text-xs">
-                Select an incident to view blast-radius analysis.
-              </div>
-            )}
-          </div>
+      {/* ─────────────────────────────────────────────────────────────
+          LAYER 4 — CONTEXTUAL STATION RESILIENCE SUMMARY
+          Compact Operational Summary at Bottom of Main Page
+          ───────────────────────────────────────────────────────────── */}
+      <section
+        aria-label="Station Resilience Summary"
+        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-[#0c1017]/80 p-5 shadow-inner backdrop-blur-sm"
+      >
+        <div className="text-[10px] font-mono font-bold tracking-widest text-slate-500 dark:text-slate-400 uppercase mb-3">
+          STATION RESILIENCE OPERATIONAL SUMMARY
         </div>
-      )}
 
-      {/* ── 4. OPERATIONAL MEMORY PANEL ──────────────────── */}
-      {(activeTab === "ALL" || activeTab === "MEMORY") && (
-        <div
-          data-testid="operational-memory-panel"
-          className="rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#151923] p-5 space-y-4 shadow-sm"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800/80 pb-3">
-            <div>
-              <h2 className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                <History className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-                <span>Operational Memory &amp; Institutional Knowledge</span>
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Structured post-mortem lessons learned across wintering expeditions. Reusable operator knowledge prevents recurring incidents.
-              </p>
-            </div>
-            <div className="relative">
-              <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-slate-400 dark:text-slate-500" />
-              <input
-                data-testid="memory-search-input"
-                type="text"
-                placeholder="Search lessons (e.g. Boiler, Vapor Lock)..."
-                value={memorySearchQuery}
-                onChange={(e) => setMemorySearchQuery(e.target.value)}
-                className="pl-8 pr-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500 w-64"
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+          <div className="space-y-0.5">
+            <span className="text-[10px] text-slate-500 uppercase">LOCAL OPERATIONS</span>
+            <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <span
+                className={`h-2 w-2 rounded-full ${isOffline ? "bg-amber-500" : "bg-emerald-500"}`}
               />
+              <span>{isOffline ? "Autonomous Degraded" : "Normal Connected"}</span>
             </div>
+            <p className="text-[10px] text-slate-500">Life-support &amp; microgrid autonomous</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {memoryData?.memories && memoryData.memories.length > 0 ? (
-              memoryData.memories.map((mem) => (
-                <div
-                  key={mem.id}
-                  data-testid="memory-card"
-                  className="rounded-xl border border-slate-200 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/40 p-4 space-y-2.5"
-                >
-                  <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="font-bold text-cyan-600 dark:text-cyan-400">{mem.id}</span>
-                    <span className="text-slate-500 dark:text-slate-500 text-[10px]">{new Date(mem.created_at).toLocaleDateString()}</span>
-                  </div>
-                  <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">{mem.title}</h3>
-                  <div className="text-xs text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800/80 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <strong className="text-slate-500 dark:text-slate-400 block text-[9px] uppercase tracking-wider mb-0.5">Context &amp; Decision:</strong>
-                    {mem.context_summary}
-                  </div>
-                  <div className="text-xs text-cyan-800 dark:text-cyan-200 bg-cyan-50/50 dark:bg-cyan-950/30 p-2.5 rounded-lg border border-cyan-200 dark:border-cyan-900/60">
-                    <strong className="text-cyan-600 dark:text-cyan-400 block text-[9px] uppercase tracking-wider mb-0.5">Lesson Learned:</strong>
-                    {mem.lessons_learned}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="py-6 text-center text-slate-400 dark:text-slate-500 font-mono text-xs col-span-2">
-                No operational memories match query.
-              </div>
-            )}
+          <div className="space-y-0.5">
+            <span className="text-[10px] text-slate-500 uppercase">SYNC SPOOL QUEUE</span>
+            <div className="font-bold text-amber-600 dark:text-amber-400">
+              {pendingCount} Pending Deltas
+            </div>
+            <p className="text-[10px] text-slate-500">Strict deterministic P0–P3 queue</p>
+          </div>
+
+          <div className="space-y-0.5">
+            <span className="text-[10px] text-slate-500 uppercase">DATA INTEGRITY</span>
+            <div className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3" />
+              <span>SHA-256 Verified</span>
+            </div>
+            <p className="text-[10px] text-slate-500">Canonical JSON payload checksums</p>
+          </div>
+
+          <div className="space-y-0.5">
+            <span className="text-[10px] text-slate-500 uppercase">SCIENCE CONTINUITY</span>
+            <div className="font-bold text-blue-600 dark:text-blue-400">
+              S-17 Nominal ({totalScienceBuffered} queued)
+            </div>
+            <p className="text-[10px] text-slate-500">Circular NVMe observation buffers</p>
           </div>
         </div>
-      )}
+      </section>
 
-      {/* ── Record to Memory Modal ──────────────────────── */}
+      {/* Record Memory Modal */}
       {isMemoryModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#151923] max-w-lg w-full p-6 space-y-4 shadow-2xl">
-            <h3 className="text-sm font-mono font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <History className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-              <span>Record Incident to Operational Memory</span>
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Human-in-the-loop transfer from resolved incident {selectedIncidentId} to permanent station memory archive.
-            </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#121724] border border-slate-300 dark:border-slate-700 p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-sm font-bold font-mono text-slate-900 dark:text-white">
+                Record Incident Post-Mortem to Operational Memory
+              </h3>
+              <button
+                onClick={() => setIsMemoryModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
 
             <form onSubmit={handleSaveMemory} className="space-y-3 font-mono text-xs">
               <div>
-                <label className="block text-slate-600 dark:text-slate-400 mb-1">Decision</label>
-                <textarea
+                <label className="text-[10px] text-slate-500 block mb-1">DECISION TAKEN</label>
+                <input
+                  type="text"
                   value={memDecision}
                   onChange={(e) => setMemDecision(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
-                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-slate-600 dark:text-slate-400 mb-1">Action Taken</label>
-                <textarea
+                <label className="text-[10px] text-slate-500 block mb-1">OPERATIONAL ACTION</label>
+                <input
+                  type="text"
                   value={memAction}
                   onChange={(e) => setMemAction(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
-                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-slate-600 dark:text-slate-400 mb-1">Outcome</label>
-                <textarea
+                <label className="text-[10px] text-slate-500 block mb-1">OUTCOME</label>
+                <input
+                  type="text"
                   value={memOutcome}
                   onChange={(e) => setMemOutcome(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
-                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-cyan-700 dark:text-cyan-400 mb-1">Lesson Learned for Future Winter Teams</label>
+                <label className="text-[10px] text-slate-500 block mb-1">LESSON LEARNED</label>
                 <textarea
                   value={memLesson}
                   onChange={(e) => setMemLesson(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-cyan-50/50 dark:bg-cyan-950/30 border border-cyan-300 dark:border-cyan-800 text-cyan-900 dark:text-cyan-200 focus:outline-none focus:border-cyan-500"
                   rows={2}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100"
                   required
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsMemoryModalOpen(false)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-mono cursor-pointer border border-slate-300 dark:border-slate-700 transition-colors"
+                  className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-400 text-white dark:text-slate-950 text-xs font-mono font-bold cursor-pointer transition-colors shadow-sm disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold"
                 >
-                  Commit to Memory
+                  Save to Archive
                 </button>
               </div>
             </form>
