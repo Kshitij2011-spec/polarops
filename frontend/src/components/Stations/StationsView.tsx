@@ -255,57 +255,72 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
         {/* ── Card 1: BHARATI ─────────────────────────────────────── */}
         <div
           data-testid="station-card-bharati"
-          className={`rounded-2xl border bg-white dark:bg-slate-900 p-5 md:p-6 space-y-4 shadow-xs transition-all ${
+          className={`rounded-2xl border bg-white dark:bg-slate-900 p-6 space-y-4.5 shadow-xs transition-all ${
             isBharatiActive
               ? "border-primary ring-2 ring-primary/20"
               : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
           }`}
         >
-          {/* Station Title, Status & Weather */}
+          {/* 1. Station Identity & Status */}
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-2xl font-bold font-sans text-slate-900 dark:text-white tracking-tight">
                   BHARATI
                 </h2>
-                <span className="text-xs text-muted-foreground font-medium">Research Station</span>
+                <span className="text-xs font-sans font-medium text-slate-500 dark:text-slate-400">
+                  Research Station
+                </span>
                 {isBharatiActive && (
-                  <span className="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60">
+                  <span className="text-[10px] font-sans font-semibold tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60">
                     ACTIVE
                   </span>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Larsemann Hills · <span className="font-mono">69°24′S 76°11′E</span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-sans">
+                <span>Larsemann Hills</span>
+                <span className="mx-1.5 text-slate-300 dark:text-slate-700">·</span>
+                <span className="font-mono text-slate-600 dark:text-slate-400">69°24′S 76°11′E</span>
               </p>
             </div>
 
-            <div className="text-right flex flex-col items-end gap-1">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            {/* Primary Station Status */}
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-sans font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                 <span>{station_a.status}</span>
-              </span>
-              <span className="text-xs font-mono text-muted-foreground">
-                {station_a.temperature_celsius}°C · {station_a.wind_speed_knots} kt BLIZZARD
               </span>
             </div>
           </div>
 
-          {/* Compact Operational Headroom */}
-          <div className="py-2.5 px-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-800/50 space-y-2">
-            <div className="flex items-baseline justify-between">
+          {/* 2. Current Condition (Weather & Environment) */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 font-sans">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#369ACC] dark:bg-[#46B9C7]" />
+            <span className="font-mono text-slate-800 dark:text-slate-200">{station_a.temperature_celsius}°C</span>
+            <span className="text-slate-300 dark:text-slate-600 font-light select-none">·</span>
+            <span className="font-mono text-slate-800 dark:text-slate-200">{station_a.wind_speed_knots} kt</span>
+            <span className="text-slate-300 dark:text-slate-600 font-light select-none">·</span>
+            <span className="font-sans font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+              {station_a.conditions || "BLIZZARD"}
+            </span>
+          </div>
+
+          {/* 3. Operational Headroom & Primary Constraint */}
+          <div className="py-3 px-4 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800/60 space-y-2.5">
+            <div className="flex items-baseline justify-between gap-2">
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono tracking-tight text-slate-900 dark:text-white">
+                <span className="text-3xl font-bold font-sans tracking-tight text-slate-900 dark:text-white">
                   {station_a.overall_health}%
                 </span>
-                <span className="text-xs font-medium text-muted-foreground">
+                <span className="text-xs font-sans font-medium text-slate-500 dark:text-slate-400">
                   Operational Headroom
                 </span>
               </div>
-              <span className="text-xs font-mono font-medium text-amber-600 dark:text-amber-400">
+              <span className="text-xs font-sans font-semibold text-amber-600 dark:text-amber-400">
                 Vibration Constraint
               </span>
             </div>
+            {/* Preserved Operational Headroom Bar */}
             <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
               <div
                 className="h-full bg-amber-500 rounded-full transition-all duration-500"
@@ -314,67 +329,69 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
             </div>
           </div>
 
-          {/* 2×2 Clean Metric Grid (No nested cards) */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-0.5">
+          {/* 4. Key Operational Indicators (2×2 Summary Grid) */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-1">
             <div>
-              <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase block">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tracking-wider uppercase block font-sans">
                 POWER
               </span>
-              <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-0.5">
+              <div className="text-xl font-semibold font-sans text-slate-900 dark:text-white mt-1">
                 94%
               </div>
-              <div className="text-xs font-mono text-muted-foreground mt-0.5">
+              <div className="text-xs font-sans text-slate-500 dark:text-slate-400 mt-0.5">
                 201 / 600 kW
               </div>
             </div>
 
             <div>
-              <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase block">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tracking-wider uppercase block font-sans">
                 FUEL
               </span>
-              <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-0.5">
+              <div className="text-xl font-semibold font-sans text-slate-900 dark:text-white mt-1">
                 57%
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5">
-                <span className="font-mono">142,500 L on hand</span> · <span className="font-mono">70.3d runway</span>
+              <div className="text-xs font-sans text-slate-500 dark:text-slate-400 mt-0.5">
+                <span className="font-mono text-slate-700 dark:text-slate-300">142,500 L on hand</span> · <span className="font-mono">70.3d runway</span>
               </div>
             </div>
 
             <div>
-              <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase block">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tracking-wider uppercase block font-sans">
                 PERSONNEL
               </span>
-              <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-0.5">
+              <div className="text-xl font-semibold font-sans text-slate-900 dark:text-white mt-1">
                 52
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5">
+              <div className="text-xs font-sans text-slate-500 dark:text-slate-400 mt-0.5">
                 Active crew
               </div>
             </div>
 
             <div>
-              <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase block">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tracking-wider uppercase block font-sans">
                 RESILIENCE
               </span>
-              <div className="text-xl font-bold font-mono text-rose-600 dark:text-rose-400 mt-0.5">
+              <div className="text-xl font-semibold font-sans text-rose-600 dark:text-rose-400 mt-1">
                 87%
               </div>
-              <div className="text-xs font-mono font-semibold text-rose-600 dark:text-rose-400 mt-0.5">
-                G-02 STOCKOUT
+              <div className="text-xs font-sans font-semibold text-rose-600 dark:text-rose-400 mt-0.5">
+                <span className="font-mono font-bold">G-02</span> STOCKOUT
               </div>
             </div>
           </div>
 
-          {/* Card Footer: Action */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" />
-              <span>Comms: <span className="font-mono">{station_a.comms_status}</span> · 1 active incident</span>
+          {/* 5. Communication & Action Footer */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+            <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-2 font-sans">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+              <span>
+                Comms <span className="font-semibold text-slate-800 dark:text-slate-200">ONLINE</span> · <span className="text-amber-600 dark:text-amber-400 font-medium">1 active incident</span>
+              </span>
             </div>
 
             <button
               onClick={() => handleSelectStation("STATION-BHARATI")}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-primary text-primary-foreground font-medium text-xs hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
             >
               <span>View Station</span>
               <ArrowRight className="h-3.5 w-3.5" />
@@ -385,57 +402,72 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
         {/* ── Card 2: MAITRI ───────────────────────────────────────── */}
         <div
           data-testid="station-card-maitri"
-          className={`rounded-2xl border bg-white dark:bg-slate-900 p-5 md:p-6 space-y-4 shadow-xs transition-all ${
+          className={`rounded-2xl border bg-white dark:bg-slate-900 p-6 space-y-4.5 shadow-xs transition-all ${
             isMaitriActive
               ? "border-primary ring-2 ring-primary/20"
               : "border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
           }`}
         >
-          {/* Station Title, Status & Weather */}
+          {/* 1. Station Identity & Status */}
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-2xl font-bold font-sans text-slate-900 dark:text-white tracking-tight">
                   MAITRI
                 </h2>
-                <span className="text-xs text-muted-foreground font-medium">Research Station</span>
+                <span className="text-xs font-sans font-medium text-slate-500 dark:text-slate-400">
+                  Research Station
+                </span>
                 {isMaitriActive && (
-                  <span className="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60">
+                  <span className="text-[10px] font-sans font-semibold tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-800/60">
                     ACTIVE
                   </span>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Schirmacher Oasis · <span className="font-mono">70°46′S 11°44′E</span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-sans">
+                <span>Schirmacher Oasis</span>
+                <span className="mx-1.5 text-slate-300 dark:text-slate-700">·</span>
+                <span className="font-mono text-slate-600 dark:text-slate-400">70°46′S 11°44′E</span>
               </p>
             </div>
 
-            <div className="text-right flex flex-col items-end gap-1">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
+            {/* Primary Station Status */}
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-sans font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 <span>{station_b.status}</span>
-              </span>
-              <span className="text-xs font-mono text-muted-foreground">
-                {station_b.temperature_celsius}°C · {station_b.wind_speed_knots} kt {station_b.conditions}
               </span>
             </div>
           </div>
 
-          {/* Compact Operational Headroom */}
-          <div className="py-2.5 px-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-800/50 space-y-2">
-            <div className="flex items-baseline justify-between">
+          {/* 2. Current Condition (Weather & Environment) */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 font-sans">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#369ACC] dark:bg-[#46B9C7]" />
+            <span className="font-mono text-slate-800 dark:text-slate-200">{station_b.temperature_celsius}°C</span>
+            <span className="text-slate-300 dark:text-slate-600 font-light select-none">·</span>
+            <span className="font-mono text-slate-800 dark:text-slate-200">{station_b.wind_speed_knots} kt</span>
+            <span className="text-slate-300 dark:text-slate-600 font-light select-none">·</span>
+            <span className="font-sans font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+              {station_b.conditions || "CLEAR_OASIS"}
+            </span>
+          </div>
+
+          {/* 3. Operational Headroom & Primary Constraint */}
+          <div className="py-3 px-4 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/70 dark:border-slate-800/60 space-y-2.5">
+            <div className="flex items-baseline justify-between gap-2">
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold font-mono tracking-tight text-slate-900 dark:text-white">
+                <span className="text-3xl font-bold font-sans tracking-tight text-slate-900 dark:text-white">
                   {station_b.overall_health}%
                 </span>
-                <span className="text-xs font-medium text-muted-foreground">
+                <span className="text-xs font-sans font-medium text-slate-500 dark:text-slate-400">
                   Operational Headroom
                 </span>
               </div>
-              <span className="text-xs font-mono font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="text-xs font-sans font-semibold text-emerald-600 dark:text-emerald-400">
                 Nominal Fleet
               </span>
             </div>
+            {/* Preserved Operational Headroom Bar */}
             <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
               <div
                 className="h-full bg-emerald-500 rounded-full transition-all duration-500"
@@ -444,67 +476,69 @@ export function StationsView({ onBack, onOpenExplanation }: StationsViewProps) {
             </div>
           </div>
 
-          {/* 2×2 Clean Metric Grid (No nested cards) */}
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 pt-0.5">
+          {/* 4. Key Operational Indicators (2×2 Summary Grid) */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-1">
             <div>
-              <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase block">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tracking-wider uppercase block font-sans">
                 POWER
               </span>
-              <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-0.5">
+              <div className="text-xl font-semibold font-sans text-slate-900 dark:text-white mt-1">
                 90%
               </div>
-              <div className="text-xs font-mono text-muted-foreground mt-0.5">
+              <div className="text-xs font-sans text-slate-500 dark:text-slate-400 mt-0.5">
                 180 / 600 kW
               </div>
             </div>
 
             <div>
-              <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase block">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tracking-wider uppercase block font-sans">
                 FUEL
               </span>
-              <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-0.5">
+              <div className="text-xl font-semibold font-sans text-slate-900 dark:text-white mt-1">
                 83%
               </div>
-              <div className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+              <div className="text-xs font-sans font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
                 +62.9d reserve surplus
               </div>
             </div>
 
             <div>
-              <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase block">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tracking-wider uppercase block font-sans">
                 PERSONNEL
               </span>
-              <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-0.5">
+              <div className="text-xl font-semibold font-sans text-slate-900 dark:text-white mt-1">
                 25
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5">
+              <div className="text-xs font-sans text-slate-500 dark:text-slate-400 mt-0.5">
                 Active crew
               </div>
             </div>
 
             <div>
-              <span className="text-xs font-semibold text-muted-foreground tracking-wider uppercase block">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400 tracking-wider uppercase block font-sans">
                 RESILIENCE
               </span>
-              <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-0.5">
+              <div className="text-xl font-semibold font-sans text-emerald-600 dark:text-emerald-400 mt-1">
                 84%
               </div>
-              <div className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                LOCKER M-2 STOCKED
+              <div className="text-xs font-sans font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                LOCKER <span className="font-mono">M-2</span> STOCKED
               </div>
             </div>
           </div>
 
-          {/* Card Footer: Action */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" />
-              <span>Comms: <span className="font-mono">{station_b.comms_status}</span> · Fleet nominal</span>
+          {/* 5. Communication & Action Footer */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+            <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-2 font-sans">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+              <span>
+                Comms <span className="font-semibold text-slate-800 dark:text-slate-200">ONLINE</span> · <span className="text-slate-500 dark:text-slate-400 font-medium">Fleet nominal</span>
+              </span>
             </div>
 
             <button
               onClick={() => handleSelectStation("STATION-MAITRI")}
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-primary text-primary-foreground font-medium text-xs hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
             >
               <span>View Station</span>
               <ArrowRight className="h-3.5 w-3.5" />

@@ -23,6 +23,16 @@ test.describe("Capture Preserved UI Screenshots", () => {
       fullPage: true,
     });
 
+    // 2b. Resources - Responsive (768x1024)
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto("/resources?station=STATION-BHARATI");
+    await page.waitForTimeout(1000);
+    await page.screenshot({
+      path: path.join(screenshotDir, "preserved-resources-responsive.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+
     // 3. Scenarios - Station Bharati
     await page.goto("/scenarios?station=STATION-BHARATI");
     await page.waitForTimeout(1000);

@@ -1,22 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { MissionGateway } from "@/components/workspaces/MissionGateway";
+import { LandingPage } from "@/components/LandingPage";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PolarOps — Mission Gateway & Station Selector" },
+      { title: "PolarOps — Antarctic Operational Digital Twin" },
       {
         name: "description",
-        content: "Mission authentication and station selection for Antarctic operations.",
+        content: "Understand station conditions, trace operational dependencies, and support resilient decisions under Antarctic constraints.",
       },
       { property: "og:title", content: "PolarOps — Antarctic Operational Digital Twin" },
       {
         property: "og:description",
-        content: "Operational intelligence and resilient decision support for Antarctic missions.",
+        content: "Operational decision-support platform for Antarctic research stations.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: MissionGateway,
+  component: LandingPage,
 });

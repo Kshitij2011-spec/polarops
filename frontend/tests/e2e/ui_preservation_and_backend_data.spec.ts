@@ -13,14 +13,14 @@ test.describe("PolarOps UI Preservation & Real Backend Data Verification", () =>
     await expect(resourceCards).toHaveCount(8);
 
     // POWER card: real energy model values
-    const powerCard = resourceCards.filter({ hasText: "POWER" });
+    const powerCard = resourceCards.filter({ has: page.getByRole("heading", { name: /power/i }) });
     await expect(powerCard).toBeVisible();
     await expect(powerCard.locator(".resource-number")).toContainText("kW");
-    await expect(powerCard).toContainText("LOAD / CAPACITY");
-    await expect(powerCard).toContainText("RESERVE MARGIN");
+    await expect(powerCard).toContainText(/load \/ capacity/i);
+    await expect(powerCard).toContainText(/reserve margin/i);
 
     // FUEL card: real fuel status values calculated by backend
-    const fuelCard = resourceCards.filter({ hasText: "FUEL" });
+    const fuelCard = resourceCards.filter({ has: page.getByRole("heading", { name: /fuel/i }) });
     await expect(fuelCard).toBeVisible();
     await expect(fuelCard.locator(".resource-number")).toContainText("57%");
     await expect(fuelCard).toContainText("2,028 L/day");
@@ -28,15 +28,15 @@ test.describe("PolarOps UI Preservation & Real Backend Data Verification", () =>
     await expect(fuelCard).toContainText("70.3 days");
 
     // LOGISTICS card: resupply vessel for Bharati
-    const logisticsCard = resourceCards.filter({ hasText: "LOGISTICS" });
+    const logisticsCard = resourceCards.filter({ has: page.getByRole("heading", { name: /logistics/i }) });
     await expect(logisticsCard).toBeVisible();
     await expect(logisticsCard).toContainText("MV Vasiliy Golovnin");
 
     // CRITICAL SPARES card: SK-402 inventory for Bharati
-    const sparesCard = resourceCards.filter({ hasText: "CRITICAL SPARES" });
+    const sparesCard = resourceCards.filter({ has: page.getByRole("heading", { name: /critical spares/i }) });
     await expect(sparesCard).toBeVisible();
     await expect(sparesCard).toContainText("SK-402");
-    await expect(sparesCard).toContainText("0 AVAILABLE");
+    await expect(sparesCard).toContainText(/0 available/i);
   });
 
   test("Resources Page: Multi-station dynamic data updates for STATION-MAITRI", async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe("PolarOps UI Preservation & Real Backend Data Verification", () =>
     await expect(resourceCards).toHaveCount(8);
 
     // FUEL card for Maitri
-    const fuelCard = resourceCards.filter({ hasText: "FUEL" });
+    const fuelCard = resourceCards.filter({ has: page.getByRole("heading", { name: /fuel/i }) });
     await expect(fuelCard).toBeVisible();
     await expect(fuelCard.locator(".resource-number")).toContainText("83%");
     await expect(fuelCard).toContainText("1,488 L/day");
@@ -57,12 +57,12 @@ test.describe("PolarOps UI Preservation & Real Backend Data Verification", () =>
     await expect(fuelCard).toContainText("133.1 days");
 
     // LOGISTICS card for Maitri
-    const logisticsCard = resourceCards.filter({ hasText: "LOGISTICS" });
+    const logisticsCard = resourceCards.filter({ has: page.getByRole("heading", { name: /logistics/i }) });
     await expect(logisticsCard).toBeVisible();
     await expect(logisticsCard).toContainText("Air traverse active");
 
     // CRITICAL SPARES card for Maitri
-    const sparesCard = resourceCards.filter({ hasText: "CRITICAL SPARES" });
+    const sparesCard = resourceCards.filter({ has: page.getByRole("heading", { name: /critical spares/i }) });
     await expect(sparesCard).toBeVisible();
     await expect(sparesCard).toContainText("2 unreserved in M-2");
   });

@@ -1,6 +1,6 @@
 import { Link, useRouterState, useSearch, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, AlertTriangle, ArrowDown, ArrowRight, BarChart3, Bell, Boxes, ChevronDown, ChevronRight, CircleGauge, ClipboardCheck, Clock, CloudOff, Download, FileText, Fuel, Grid3X3, Menu, Minus, Moon, Plus, Radio, RefreshCw, RotateCcw, Satellite, Settings, ShieldAlert, ShieldCheck, Sun, UserRound, Users, X, Zap } from "lucide-react";
+import { Activity, AlertTriangle, ArrowDown, ArrowRight, BarChart3, Bell, Boxes, ChevronDown, ChevronRight, CircleGauge, ClipboardCheck, Clock, CloudOff, Download, Droplets, FileText, Fuel, Grid3X3, Menu, Minus, Moon, Plus, Radio, RefreshCw, RotateCcw, Satellite, Settings, ShieldAlert, ShieldCheck, Sun, UserRound, Users, UtensilsCrossed, Wrench, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -39,12 +39,92 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
 }
 export const useOperations = () => useContext(OperationsContext);
 
-export const ThemeContext = createContext({ dark: false, toggle: () => { } });
+export type ThemeMode = "light" | "dark" | "system";
+
+export const ThemeContext = createContext<{
+  dark: boolean;
+  themeMode: ThemeMode;
+  toggle: () => void;
+  setThemeMode: (mode: ThemeMode) => void;
+}>({
+  dark: false,
+  themeMode: "light",
+  toggle: () => { },
+  setThemeMode: () => { },
+});
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [dark, setDark] = useState(false);
-  useEffect(() => { const saved = localStorage.getItem("polarops-theme"); const value = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches; setDark(value); document.documentElement.classList.toggle("dark", value); }, []);
-  const toggle = () => { const next = !dark; setDark(next); document.documentElement.classList.toggle("dark", next); localStorage.setItem("polarops-theme", next ? "dark" : "light"); };
-  return <ThemeContext.Provider value={{ dark, toggle }}>{children}</ThemeContext.Provider>;
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => {
+    if (typeof window !== "undefined") {
+      const savedMode = localStorage.getItem("polarops-theme-mode") as ThemeMode | null;
+      if (savedMode && ["light", "dark", "system"].includes(savedMode)) {
+        return savedMode;
+      }
+      const savedTheme = localStorage.getItem("polarops-theme");
+      if (savedTheme === "dark") return "dark";
+      if (savedTheme === "light") return "light";
+      if (document.documentElement.classList.contains("dark")) return "dark";
+    }
+    return "light";
+  });
+
+  const [dark, setDark] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const savedMode = localStorage.getItem("polarops-theme-mode");
+      if (savedMode === "dark") return true;
+      if (savedMode === "light") return false;
+      if (savedMode === "system") {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches;
+      }
+      const saved = localStorage.getItem("polarops-theme");
+      if (saved) return saved === "dark";
+      if (document.documentElement.classList.contains("dark")) return true;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches;
+    }
+    return false;
+  });
+
+  // Apply theme to DOM and keep localStorage in sync
+  useEffect(() => {
+    const applyTheme = (isDark: boolean) => {
+      document.documentElement.classList.toggle("dark", isDark);
+      localStorage.setItem("polarops-theme", isDark ? "dark" : "light");
+    };
+
+    if (themeMode === "system") {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handleChange = (e: MediaQueryListEvent) => {
+        setDark(e.matches);
+        applyTheme(e.matches);
+      };
+      const initialMatches = mediaQuery.matches;
+      setDark(initialMatches);
+      applyTheme(initialMatches);
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    } else {
+      const isDark = themeMode === "dark";
+      setDark(isDark);
+      applyTheme(isDark);
+    }
+  }, [themeMode]);
+
+  const toggle = () => {
+    const nextMode: ThemeMode = dark ? "light" : "dark";
+    setThemeModeState(nextMode);
+    localStorage.setItem("polarops-theme-mode", nextMode);
+  };
+
+  const setThemeMode = (mode: ThemeMode) => {
+    setThemeModeState(mode);
+    localStorage.setItem("polarops-theme-mode", mode);
+  };
+
+  return (
+    <ThemeContext.Provider value={{ dark, themeMode, toggle, setThemeMode }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 export const useTheme = () => useContext(ThemeContext);
 
@@ -123,8 +203,8 @@ export function LandingPage() {
     <section className="landing-cta"><p className="eyebrow">READY FOR THE OPERATIONAL PICTURE?</p><h2>ENTER POLAROPS</h2><div className="flex justify-center gap-3"><Button size="lg" asChild><Link to="/command-center">ENTER POLAROPS</Link></Button><Button size="lg" variant="outline" asChild><Link to="/digital-twin" search={{ asset: undefined }}>VIEW DIGITAL TWIN</Link></Button></div></section></main>;
 }
 
-export function StatusBadge({ value }: { value: string }) { const k = value.toLowerCase(); return <span className={`status-badge status-${k}`}>{value}</span>; }
-export function PageHeader({ eyebrow, title, subtitle, status }: { eyebrow?: string; title: string; subtitle: string; status?: string }) { return <div className="mb-7 flex flex-col sm:flex-row sm:items-end justify-between gap-4"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h1 className="page-title">{title}</h1><p className="text-muted-foreground mt-2 max-w-2xl text-sm leading-6">{subtitle}</p></div>{status && <StatusBadge value={status} />}</div>; }
+export function StatusBadge({ value, className = "" }: { value: string; className?: string }) { const k = value.toLowerCase(); return <span className={`status-badge status-${k} ${className}`}>{value}</span>; }
+export function PageHeader({ eyebrow, title, subtitle, status, statusClassName = "text-[12.5px] font-semibold" }: { eyebrow?: string; title: string; subtitle: string; status?: string; statusClassName?: string }) { return <div className="mb-7 flex flex-col sm:flex-row sm:items-end justify-between gap-4"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h1 className="page-title">{title}</h1><p className="text-muted-foreground mt-2 max-w-4xl text-[16px] sm:text-[17px] leading-relaxed font-normal">{subtitle}</p></div>{status && <StatusBadge value={status} className={statusClassName} />}</div>; }
 export function Panel({ title, subtitle, children, className = "", action }: { title: string; subtitle?: string; children: ReactNode; className?: string; action?: ReactNode }) { return <section className={`panel ${className}`}><div className="panel-head"><div><h2 className="panel-title">{title}</h2>{subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}</div>{action}</div><div className="p-5">{children}</div></section>; }
 
 export function Topology({ large = false, selected, onSelect }: { large?: boolean; selected?: string; onSelect?: (id: string) => void }) {
@@ -329,7 +409,7 @@ export function ResourcesPage() {
   const lifeSupport = overview?.subsystem_summary?.find((s) => s.code === "LIFE_SUPPORT");
   const waterPercent = lifeSupport?.health_score ?? (isMaitri ? 98 : 88);
   const waterConsumption = isMaitri ? "2.8 m³/day" : "4.2 m³/day";
-  const waterReserve = isMaitri ? "45 days (Melt Tank)" : "31 days (RO Plant)";
+  const waterReserve = isMaitri ? "45 days (melt tank)" : "31 days (RO plant)";
 
   // 5. Food Metrics (from rations registry)
   const foodPercent = isMaitri ? 92 : 82;
@@ -340,128 +420,168 @@ export function ResourcesPage() {
   // 6. Logistics / Resupply Metrics (from real maritime/air resupply endpoint)
   const resupplyItem = resupply?.[0];
   const logisticsPercent = isMaitri ? 90 : 61;
-  const logisticsDisplay = isMaitri ? "NOMINAL" : (resupplyItem?.eta_days ? `ETA ${resupplyItem.eta_days}d` : "WATCH");
+  const logisticsDisplay = isMaitri ? "Nominal" : (resupplyItem?.eta_days ? `ETA ${resupplyItem.eta_days}d` : "Watch");
   const logisticsMovement = isMaitri ? "Air traverse active" : (resupplyItem ? resupplyItem.vessel_name : "1 vessel in transit");
-  const logisticsNext = isMaitri ? "Autonomous (Oasis)" : (resupplyItem?.eta_days ? `ETA ${resupplyItem.eta_days} days (Pack ice)` : "Next: 11 days");
+  const logisticsNext = isMaitri ? "Autonomous (Oasis)" : (resupplyItem?.eta_days ? `ETA ${resupplyItem.eta_days} days (pack ice)` : "Next: 11 days");
   const logisticsStatus = isMaitri ? "NOMINAL" : "WATCH";
 
   // 7. Critical Spares Metrics (from real warehouse inventory endpoint)
   const spareItem = inventory?.[0];
   const sparesAvailable = spareItem?.quantity_available ?? (isMaitri ? 2 : 0);
-  const sparesDisplay = spareItem !== undefined ? `${sparesAvailable} AVAILABLE` : "DATA UNAVAILABLE";
+  const sparesDisplay = spareItem !== undefined ? `${sparesAvailable} available` : "Data unavailable";
   const sparesStatus = sparesAvailable === 0 ? "CRITICAL" : "NOMINAL";
-  const sparesPart = spareItem ? `${spareItem.part_number} (${spareItem.name.slice(0, 18)}...)` : "DATA UNAVAILABLE";
-  const sparesReserve = sparesAvailable === 0 ? "MWO-2026-089 Blocked" : "2 unreserved in M-2";
+  const sparesPart = spareItem ? `${spareItem.part_number} (${spareItem.name})` : "Data unavailable";
+  const sparesReserve = sparesAvailable === 0 ? "MWO-2026-089 blocked" : "2 unreserved in M-2";
 
   // 8. Equipment Recovery Metrics (from real equipment / generator posture)
-  const recoveryDisplay = isMaitri ? "NOMINAL" : "CONSTRAINED";
+  const recoveryDisplay = isMaitri ? "Nominal" : "Constrained";
   const recoveryPercent = isMaitri ? 100 : 62;
-  const recoveryAsset = isMaitri ? "GEN-01 (100% Health)" : "G-02 (4.8 mm/s vibration)";
-  const recoveryRedundancy = isMaitri ? "Dual N+1 generator backup" : "N+1 Reduced (Single Fault)";
+  const recoveryAsset = isMaitri ? "GEN-01 (100% health)" : "G-02 (4.8 mm/s vibration)";
+  const recoveryRedundancy = isMaitri ? "Dual N+1 backup" : "N+1 reduced (fault)";
   const recoveryStatus = isMaitri ? "NOMINAL" : "ATTENTION";
 
   const resourcesList = [
     {
-      name: "POWER",
-      category: "ENERGY",
+      name: "Power",
+      category: "Energy",
+      icon: Zap,
       display: `${powerLoadKw} kW`,
       percent: powerPercent,
       status: powerStatus,
-      meta1Label: "LOAD / CAPACITY",
-      meta1Value: `${powerLoadKw} kW / ${powerCapKw} kW`,
-      meta2Label: "RESERVE MARGIN",
-      meta2Value: `${powerReserveKw} kW (${energy?.online_generators_count ?? 2} Online)`,
+      meta1Label: "Load / capacity",
+      meta1Value: `${powerLoadKw} / ${powerCapKw} kW`,
+      meta1Sub: undefined,
+      meta1Title: `${powerLoadKw} / ${powerCapKw} kW electrical load`,
+      meta2Label: "Reserve margin",
+      meta2Value: `${powerReserveKw} kW`,
+      meta2Sub: `${energy?.online_generators_count ?? 2} gen online`,
+      meta2Title: `${powerReserveKw} kW (${energy?.online_generators_count ?? 2} online)`,
       truth: energy?.truth_type ?? "DERIVED",
       source: "energy_service",
     },
     {
-      name: "FUEL",
-      category: "PROPULSION & HEAT",
+      name: "Fuel",
+      category: "Propulsion & Heat",
+      icon: Fuel,
       display: `${fuelPercent}%`,
       percent: fuelPercent,
       status: fuelStatus,
-      meta1Label: "CONSUMPTION",
+      meta1Label: "Consumption",
       meta1Value: fuelBurnDay,
-      meta2Label: "RESERVE RUNWAY",
-      meta2Value: `${fuelRunwayDays} (${fuel ? Math.round(fuel.current_stock_liters).toLocaleString() : 0} L)`,
+      meta1Sub: undefined,
+      meta1Title: fuelBurnDay,
+      meta2Label: "Reserve runway",
+      meta2Value: fuelRunwayDays,
+      meta2Sub: fuel ? `${Math.round(fuel.current_stock_liters).toLocaleString()} L reserve` : "",
+      meta2Title: `${fuelRunwayDays} (${fuel ? Math.round(fuel.current_stock_liters).toLocaleString() : 0} L)`,
       truth: fuel?.provenance?.truth_type ?? "DERIVED",
       source: "fuel_service",
     },
     {
-      name: "PERSONNEL",
-      category: "EXPEDITION CREW",
+      name: "Personnel",
+      category: "Expedition Crew",
+      icon: Users,
       display: `${personnelCount} / ${personnelCapacity}`,
       percent: personnelPercent,
       status: "NOMINAL",
-      meta1Label: "COMPLEMENT",
-      meta1Value: `${personnelCount} Station Crew`,
-      meta2Label: "DUTY WATCH",
+      meta1Label: "Complement",
+      meta1Value: `${personnelCount} station crew`,
+      meta1Sub: undefined,
+      meta1Title: `${personnelCount} of ${personnelCapacity} active complement`,
+      meta2Label: "Duty watch",
       meta2Value: overview?.active_incidents_count ? `${overview.active_incidents_count} on active watch` : "All nominal",
+      meta2Sub: undefined,
+      meta2Title: overview?.active_incidents_count ? `${overview.active_incidents_count} on active watch` : "All nominal watch",
       truth: "MEASURED",
       source: "station_manifest",
     },
     {
-      name: "WATER",
-      category: "LIFE SUPPORT",
+      name: "Water",
+      category: "Life Support",
+      icon: Droplets,
       display: `${waterPercent}%`,
       percent: waterPercent,
       status: lifeSupport?.status ?? "NOMINAL",
-      meta1Label: "CONSUMPTION",
+      meta1Label: "Consumption",
       meta1Value: waterConsumption,
-      meta2Label: "RESERVE",
-      meta2Value: waterReserve,
+      meta1Sub: undefined,
+      meta1Title: waterConsumption,
+      meta2Label: "Reserve",
+      meta2Value: isMaitri ? "45 days" : "31 days",
+      meta2Sub: isMaitri ? "melt tank" : "RO plant",
+      meta2Title: waterReserve,
       truth: "MEASURED",
       source: "life_support_telemetry",
     },
     {
-      name: "FOOD",
-      category: "SUSTENANCE",
+      name: "Food",
+      category: "Sustenance",
+      icon: UtensilsCrossed,
       display: foodDisplay,
       percent: foodPercent,
       status: "NOMINAL",
-      meta1Label: "DAILY RATIONS",
+      meta1Label: "Daily rations",
       meta1Value: foodConsumption,
-      meta2Label: "WINTER RESERVE",
-      meta2Value: foodReserve,
+      meta1Sub: undefined,
+      meta1Title: foodConsumption,
+      meta2Label: "Winter reserve",
+      meta2Value: foodDisplay,
+      meta2Sub: "sustenance reserve",
+      meta2Title: foodReserve,
       truth: "DERIVED",
       source: "rations_registry",
     },
     {
-      name: "LOGISTICS",
-      category: "MARITIME & AIR",
+      name: "Logistics",
+      category: "Maritime & Air",
+      icon: Boxes,
       display: logisticsDisplay,
       percent: logisticsPercent,
       status: logisticsStatus,
-      meta1Label: "INBOUND MOVEMENTS",
+      meta1Label: "Inbound movements",
       meta1Value: logisticsMovement,
-      meta2Label: "NEXT RESUPPLY",
-      meta2Value: logisticsNext,
+      meta1Sub: undefined,
+      meta1Title: logisticsMovement,
+      meta2Label: "Next resupply",
+      meta2Value: isMaitri ? "Autonomous" : (resupplyItem?.eta_days ? `ETA ${resupplyItem.eta_days} days` : "Next: 11 days"),
+      meta2Sub: isMaitri ? "air traverse active" : "pack ice routing",
+      meta2Title: logisticsNext,
       truth: "MEASURED",
       source: "ais_manifest",
     },
     {
-      name: "CRITICAL SPARES",
-      category: "EQUIPMENT INVENTORY",
+      name: "Critical Spares",
+      category: "Equipment Inventory",
+      icon: Wrench,
       display: sparesDisplay,
       percent: sparesAvailable > 0 ? 100 : 0,
       status: sparesStatus,
-      meta1Label: "PRIMARY PART",
-      meta1Value: sparesPart,
-      meta2Label: "WORK ORDERS",
-      meta2Value: sparesReserve,
+      meta1Label: "Primary part",
+      meta1Value: spareItem ? spareItem.part_number : "Data unavailable",
+      meta1Sub: "Generator oil filter",
+      meta1Title: sparesPart,
+      meta2Label: "Work orders",
+      meta2Value: isMaitri ? "2 unreserved in M-2" : "MWO-2026-089",
+      meta2Sub: isMaitri ? undefined : "blocked",
+      meta2Title: sparesReserve,
       truth: "MEASURED",
       source: "station_warehouse_db",
     },
     {
-      name: "EQUIPMENT RECOVERY",
-      category: "MAINTENANCE ASSURANCE",
+      name: "Equipment Recovery",
+      category: "Maintenance Assurance",
+      icon: RefreshCw,
       display: recoveryDisplay,
       percent: recoveryPercent,
       status: recoveryStatus,
-      meta1Label: "TARGET ASSET",
-      meta1Value: recoveryAsset,
-      meta2Label: "REDUNDANCY POSTURE",
-      meta2Value: recoveryRedundancy,
+      meta1Label: "Target asset",
+      meta1Value: isMaitri ? "GEN-01" : "G-02",
+      meta1Sub: isMaitri ? "100% health" : "4.8 mm/s vibration",
+      meta1Title: recoveryAsset,
+      meta2Label: "Redundancy posture",
+      meta2Value: isMaitri ? "Dual N+1" : "N+1 reduced",
+      meta2Sub: isMaitri ? "backup operational" : "fault condition",
+      meta2Title: recoveryRedundancy,
       truth: "DERIVED",
       source: "recovery_chain_engine",
     },
@@ -474,39 +594,86 @@ export function ResourcesPage() {
         title="Resource & Logistics"
         subtitle={`Current station resources, consumption and operational reserves · ${stationId}`}
         status={overview?.status || "NOMINAL"}
+        statusClassName="text-[12px] font-semibold"
       />
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
-        {resourcesList.map((res) => (
-          <div className="resource-card" key={res.name}>
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="demo-tag text-[9px] uppercase tracking-wider mb-1">{res.category}</span>
-                <h2>{res.name}</h2>
+        {resourcesList.map((res) => {
+          const Icon = res.icon;
+          return (
+            <div className="resource-card" key={res.name}>
+              {/* Card Header: Category + Status Badge, followed by prominent Resource Name */}
+              <div className="flex items-start justify-between gap-2 mb-0.5">
+                <div className="min-w-0 flex-1 pr-1">
+                  <div className="flex items-center gap-1 text-[10.5px] font-medium text-muted-foreground/80 mb-1">
+                    {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />}
+                    <span className="truncate" title={res.category}>{res.category}</span>
+                  </div>
+                  <h2 className="text-[1.25rem] font-bold text-foreground tracking-tight leading-snug">
+                    {res.name}
+                  </h2>
+                </div>
+                <StatusBadge value={res.status} className="shrink-0 text-[11px] font-semibold tracking-wider px-2 py-0.5" />
               </div>
-              <StatusBadge value={res.status} />
-            </div>
-            <div className={`resource-number ${res.display.length > 9 ? "!text-[1.8rem]" : ""}`}>{res.display}</div>
-            <BatteryIndicator
-              value={res.percent}
-              status={res.status}
-              label={`${res.name} operational level`}
-            />
-            <div className="grid grid-cols-2 gap-3 mt-5 text-xs">
-              <div>
-                <span>{res.meta1Label}</span>
-                <strong className="truncate block" title={res.meta1Value}>{res.meta1Value}</strong>
+
+              {/* Primary Value: Large focal point */}
+              <div className={`resource-number ${res.display.length > 8 ? "!text-[1.85rem]" : ""}`}>
+                {res.display}
               </div>
-              <div>
-                <span>{res.meta2Label}</span>
-                <strong className="truncate block" title={res.meta2Value}>{res.meta2Value}</strong>
+
+              {/* Progress Bar: Kept exactly as-is with comfortable vertical spacing */}
+              <div className="my-3">
+                <BatteryIndicator
+                  value={res.percent}
+                  status={res.status}
+                  label={`${res.name} operational level`}
+                />
+              </div>
+
+              {/* 2 Key Supporting Metrics: Clean flat 2-column mini-grid */}
+              <div className="grid grid-cols-2 gap-3 py-3 border-t border-border/40">
+                <div className="min-w-0">
+                  <span className="text-[11.5px] font-medium text-muted-foreground block leading-tight mb-1" title={res.meta1Label}>
+                    {res.meta1Label}
+                  </span>
+                  <strong className="text-[13.5px] font-semibold text-foreground block leading-snug line-clamp-2" title={res.meta1Title || res.meta1Value}>
+                    {res.meta1Value}
+                  </strong>
+                  {res.meta1Sub && (
+                    <span className="text-[11px] text-muted-foreground/80 block truncate mt-0.5" title={res.meta1Sub}>
+                      {res.meta1Sub}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[11.5px] font-medium text-muted-foreground block leading-tight mb-1" title={res.meta2Label}>
+                    {res.meta2Label}
+                  </span>
+                  <strong className="text-[13.5px] font-semibold text-foreground block leading-snug line-clamp-2" title={res.meta2Title || res.meta2Value}>
+                    {res.meta2Value}
+                  </strong>
+                  {res.meta2Sub && (
+                    <span className="text-[11px] text-muted-foreground/80 block truncate mt-0.5" title={res.meta2Sub}>
+                      {res.meta2Sub}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Technical Source: Subtle bottom metadata */}
+              <div className="mt-auto pt-2.5 border-t border-border/30 flex items-center justify-between text-[11.5px] text-muted-foreground/80">
+                <span className="inline-flex items-center gap-1.5 min-w-0">
+                  <span className="font-sans font-medium text-foreground/80 text-[11.5px]">
+                    {res.truth === "MEASURED" ? "Measured" : "Derived"}
+                  </span>
+                  <span className="text-muted-foreground/40">·</span>
+                  <span className="font-mono text-[11px] text-muted-foreground/75 truncate" title={res.source}>
+                    {res.source}
+                  </span>
+                </span>
               </div>
             </div>
-            <div className="demo-label mt-5 flex justify-between items-center text-[10px] text-muted-foreground">
-              <span>TRUTH: {res.truth}</span>
-              <span className="font-mono">{res.source}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );
@@ -751,7 +918,14 @@ export function ResiliencePage() {
 }
 
 export function AlertsPage() {
-  const [filter, setFilter] = useState("ALL");
+  const [filter, setFilter] = useState(() => {
+    try {
+      const saved = typeof window !== "undefined" ? localStorage.getItem("polarops-alert-severity") : null;
+      if (saved === "Critical Only") return "CRITICAL";
+      if (saved === "Critical + Warning") return "WARNING";
+    } catch { }
+    return "ALL";
+  });
   const [reviewed, setReviewed] = useState<Array<string | number>>(() => {
     try {
       const saved = localStorage.getItem("polarops-reviewed-alerts");
@@ -1050,9 +1224,5 @@ export function AlertsPage() {
   );
 }
 export { ReportsView as ReportsPage } from "./Reports/ReportsView";
-export function OfflinePage() {
-  const { mode, setMode } = useContext(OperationsContext); const [sync, setSync] = useState("IDLE"); const offline = mode === "offline";
-  const reconnect = () => { setSync("RECONNECTING"); window.setTimeout(() => setSync("SYNC IN PROGRESS"), 700); window.setTimeout(() => setSync("SYNC COMPLETE"), 1500); window.setTimeout(() => { setMode("online"); setSync("EVENTS RECONCILED") }, 2300) };
-  return <><PageHeader eyebrow="RESILIENT LOCAL-FIRST OPERATIONS" title="Offline Analog" subtitle="The station operational picture remains available when external connectivity is unavailable." status={offline ? "LOCAL OPERATION ACTIVE" : "ONLINE DEMO"} /><div className="offline-principle"><CloudOff /><span>CONNECTIVITY LOSS</span><b>DOES NOT EQUAL</b><span>OPERATIONAL CONTEXT LOSS</span></div><div className="grid xl:grid-cols-[1.35fr_1fr] gap-6 mb-6"><Panel title="LOCAL TWIN STATE" subtitle={`LAST SYNCHRONIZED · ${demoOfflineState.lastSynchronized}`} action={<span className="demo-tag">{offline ? "LOCAL SNAPSHOT · CACHED" : "ONLINE DEMO"}</span>}><Topology /><div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">{["LOCAL SNAPSHOT", "CACHED", "DERIVED", "PENDING SYNC"].map(x => <div className="provenance-cell" key={x}>{x}</div>)}</div></Panel><div className="space-y-6"><Panel title="OPERATING MODE"><div className="mode-switch"><Button variant={!offline ? "default" : "outline"} onClick={() => setMode("online")}>ONLINE DEMO</Button><Button variant={offline ? "default" : "outline"} onClick={() => setMode("offline")}><CloudOff /> ENTER OFFLINE MODE</Button></div><p className="text-sm text-muted-foreground mt-4">Local inspection, scenarios, alerts, resources, reasoning and recommendations remain available.</p></Panel><Panel title="STORE & FORWARD"><div className="store-grid">{[["LOCAL EVENTS", demoOfflineState.localEvents], ["PENDING SYNC", demoOfflineState.pendingSync], ["LAST ACKNOWLEDGED", demoOfflineState.lastAcknowledged], ["NEXT SYNC", demoOfflineState.nextSync]].map(([a, b]) => <div key={a}><span>{a}</span><strong>{b}</strong></div>)}</div>{offline ? <Button className="w-full mt-5" onClick={reconnect} disabled={sync !== "IDLE"}><RefreshCw className={sync.includes("SYNC IN") ? "animate-spin" : ""} />{sync === "IDLE" ? "RECONNECT & SYNCHRONIZE" : sync}</Button> : <div className="notice mt-5">{sync === "EVENTS RECONCILED" ? "EVENTS RECONCILED · 3  |  ACKNOWLEDGED · 3" : "Connectivity available · synchronized"}</div>}</Panel></div></div><Panel title="PENDING SYNC" subtitle="Priority local event queue"><div className="sync-queue">{demoSyncQueue.map(item => <div key={item.id}><span className="queue-index">0{item.id}</span><div><h3>{item.event}</h3><p>{item.priority} PRIORITY · LOCAL EVENT</p></div><StatusBadge value={offline ? item.state : "ACKNOWLEDGED"} /></div>)}</div></Panel><Panel title="RESILIENCE PATH" className="mt-6"><div className="operator-flow">{["LOCAL TWIN STATE", "LOCAL STORE", "PRIORITY QUEUE", "STORE & FORWARD", "SYNC", "ACK / RECONCILE"].map((x, i) => <span key={x}>{x}{i < 5 && <ArrowRight />}</span>)}</div></Panel></>;
-}
+export { OfflineView as OfflinePage } from "./Offline/OfflineView";
 export { SettingsPage } from "./SettingsPage";

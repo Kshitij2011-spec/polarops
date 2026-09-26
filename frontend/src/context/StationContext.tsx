@@ -106,7 +106,7 @@ export function StationProvider({
   children,
   initialStationId = "STATION-BHARATI",
 }: StationProviderProps) {
-  // Read initial station from URL search param if present in browser
+  // Read initial station from URL search param if present in browser, or saved preference
   const [activeStationId, setActiveStationIdState] = useState<StationId>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -114,6 +114,10 @@ export function StationProvider({
         const st = params.get("station");
         if (st === "STATION-MAITRI" || st === "STATION-BHARATI") {
           return st;
+        }
+        const pref = localStorage.getItem("polarops-preferred-station");
+        if (pref === "STATION-MAITRI" || pref === "STATION-BHARATI") {
+          return pref as StationId;
         }
       } catch {
         // Fallback safely
@@ -146,11 +150,12 @@ export function StationProvider({
     id: "",
   });
 
-  // Station update wrapper that updates state and keeps URL param synchronized
+  // Station update wrapper that updates state, persists preferred station, and keeps URL param synchronized
   const setActiveStationId = useCallback((id: StationId) => {
     setActiveStationIdState(id);
     if (typeof window !== "undefined") {
       try {
+        localStorage.setItem("polarops-preferred-station", id);
         const url = new URL(window.location.href);
         url.searchParams.set("station", id);
         window.history.replaceState({}, "", url.toString());

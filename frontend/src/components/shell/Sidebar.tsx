@@ -143,46 +143,66 @@ export function Sidebar({
 
   return (
     <aside
-      className={`h-full flex flex-col bg-white dark:bg-[#0B1120] text-slate-800 dark:text-slate-200 border-r border-slate-200 dark:border-slate-800 select-none transition-[width] duration-200 ease-in-out relative z-30 ${sidebarWidthClass}`}
+      className={`h-full flex flex-col bg-white dark:bg-[#0B1120] text-slate-800 dark:text-slate-200 border-r border-slate-200 dark:border-slate-800 select-none transition-[width,color,background-color,border-color] duration-200 ease-in-out relative z-30 ${sidebarWidthClass}`}
       role="navigation"
       aria-label="PolarOps Primary Sidebar Navigation"
     >
-      {/* Top Brand Header */}
-      <div className="h-16 px-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 shrink-0">
-        <Link
-          to="/"
-          onClick={mobile ? onCloseMobile : undefined}
-          className="flex items-center gap-2.5 overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#369ACC] rounded py-1 px-0.5 group"
-          aria-label="PolarOps Mission Home"
-          title="PolarOps Antarctic Digital Twin — Click to return to Mission Gateway"
-        >
-          <div className="w-8 h-8 rounded bg-[#172554] dark:bg-[#0F1E3D] border border-[#369ACC]/40 text-[#46B9C7] flex items-center justify-center shrink-0 group-hover:border-[#46B9C7] transition-colors">
-            <Compass size={18} className="animate-spin-slow text-[#46B9C7]" />
+      {/* Top Header: PolarOps Brand Identity at TOP of sidebar */}
+      <div className="h-16 px-3.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 shrink-0">
+        {collapsed && !mobile ? (
+          <div className="w-full flex items-center justify-center">
+            <Link
+              to="/"
+              className="w-8 h-8 rounded bg-[#172554] dark:bg-[#0F1E3D] border border-[#369ACC]/40 text-[#46B9C7] flex items-center justify-center shrink-0 hover:border-[#46B9C7] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#369ACC]"
+              aria-label="PolarOps Mission Home"
+              title="PolarOps Antarctic Digital Twin — Mission Gateway"
+            >
+              <Compass size={18} className="text-[#46B9C7]" aria-hidden="true" />
+            </Link>
           </div>
-          {(!collapsed || mobile) && (
-            <div className="leading-tight min-w-0">
-              <div className="font-bold text-sm tracking-wider text-[#172554] dark:text-white flex items-center gap-1.5">
-                <span>POLAROPS</span>
-                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-[#369ACC] font-semibold border border-slate-200 dark:border-slate-700">
-                  v2.0
-                </span>
+        ) : (
+          <>
+            <Link
+              to="/"
+              onClick={mobile ? onCloseMobile : undefined}
+              className="flex items-center gap-2.5 overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#369ACC] rounded py-1 px-0.5 group"
+              aria-label="PolarOps Mission Home"
+              title="PolarOps Antarctic Digital Twin — Mission Gateway"
+            >
+              <div className="w-8 h-8 rounded bg-[#172554] dark:bg-[#0F1E3D] border border-[#369ACC]/40 text-[#46B9C7] flex items-center justify-center shrink-0 group-hover:border-[#46B9C7] transition-colors">
+                <Compass size={18} className="text-[#46B9C7]" aria-hidden="true" />
               </div>
-              <div className="text-[9px] font-mono uppercase text-slate-500 dark:text-slate-400 tracking-wider truncate">
-                Antarctic Digital Twin
+              <div className="leading-tight min-w-0">
+                <div className="font-bold text-sm tracking-wider text-[#172554] dark:text-white font-sans">
+                  POLAROPS
+                </div>
+                <div className="text-[9px] font-sans uppercase text-slate-500 dark:text-slate-400 tracking-wider truncate">
+                  Antarctic Digital Twin
+                </div>
               </div>
-            </div>
-          )}
-        </Link>
+            </Link>
 
-        {mobile && (
-          <button
-            type="button"
-            onClick={onCloseMobile}
-            className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#369ACC]"
-            aria-label="Close navigation sidebar"
-          >
-            <X size={18} />
-          </button>
+            {mobile ? (
+              <button
+                type="button"
+                onClick={onCloseMobile}
+                className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#369ACC] cursor-pointer"
+                aria-label="Close navigation sidebar"
+              >
+                <X size={18} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#369ACC] cursor-pointer"
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar (Ctrl+\)"
+              >
+                <ChevronLeft size={16} />
+              </button>
+            )}
+          </>
         )}
       </div>
 

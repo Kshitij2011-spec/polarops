@@ -7,8 +7,26 @@
     <meta name="description" content="PolarOps — Antarctic Operational Digital Twin for Indian Research Stations" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
     <title>PolarOps — Antarctic Digital Twin</title>
+    <script>
+      (function() {
+        try {
+          var mode = localStorage.getItem("polarops-theme-mode");
+          var saved = localStorage.getItem("polarops-theme");
+          var isDark = mode === "dark" ? true : (mode === "light" ? false : (saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches));
+          if (isDark) {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+          var motion = localStorage.getItem("polarops-motion");
+          if (motion === "reduced") {
+            document.documentElement.classList.add("reduced-motion");
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
