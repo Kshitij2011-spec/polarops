@@ -16,6 +16,7 @@ import {
 import { fetchFuelRunway, fetchEnergyBalance, fetchComparativeHeadroom } from "@/lib/api/runway";
 import { TruthBadge } from "@/components/foundation/TruthBadge";
 import { StatusBadge } from "@/components/foundation/StatusBadge";
+import { BatteryIndicator } from "@/components/common/OperationalIndicators";
 
 interface FuelEnergyRunwayCardProps {
   stationId: string;
@@ -150,18 +151,12 @@ export function FuelEnergyRunwayCard({ stationId }: FuelEnergyRunwayCardProps) {
                 </div>
               </div>
               <div className="mt-2">
-                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      percentCapacity < 25
-                        ? "bg-red-500"
-                        : percentCapacity < 45
-                        ? "bg-amber-500"
-                        : "bg-emerald-500"
-                    }`}
-                    style={{ width: `${percentCapacity}%` }}
-                  />
-                </div>
+                <BatteryIndicator
+                  value={percentCapacity}
+                  status={percentCapacity < 25 ? "CRITICAL" : percentCapacity < 45 ? "WARNING" : "NOMINAL"}
+                  label="Fuel stock capacity"
+                  className="my-1"
+                />
                 <span className="text-[10px] font-mono text-slate-500 block text-right mt-1">
                   {percentCapacity}% of {fuel.max_capacity_liters.toLocaleString()} L
                 </span>

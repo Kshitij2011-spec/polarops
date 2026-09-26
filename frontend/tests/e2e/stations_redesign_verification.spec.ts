@@ -118,10 +118,22 @@ test.describe("PolarOps Stations Page Final Visual Refinement & Functionality", 
 
     // Mobile viewport (390x844)
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/stations?station=STATION-BHARATI");
     await page.waitForTimeout(600);
     await page.screenshot({
       path: path.join(screenshotDir, "stations-refined-mobile.png"),
-      fullPage: true,
+      fullPage: false,
+    });
+
+    // Dark mode desktop (1440x900)
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.evaluate(() => {
+      document.documentElement.classList.add("dark");
+    });
+    await page.waitForTimeout(600);
+    await page.screenshot({
+      path: path.join(screenshotDir, "stations-refined-desktop-dark.png"),
+      fullPage: false,
     });
   });
 });

@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { DigitalTwinPage } from "@/components/polarops";
 
 export const Route = createFileRoute("/digital-twin")({
-  validateSearch: (search: Record<string, unknown>): { asset?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { asset?: string; station?: string } => ({
     asset: typeof search["asset"] === "string" ? search["asset"] : undefined,
+    station: typeof search["station"] === "string" ? search["station"] : undefined,
   }),
   head: () => ({
     meta: [

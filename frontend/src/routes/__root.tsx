@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import { OperationsProvider, ThemeProvider } from "../components/polarops";
 import { StationProvider } from "@/context/StationContext";
@@ -81,15 +82,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isLanding = pathname === "/" || pathname === "";
 
   return (
     <QueryClientProvider client={queryClient}>
       <StationProvider>
         <ThemeProvider>
           <OperationsProvider>
-            <AppShell>
+            {isLanding ? (
               <Outlet />
-            </AppShell>
+            ) : (
+              <AppShell>
+                <Outlet />
+              </AppShell>
+            )}
           </OperationsProvider>
         </ThemeProvider>
       </StationProvider>

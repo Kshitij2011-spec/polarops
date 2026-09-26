@@ -59,7 +59,7 @@ export function AppShell({ children }: AppShellProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#070B12] text-slate-900 dark:text-slate-100 flex flex-col font-sans antialiased overflow-x-hidden selection:bg-[#369ACC]/30 selection:text-[#172554] dark:selection:text-[#46B9C7]">
+    <div className="h-screen h-[100dvh] bg-[#F8FAFC] dark:bg-[#070B12] text-slate-900 dark:text-slate-100 flex overflow-hidden font-sans antialiased selection:bg-[#369ACC]/30 selection:text-[#172554] dark:selection:text-[#46B9C7] transition-colors duration-200">
       {/* WCAG 2.2 Skip to main content link */}
       <a
         href="#main-content"
@@ -68,59 +68,59 @@ export function AppShell({ children }: AppShellProps) {
         Skip to main content
       </a>
 
-      {/* Top Command Bar */}
-      <HeaderBar
-        isMobileMenuOpen={mobileMenuOpen}
-        onMobileMenuToggle={() => setMobileMenuOpen((prev) => !prev)}
-        isDesktopSidebarCollapsed={sidebarCollapsed}
-        onDesktopSidebarToggle={handleToggleCollapse}
-      />
+      {/* Desktop Fixed/Stationary Sidebar */}
+      <div className="hidden lg:block shrink-0 h-full">
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+        />
+      </div>
 
-      {/* Body: Sidebar + Main Content Layout */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Desktop Fixed/Sticky Sidebar */}
-        <div className="hidden lg:block shrink-0">
-          <Sidebar
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={handleToggleCollapse}
-          />
-        </div>
-
-        {/* Mobile Off-Canvas Drawer Navigation */}
-        {mobileMenuOpen && (
+      {/* Mobile Off-Canvas Drawer Navigation */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 lg:hidden flex"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Mobile Navigation Menu"
+        >
+          {/* Backdrop */}
           <div
-            className="fixed inset-0 z-50 lg:hidden flex"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Mobile Navigation Menu"
-          >
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity"
-              onClick={() => setMobileMenuOpen(false)}
-              aria-hidden="true"
-            />
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
 
-            {/* Drawer Content */}
-            <div className="relative z-10 w-72 max-w-[80vw] h-full shadow-2xl animate-in slide-in-from-left duration-200">
-              <Sidebar
-                collapsed={false}
-                onToggleCollapse={() => {}}
-                mobile
-                onCloseMobile={() => setMobileMenuOpen(false)}
-              />
-            </div>
+          {/* Drawer Content */}
+          <div className="relative z-10 w-72 max-w-[80vw] h-full shadow-2xl animate-in slide-in-from-left duration-200">
+            <Sidebar
+              collapsed={false}
+              onToggleCollapse={() => {}}
+              mobile
+              onCloseMobile={() => setMobileMenuOpen(false)}
+            />
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Main Column: Stable HeaderBar + Independently Scrollable Workspace */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden">
+        {/* Top Command Bar */}
+        <HeaderBar
+          isMobileMenuOpen={mobileMenuOpen}
+          onMobileMenuToggle={() => setMobileMenuOpen((prev) => !prev)}
+          isDesktopSidebarCollapsed={sidebarCollapsed}
+          onDesktopSidebarToggle={handleToggleCollapse}
+        />
 
         {/* Main Operational Canvas */}
         <main
           id="main-content"
-          className="flex-1 flex flex-col min-h-0 w-full overflow-y-auto outline-none"
+          className="flex-1 min-h-0 w-full overflow-y-auto outline-none"
           role="main"
           tabIndex={-1}
         >
-          <div className="flex-1 p-3 sm:p-5 lg:p-7 max-w-[1600px] w-full mx-auto">
+          <div className="p-3 sm:p-5 lg:p-7 max-w-[1600px] w-full mx-auto">
             {children}
           </div>
         </main>
