@@ -1,6 +1,6 @@
-# ========================
+# ==============================================================================
 # PolarOps .gitignore
-# ========================
+# ==============================================================================
 
 # --- Dependencies ---
 node_modules/
@@ -12,33 +12,38 @@ venv/
 env/
 *.egg-info/
 
-# --- Environment / Secrets ---
+# --- Environment & Secrets ---
 .env
 .env.local
 .env.*.local
 !.env.example
 
-# --- Database ---
+# --- Databases (Local SQLite) ---
 *.db
 *.sqlite3
 
-# --- Build Output ---
+# --- Build Outputs ---
 dist/
 build/
+.output/
+.vinxi/
+*.tsbuildinfo
+node_modules/.tmp/
 
-# --- IDE ---
+# --- IDE & Editor Artifacts ---
 .vscode/
 .idea/
 *.swp
 *.swo
 *.sublime-*
+.claude/
 
-# --- OS ---
+# --- Operating System Artifacts ---
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# --- Python ---
+# --- Python Tooling Caches ---
 .pytest_cache/
 htmlcov/
 coverage/
@@ -46,16 +51,32 @@ coverage/
 .mypy_cache/
 .ruff_cache/
 
-# --- Playwright ---
+# --- Test Artifacts & Playwright ---
 test-results/
 playwright-report/
 blob-report/
 .playwright-mcp/
-*.png
+**/test-results/
+**/playwright-report/
 
-# --- Misc ---
+# --- Images & Documentation Assets ---
+# Exclude root scratch screenshots, historical integration captures, and test outputs
+/*.png
+**/test-results/**/*.png
+**/playwright-report/**/*.png
+docs/integration/screenshots/
+
+# Explicitly allow documentation screenshots
+!docs/screenshots/*.png
+
+# --- Code Analysis, Graphify & Agent Caches ---
+graphify-out/
+.lovable/
+brag-output/
+brag-output-*/
+skills-lock.json
+
+# --- Temporary & Log Files ---
 *.log
 *.tmp
 *.bak
-brag-output/
-skills-lock.json

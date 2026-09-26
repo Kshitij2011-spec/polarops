@@ -1,249 +1,300 @@
 # PolarOps — Antarctic Operational Digital Twin
 
-> SIH 2026 · SIH26060 — Digital Platform for efficient remote management of Indian Antarctic Research Stations.
-
-## Live Production Deployments
-
-- **Frontend UI (Vercel)**: [https://polarops-two.vercel.app](https://polarops-two.vercel.app)
-- **Backend API (Render)**: [https://polarops-api.onrender.com](https://polarops-api.onrender.com)
-- **Swagger API Docs**: [https://polarops-api.onrender.com/docs](https://polarops-api.onrender.com/docs)
-- **GitHub Repository**: [https://github.com/Kshitij2011-spec/polarops](https://github.com/Kshitij2011-spec/polarops)
-
-## What It Is
-
-PolarOps is an operational digital twin for Indian Antarctic research stations (Bharati, Maitri). It provides station commanders and logistics operators with a unified operational picture, dependency-aware risk intelligence, what-if scenario simulation, and communication-resilient operation — even when satellite connectivity is disrupted.
-
-**Core thesis:**
-
-> When something changes at the station, the Digital Twin tells the operator what changed, what it affects, what may happen next, and what can be done about it — even when connectivity is disrupted.
-
-**Core loop:** SENSE → UNDERSTAND → PREDICT → SIMULATE → DECIDE → LEARN
-
-> [!IMPORTANT]
-> Current operational data is **synthetic for demonstration**. Production deployment would integrate validated station systems through an edge/integration layer. No real SCADA, satellite modem, or NCPOR telemetry is connected in this prototype.
+> Operational digital twin and decision-support platform for remote management of Indian Antarctic Research Stations (Bharati & Maitri), developed for the National Centre for Polar and Ocean Research (NCPOR), Ministry of Earth Sciences, Government of India.
 
 ---
 
-## Core Capabilities
+## Live Deployments
 
-| Pillar | Capability | Route |
-|--------|-----------|-------|
-| **Unify the Station** | Command Center — Common Operational Picture | `/` |
-| **Understand & Predict** | Asset Intelligence — Dependency + Explainable Risk | `/assets/:id` |
-| **Understand & Predict** | Resources — Energy, Fuel, Inventory, Resupply | `/resources` |
-| **Understand & Predict** | Scenario Engine — What-If Simulation | `/scenarios` |
-| **Operate Through Disruption** | Communication Resilience — Offline Queue + Priority Sync | `/resilience` |
-| **Operate Through Disruption** | Science Continuity — Observation Buffering | `/resilience` (Science tab) |
-| **Operate Through Disruption** | Incident Workspace — Blast Radius + Actions | `/resilience` (Incidents tab) |
-| **Operate Through Disruption** | Operational Memory — Human-in-the-Loop Lessons | `/resilience` (Memory tab) |
+- **Frontend Application (Vercel)**: [https://polarops-two.vercel.app](https://polarops-two.vercel.app)
+- **Backend API Service (Render)**: [https://polarops-api.onrender.com](https://polarops-api.onrender.com)
+- **Interactive Swagger Docs**: [https://polarops-api.onrender.com/docs](https://polarops-api.onrender.com/docs)
+- **Source Repository**: [https://github.com/Kshitij2011-spec/polarops](https://github.com/Kshitij2011-spec/polarops)
 
 ---
 
-## Architecture
+## Product Overview
+
+Operating research stations in Antarctica requires continuous decision-making in extreme conditions (-40°C temperatures, blizzards exceeding 100 knots, satellite blackouts, and month-long logistics resupply lead times). Physical equipment failures—such as primary generator degradation—cascading through life-support heating and snowmelt potable water systems present existential risks to station crews.
+
+**PolarOps** serves as a mission-critical digital twin and operational decision-support layer. It continuously aggregates multi-domain station telemetry, evaluates cascading failure blast radiuses using deterministic breadth-first search (BFS) graph traversals, models fuel autonomy and energy balances, simulates cross-domain what-if disruption scenarios, and guarantees operational continuity during satellite outages.
+
+Physical equipment actuation always requires authenticated on-station human authorization. PolarOps informs and empowers human operators—it does not replace local agency.
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│                     Presentation Layer                          │
-│         React 19 + TypeScript + Vite + Tailwind v4              │
-│         (Command Center, Asset Intelligence, Scenarios,         │
-│          Resilience, Incidents, Science, Memory)                 │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │ REST API (JSON + Provenance Metadata)
-┌────────────────────────────────▼────────────────────────────────┐
-│                      Backend Application                        │
-│                     FastAPI (Python 3.11+)                      │
-│  ┌────────────────────┬────────────────────┬─────────────────┐  │
-│  │ Dependency Engine  │ Risk & Telemetry   │ Scenario Engine │  │
-│  │ (Relational BFS)   │ Scoring Service    │ Simulator       │  │
-│  ├────────────────────┼────────────────────┼─────────────────┤  │
-│  │ Resilience Service │ Science Service    │ Incident/Memory │  │
-│  │ (Offline Queue)    │ (Observation Buf)  │ (Human-in-Loop) │  │
-│  └────────────────────┴────────────────────┴─────────────────┘  │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │ SQLAlchemy v2
-┌────────────────────────────────▼────────────────────────────────┐
-│                        Data Layer                               │
-│     SQLite (local dev) │ PostgreSQL (production / Render)       │
-│     Deterministic synthetic Antarctic station dataset            │
-└─────────────────────────────────────────────────────────────────┘
+SENSE ──▶ UNDERSTAND ──▶ PREDICT ──▶ SIMULATE ──▶ DECIDE ──▶ LEARN
 ```
 
-## Tech Stack
+---
 
-| Technology | Role |
-|-----------|------|
-| React 19 + TypeScript + Vite | Frontend SPA |
-| Tailwind CSS v4 + Lucide | Styling & icons |
-| TanStack Query | Client data fetching & cache |
-| Zod | Frontend runtime validation |
-| FastAPI + Python 3.11+ | Backend API + domain logic |
-| Pydantic v2 | Backend validation & schemas |
-| SQLAlchemy v2 | ORM |
-| Alembic | Migrations |
-| PostgreSQL | Production database |
-| SQLite | Local development database |
-| Playwright | E2E testing + visual QA |
+## Core Operational Workspaces
+
+| Workspace | Route | Operational Purpose |
+|---|---|---|
+| **Command Center** | `/command-center` | Unified Common Operational Picture (COP). Live situational awareness, 3-question operator briefing (*What is happening? Why does it matter? What should we do next?*), subsystem status matrix, and canonical station event stream. |
+| **Stations** | `/stations` | Multi-station portfolio coordination. Comparative operational headroom across 5 domains (Power, Thermal, Fuel, Life Support, Maintenance) between Bharati and Maitri stations. |
+| **Resources** | `/resources` | Logistics, fuel autonomy, and recovery intelligence. Energy consumption projections, burn-rate modeling, critical spare inventory tracking (e.g. SK-402 seals), and vessel ETA countdowns. |
+| **Scenarios** | `/scenarios` | Deterministic what-if consequence simulator. Evaluates multi-variable contingencies (e.g. 72-hour primary generator failure during severe polar blizzard) with side-by-side delta impact analysis. |
+| **Resilience** | `/resilience` | Disruption resilience and air-gapped continuity. Manages P0–P3 prioritized telemetry sync queues, cryptographic SHA-256 integrity verification, and scientific instrument observation buffering. |
+| **Alerts** | `/alerts` | Station-wide alarm console categorized by severity (`CRITICAL`, `WARNING`, `NOMINAL`) with direct drill-down into root cause diagnostic telemetry. |
+| **Reports** | `/reports` | Formal engineering and operational records, verification summaries, and handover shift logs. |
+| **Settings** | `/settings` | Station environment preferences, high-contrast light/dark mode configuration, and backend API connection parameters. |
+| **Offline Analog** | `/offline` | Local air-gapped operational simulator demonstrating degraded comms behavior and local store-and-forward reconciliation. |
+| **Digital Twin** | `/digital-twin` | Spatial and topological station infrastructure visualizer linking equipment components to power buses, thermal loops, and habitat zones. |
+
+---
+
+## Screenshots
+
+Captured directly from the live application at desktop resolution (1440×900):
+
+### Command Center
+![Command Center](docs/screenshots/command-center.png)
+
+### Station Portfolio
+![Stations](docs/screenshots/stations.png)
+
+### Resources & Fuel Runway
+![Resources](docs/screenshots/resources.png)
+
+### What-If Scenario Simulation
+![Scenarios](docs/screenshots/scenarios.png)
+
+### Communication Resilience & Offline Queue
+![Resilience](docs/screenshots/resilience.png)
+
+### Operational Reports
+![Reports](docs/screenshots/reports.png)
+
+### System Settings
+![Settings](docs/screenshots/settings.png)
+
+### Landing Overview
+![Landing Page](docs/screenshots/landing.png)
+
+---
+
+## System Architecture & Data Flow
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Presentation Layer                              │
+│         React 19 + TypeScript + Vite + Tailwind CSS v4                 │
+│         TanStack Router + TanStack Query + Lucide Icons                │
+│   (Command Center, Stations, Resources, Scenarios, Resilience, etc.)   │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ REST API (JSON + Provenance Metadata)
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                        FastAPI Backend Engine                          │
+│                         Python 3.11 + Pydantic v2                      │
+│  ┌────────────────────────┬─────────────────────┬───────────────────┐  │
+│  │ Dependency BFS Engine  │ Risk Scoring Engine │ Scenario Engine   │  │
+│  │ (Cascade Blast Radius) │ (0-100 Composite)   │ (Outage Modeling) │  │
+│  ├────────────────────────┼─────────────────────┼───────────────────┤  │
+│  │ Energy Balance Model   │ Offline Sync Buffer │ Event Stream      │  │
+│  │ (Autonomy Projections) │ (P0-P3 & SHA-256)   │ (Provenance Logs) │  │
+│  └────────────────────────┴─────────────────────┴───────────────────┘  │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ SQLAlchemy v2 ORM
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                          Database Layer                                │
+│       SQLite (Local Development) │ PostgreSQL (Render Production)       │
+│       Managed schema migrations via Alembic                             │
+│       Deterministic canonical Antarctic station dataset                 │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Data Flow & Architectural Principles
+1. **Domain Logic Ownership**: All mathematical computations, fuel consumption burns, multi-factor risk scores (0–100), dependency graph BFS traversals, and scenario delta projections belong strictly to the FastAPI backend services.
+2. **Presentation Decoupling**: The React frontend is responsible for presentation, spatial schematic rendering, scannable status matrices, and operator interactions.
+3. **Data Provenance & Honesty**: Telemetry payloads carry explicit provenance metadata (`source`, `timestamp`, `freshness`, `quality`, `truth_type`, `confidence`). Synthetic simulation data is visibly tagged with truth badges (`[SYNTHETIC DEMO DATASET]`, `[MEASURED]`, `[SCENARIO]`) and never disguised as live sensor feeds.
+
+---
+
+## Technology Stack
+
+### Frontend (`frontend/`)
+- **Runtime & Framework**: React 19.2, TypeScript 6.0, Vite 8.2
+- **Routing & State**: TanStack Router 1.170, TanStack Query 5.102
+- **Styling & Design System**: Tailwind CSS v4, Radix UI primitives, Lucide React icons
+- **Quality & Testing**: oxlint, Playwright Test 1.63 (39 E2E test specs)
+- **Deployment**: Vercel Analytics
+
+### Backend (`backend/`)
+- **Web Framework**: FastAPI 0.115+, Uvicorn 0.30+, Starlette
+- **Data Validation & Settings**: Pydantic v2, Pydantic Settings
+- **Database & ORM**: SQLAlchemy v2, Alembic (migrations), SQLite (local dev), PostgreSQL (production via psycopg2)
+- **HTTP Client**: HTTPX 0.27+
+- **Testing**: pytest (95 passing unit and integration tests)
+
+---
+
+## Repository Structure
+
+```text
+polarops/
+├── .github/                      # GitHub configuration
+│   ├── workflows/ci.yml          # GitHub Actions CI workflow
+│   └── pull_request_template.md  # Standard pull request checklist
+├── backend/                      # Production FastAPI backend
+│   ├── alembic/                  # Database migration versions
+│   ├── app/                      # Application source
+│   │   ├── api/                  # REST API route handlers
+│   │   ├── core/                 # Configuration, DB session, seed engine
+│   │   ├── models/               # SQLAlchemy ORM entities & enums
+│   │   ├── schemas/              # Pydantic v2 validation schemas
+│   │   └── services/             # Domain logic (risk, BFS, energy, sync)
+│   ├── tests/                    # Backend pytest suite (95 tests)
+│   ├── pyproject.toml            # Backend tool settings
+│   └── requirements.txt          # Python dependencies
+├── frontend/                     # Production React 19 SPA
+│   ├── public/                   # Static assets & SVG icons
+│   ├── src/                      # Frontend source
+│   │   ├── components/           # UI components & workspace views
+│   │   ├── hooks/                # Data-fetching & state hooks
+│   │   ├── lib/                  # API client & domain models
+│   │   ├── routes/               # TanStack Router page routes
+│   │   └── index.css             # Semantic SCADA CSS token system
+│   ├── tests/e2e/                # Playwright E2E automation specs
+│   ├── package.json              # Node dependencies & scripts
+│   ├── playwright.config.ts      # E2E test runner configuration
+│   ├── tsconfig.json             # TypeScript configuration
+│   ├── vercel.json               # Vercel deployment & rewrite rules
+│   └── vite.config.ts            # Vite bundler configuration
+├── docs/                         # Structured technical documentation
+│   ├── architecture/             # Architecture, API contracts, design system
+│   ├── audit/                    # Baseline capability & parity audits
+│   ├── engineering/              # Standards, security, release handoff, QA
+│   ├── product/                  # PRD, navigation guides, user journeys
+│   ├── reimagination/            # Design specifications & interaction models
+│   ├── research/                 # Evidence register, sources, assumptions
+│   └── screenshots/              # 1440x900 production UI captures
+├── tasks/                        # Task templates & current roadmap
+├── .gitignore                    # Professional ignore rules
+├── AGENTS.md                     # Agentic engineering rules & guidelines
+├── CONTRIBUTING.md               # Contribution & development standards
+├── README.md                     # Project overview & documentation
+└── render.yaml                   # Render Blueprint deployment definition
+```
 
 ---
 
 ## Local Development
 
 ### Prerequisites
+- **Node.js**: v20 or v22
+- **Python**: 3.11.x
+- **Package Managers**: `npm` and `pip`
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Node.js | ≥ 18 | Frontend & Playwright |
-| npm | ≥ 9 | Package manager |
-| Python | ≥ 3.11 | Backend |
-| pip | ≥ 23 | Python packages |
-
-### 1. Backend
-
-```powershell
+### 1. Backend Setup
+```bash
 cd backend
-cp .env.example .env                # Configure as needed
-pip install -r requirements.txt     # Or: pip install -e .
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+
+# Create and activate virtual environment
+python -m venv .venv
+# On Windows:
+.venv\Scripts\Activate.ps1
+# On Linux/macOS:
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+pip install pytest httpx
+
+# Run database migrations and seed canonical Antarctic dataset
+alembic upgrade head
+python -m app.core.seed
+
+# Start FastAPI development server
+uvicorn app.main:app --reload --port 8000
 ```
+- API Server: `http://127.0.0.1:8000`
+- Swagger Documentation: `http://127.0.0.1:8000/docs`
 
-Backend available at: `http://127.0.0.1:8000/`  
-API docs at: `http://127.0.0.1:8000/docs`
-
-### 2. Frontend
-
-```powershell
+### 2. Frontend Setup
+```bash
 cd frontend
-cp .env.example .env
+
+# Install dependencies
 npm install
-npx playwright install chromium     # One-time browser binary install
-npm run dev -- --host 127.0.0.1     # → http://127.0.0.1:5173
+
+# Start Vite development server
+npm run dev
+```
+- Frontend UI: `http://localhost:5173`
+- The Vite dev server automatically proxies `/api` calls to `http://127.0.0.1:8000`.
+
+---
+
+## Verification & Testing
+
+### Frontend Quality Suite
+```bash
+cd frontend
+
+# Run static linter
+npm run lint
+
+# Run TypeScript typecheck and production build
+npm run build
+
+# Run Playwright E2E test suite (auto-boots backend and frontend)
+npm run test:e2e
 ```
 
-The Vite dev server proxies `/api/*` requests to the backend at `127.0.0.1:8000`.
+### Backend Test Suite
+```bash
+cd backend
 
----
-
-## Testing
-
-| Action | Command | Working Dir |
-|--------|---------|-------------|
-| Backend tests | `python -m pytest tests/ -v` | `backend/` |
-| Frontend build + typecheck | `npm run build` | `frontend/` |
-| Playwright E2E (auto-boots servers) | `npm run test:e2e` | `frontend/` |
-| Playwright UI debugger | `npm run test:e2e:ui` | `frontend/` |
-
-### Current Test Status (Day 4)
-
-- **Backend**: 36/36 pytest tests passing
-- **Frontend**: Build + TypeScript strict check passing
-- **Playwright E2E**: 30/30 tests passing across 5 spec files
-- **Playwright MCP**: Interactive visual QA verified
-
----
-
-## Deployment Architecture
-
-```text
-LOCAL DEVELOPMENT:
-  React/Vite (5173) → /api proxy → FastAPI (8000) → SQLite
-
-PRODUCTION:
-  Vercel (React 19 SPA) — https://polarops-two.vercel.app
-      ↓ VITE_API_BASE_URL
-  Render (FastAPI Web Service) — https://polarops-api.onrender.com
-      ↓ DATABASE_URL
-  Render PostgreSQL (polarops_db) — dpg-daequmfqj5pc73aj9pg0-a
+# Run complete pytest test suite
+pytest -v
 ```
 
-### Verified Production Endpoints
+---
 
-| Service | Environment | Endpoint URL | Status |
-|---------|-------------|--------------|--------|
-| **Frontend UI** | Vercel | [https://polarops-two.vercel.app](https://polarops-two.vercel.app) | `200 OK` (Vercel Production) |
-| **Backend API Health** | Render | [https://polarops-api.onrender.com/health](https://polarops-api.onrender.com/health) | `200 OK` (`{"status":"ok","service":"polarops-api"}`) |
-| **Backend Swagger Docs** | Render | [https://polarops-api.onrender.com/docs](https://polarops-api.onrender.com/docs) | `200 OK` (FastAPI OpenAPI) |
-| **Managed Database** | Render PostgreSQL | `polarops-db` (`polarops_db`) | `AVAILABLE` (Alembic Migrated & Seeded) |
-| **GitHub Repository** | GitHub | [https://github.com/Kshitij2011-spec/polarops](https://github.com/Kshitij2011-spec/polarops) | `main` branch |
+## Production Deployment
 
-### Render Backend Deployment
+### Frontend (Vercel)
+- **Deployment URL**: [https://polarops-two.vercel.app](https://polarops-two.vercel.app)
+- **Configuration**: `frontend/vercel.json`
+- **Root Directory**: `frontend`
+- **Framework Preset**: `Vite`
+- **Build Command**: `npm run build` (`tsc -b && vite build`)
+- **Output Directory**: `dist`
+- **Install Command**: `npm install`
+- **Routing**: SPA rewrites `/(.*) -> /index.html` and proxies `/api/(.*) -> https://polarops-api.onrender.com/$1`.
 
-1. Connected GitHub repository: `https://github.com/Kshitij2011-spec/polarops`
-2. Managed Web Service: `polarops-api`
-3. Root directory: `./`
-4. Build command: `pip install -r backend/requirements.txt`
-5. Start command: `cd backend && alembic upgrade head && python -m app.core.seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-6. Environment variables configured:
-   - `DATABASE_URL` — Internal PostgreSQL connection string to `polarops-db`
-   - `FRONTEND_ORIGIN` — `https://polarops-two.vercel.app` (comma-separated origins supported for preview deploys)
-   - `PYTHON_VERSION` — `3.11.12`
-   - `DEBUG` — `false`
-
-### Vercel Frontend Deployment
-
-1. Connected GitHub repository: `https://github.com/Kshitij2011-spec/polarops`
-2. Managed Project: `polarops`
-3. Root directory: `frontend/`
-4. Framework preset: Vite
-5. Build command: `npm run build`
-6. Output directory: `dist`
-7. SPA Routing: Configured via `frontend/vercel.json` rewriting `/(.*)` to `/index.html` and proxying `/api/(.*)` to Render backend
-8. Environment variables configured:
-   - `VITE_API_BASE_URL` — `https://polarops-api.onrender.com`
-
-### Database Environment Configuration
-
-| Environment | DATABASE_URL | Description |
-|-------------|-------------|-------------|
-| Local dev | `sqlite:///./polarops_dev.db` | Default zero-config local development |
-| Production | `postgresql://...` | Managed Render PostgreSQL with canonical Alembic migrations & idempotent seed |
+### Backend (Render)
+- **Service URL**: [https://polarops-api.onrender.com](https://polarops-api.onrender.com)
+- **Configuration**: `render.yaml`
+- **Root Directory**: `backend`
+- **Runtime**: Python 3.11.12
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `alembic upgrade head && python -m app.core.seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- **Health Check**: `/health`
+- **Database**: Managed Render PostgreSQL (`polarops-db`)
 
 ---
 
-## Project Documentation
+## Data Truth Disclaimer
 
-| Document | Purpose |
-|----------|---------|
-| [PRD](docs/product/PRD.md) | Product requirements |
-| [MVP Scope](docs/product/MVP_SCOPE.md) | Feature priority matrix |
-| [Architecture](docs/architecture/ARCHITECTURE.md) | System design |
-| [Data Model](docs/architecture/DATA_MODEL.md) | Entity relationships |
-| [API Contracts](docs/architecture/API_CONTRACTS.md) | REST endpoint specs |
-| [Offline Sync](docs/architecture/OFFLINE_SYNC.md) | Resilience architecture |
-| [Test Strategy](docs/engineering/TEST_STRATEGY.md) | QA strategy |
-| [Roadmap](tasks/ROADMAP.md) | Build schedule |
+All telemetry, weather metrics, power curves, equipment statuses, and sensor feeds displayed for Bharati and Maitri research stations are **deterministic synthetic datasets** engineered to faithfully represent Antarctic operational physics and environmental constraints.
+
+No live physical SCADA connections, active satellite modems, or confidential NCPOR internal networks are linked in this demonstration deployment. Every telemetry reading in the UI prominently carries appropriate provenance markers (`[MEASURED]`, `[SYNTHETIC DEMO DATASET]`, `[SCENARIO]`) to uphold complete scientific and institutional honesty.
 
 ---
 
-## Synthetic Data Disclaimer
+## Team & Contribution Workflow
 
-All station data (Bharati, Maitri) is **deterministic synthetic data** created for demonstration purposes. This includes:
-
-- Station telemetry and environmental readings
-- Asset health scores and maintenance records
-- Fuel, water, and inventory levels
-- Energy generation models
-- Communication link simulations
-- Scientific instrument observations
-- Incident records
-
-**No real NCPOR data, satellite telemetry, or operational station measurements are used.**
-
-Truth badges throughout the UI explicitly mark data provenance: `[MEASURED]`, `[SYNTHETIC DEMO DATASET]`, `[PROTOTYPE RESILIENCE MODEL]`.
+Contributions follow the engineering standards outlined in [CONTRIBUTING.md](CONTRIBUTING.md) and repository operating rules in [AGENTS.md](AGENTS.md). All pull requests must pass frontend linting, clean production builds, backend pytest suites, and browser visual checks before merging.
 
 ---
 
-## Future Work (NOT in current MVP)
+## Documented Future Work
 
-1. Real station system/instrument integrations
-2. Edge gateway / integration layer
-3. Real communications adapters (satellite modem, HF radio)
-4. Production-grade offline synchronization
-5. Real-time telemetry ingestion
-6. Validated Antarctic domain models (NCPOR-reviewed)
-7. Historical operational analytics
-8. Advanced forecasting models
-9. More sophisticated scenario modeling
-10. Multi-station federation
-11. Authentication / RBAC
-12. Audit/security hardening
-13. AI-assisted explanation (only after deterministic foundations and validated data are mature)
+The following items represent documented enhancements beyond the initial MVP:
+1. Real edge-gateway adapter interfaces for physical station hardware (MODBUS, OPC-UA, NMEA).
+2. Live satellite modem drivers (Iridium SBD, Inmarsat BGAN) with dynamic bandwidth degradation throttling.
+3. Multi-year historical telemetry trending and long-term degradation forecasting.
+4. Cryptographic role-based access control (RBAC) with hardware security key authorization for on-station operational actions.
+5. Bi-directional field synchronization between mobile hand-held field terminals and station central servers.
