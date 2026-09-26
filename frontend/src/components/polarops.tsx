@@ -161,7 +161,7 @@ function HealthStatusBadge() {
       POLAROPS API ONLINE
       <br />
       <span className="pl-4 font-mono text-[9px] text-success">
-        {data.service.toUpperCase()} Â· V1 OK
+        {data.service.toUpperCase()} ┬╖ V1 OK
       </span>
     </div>
   );
@@ -189,14 +189,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const connectivityStatus = offline ? "OFFLINE MODE" : (apiOnline ? "CONNECTED" : (healthError ? "DISCONNECTED" : "CONNECTING..."));
   const connectivityDot = offline ? "bg-warning" : (apiOnline ? "bg-success" : (healthError ? "bg-critical" : "bg-warning animate-pulse"));
 
-  return <div className="min-h-screen bg-background text-foreground"><Sidebar /><div className="lg:pl-60"><header className="sticky top-0 z-30 min-h-16 bg-background/95 backdrop-blur border-b flex items-center px-4 lg:px-7 gap-4"><Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMenu(true)} aria-label="Open navigation"><Menu /></Button><div className="hidden md:flex items-center gap-7 flex-1">{[["STATION", "BHARATI"], ["STATE", "WINTER"], ["CONNECTIVITY", connectivityStatus], ["SYNC", offline ? "LOCAL OPERATION ACTIVE" : (apiOnline ? "SYNCHRONIZED" : "PENDING SYNC")]].map(([a, b]) => <div key={a}><div className="command-label">{a}</div><div className={`text-xs font-bold flex items-center gap-1.5 ${offline && (a === "CONNECTIVITY" || a === "SYNC") ? "text-warning" : (a === "CONNECTIVITY" && !apiOnline ? "text-critical" : "")}`}>{a === "CONNECTIVITY" && <NetworkSignalIndicator level={offline ? 1 : (apiOnline ? 5 : (healthError ? 0 : 2))} active={!offline && apiOnline} status={connectivityStatus} className="mr-0.5" />} {b}</div></div>)}</div><span className="demo-tag ml-auto md:ml-0">{offline ? "LOCAL SNAPSHOT" : (apiOnline ? "LIVE API / DEMO MIX" : "STANDALONE DEMO")}</span><div className="hidden sm:block"><div className="command-label">TIME</div><div className="font-mono text-xs font-semibold">14:32:08 UTC</div></div><Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">{dark ? <Sun /> : <Moon />}</Button><Button variant="outline" size="icon" aria-label="System user"><UserRound /></Button></header><main className="p-4 sm:p-6 xl:p-8 max-w-[1680px] mx-auto">{offline && <div className="offline-strip"><CloudOff size={15} /> OFFLINE ANALOG Â· LOCAL OPERATION ACTIVE <span>LAST SYNC {demoOfflineState.lastSynchronized}</span></div>}{children}</main></div>
+  return <div className="min-h-screen bg-background text-foreground"><Sidebar /><div className="lg:pl-60"><header className="sticky top-0 z-30 min-h-16 bg-background/95 backdrop-blur border-b flex items-center px-4 lg:px-7 gap-4"><Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMenu(true)} aria-label="Open navigation"><Menu /></Button><div className="hidden md:flex items-center gap-7 flex-1">{[["STATION", "BHARATI"], ["STATE", "WINTER"], ["CONNECTIVITY", connectivityStatus], ["SYNC", offline ? "LOCAL OPERATION ACTIVE" : (apiOnline ? "SYNCHRONIZED" : "PENDING SYNC")]].map(([a, b]) => <div key={a}><div className="command-label">{a}</div><div className={`text-xs font-bold flex items-center gap-1.5 ${offline && (a === "CONNECTIVITY" || a === "SYNC") ? "text-warning" : (a === "CONNECTIVITY" && !apiOnline ? "text-critical" : "")}`}>{a === "CONNECTIVITY" && <NetworkSignalIndicator level={offline ? 1 : (apiOnline ? 5 : (healthError ? 0 : 2))} active={!offline && apiOnline} status={connectivityStatus} className="mr-0.5" />} {b}</div></div>)}</div><span className="demo-tag ml-auto md:ml-0">{offline ? "LOCAL SNAPSHOT" : (apiOnline ? "LIVE API / DEMO MIX" : "STANDALONE DEMO")}</span><div className="hidden sm:block"><div className="command-label">TIME</div><div className="font-mono text-xs font-semibold">14:32:08 UTC</div></div><Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">{dark ? <Sun /> : <Moon />}</Button><Button variant="outline" size="icon" aria-label="System user"><UserRound /></Button></header><main className="p-4 sm:p-6 xl:p-8 max-w-[1680px] mx-auto">{offline && <div className="offline-strip"><CloudOff size={15} /> OFFLINE ANALOG ┬╖ LOCAL OPERATION ACTIVE <span>LAST SYNC {demoOfflineState.lastSynchronized}</span></div>}{children}</main></div>
     {menu && <div className="fixed inset-0 z-50 bg-foreground/40 lg:hidden"><div className="w-72 h-full"><Sidebar mobile close={() => setMenu(false)} /></div><Button size="icon" variant="secondary" className="absolute left-[18.5rem] top-4" onClick={() => setMenu(false)}><X /></Button></div>}</div>;
 }
 
 export function LandingPage() {
   const flow = ["STATION", "INFRASTRUCTURE", "ENVIRONMENT", "RESOURCES", "INTELLIGENCE", "DECISION"];
   const decision = ["DATA", "CONTEXT", "IMPACT", "PREDICTION", "DECISION", "HUMAN APPROVAL", "ACTION"];
-  return <main className="landing-shell"><section className="landing-hero"><div className="landing-grid" /><div className="landing-kicker"><span /> SMART INDIA HACKATHON 2026 Â· AODT</div><p className="eyebrow">ANTARCTIC OPERATIONAL DIGITAL TWIN</p><h1>POLAROPS</h1><h2>Operational intelligence for Antarctic missions.</h2><p className="landing-copy">A resilient digital twin platform connecting station state, operational context, scenario reasoning and human decision-making into one common operational picture.</p><div className="flex flex-wrap gap-3"><Button size="lg" asChild><Link to="/command-center">ENTER COMMAND CENTER <ArrowRight /></Link></Button><Button size="lg" variant="outline" asChild><Link to="/digital-twin" search={{ asset: undefined }}>EXPLORE DIGITAL TWIN</Link></Button></div><div className="landing-flow">{flow.map((item, i) => <span key={item}>{item}{i < flow.length - 1 && <ArrowRight />}</span>)}</div></section>
+  return <main className="landing-shell"><section className="landing-hero"><div className="landing-grid" /><div className="landing-kicker"><span /> SMART INDIA HACKATHON 2026 ┬╖ AODT</div><p className="eyebrow">ANTARCTIC OPERATIONAL DIGITAL TWIN</p><h1>POLAROPS</h1><h2>Operational intelligence for Antarctic missions.</h2><p className="landing-copy">A resilient digital twin platform connecting station state, operational context, scenario reasoning and human decision-making into one common operational picture.</p><div className="flex flex-wrap gap-3"><Button size="lg" asChild><Link to="/command-center">ENTER COMMAND CENTER <ArrowRight /></Link></Button><Button size="lg" variant="outline" asChild><Link to="/digital-twin" search={{ asset: undefined }}>EXPLORE DIGITAL TWIN</Link></Button></div><div className="landing-flow">{flow.map((item, i) => <span key={item}>{item}{i < flow.length - 1 && <ArrowRight />}</span>)}</div></section>
     <section className="landing-section"><div><p className="eyebrow">OPERATIONAL LOGIC</p><h2>FROM DATA TO DECISION</h2></div><div className="decision-chain">{decision.map((item, i) => <span key={item} className={item === "HUMAN APPROVAL" ? "active" : ""}>{item}{i < decision.length - 1 && <ArrowDown />}</span>)}</div></section>
     <section className="landing-band"><div className="landing-section"><div><p className="eyebrow">SYSTEM CAPABILITY</p><h2>OPERATIONAL CAPABILITIES</h2></div><div className="capability-grid">{demoCapabilities.map(([title, text], i) => <article key={title}><span>0{i + 1}</span><h3>{title}</h3><p>{text}</p></article>)}</div></div></section>
     <section className="landing-section reality"><div><p className="eyebrow">RESILIENT BY DESIGN</p><h2>DESIGNED FOR ANTARCTIC REALITY</h2><p>Connectivity loss does not equal operational context loss.</p></div><div className="reality-grid">{[["LIMITED CONNECTIVITY", "LOCAL-FIRST"], ["LOCAL OPERATION", "STORE & FORWARD"], ["DATA TRANSFER", "SYNC WHEN AVAILABLE"], ["TRUSTED STATE", "ACKNOWLEDGEMENT & RECONCILIATION"]].map(([a, b]) => <div key={a}><Satellite /><span>{a}</span><b>{b}</b></div>)}</div></section>
@@ -237,9 +237,9 @@ export function ExplanationDrawer({
       <SheetContent className="sm:max-w-xl overflow-y-auto">
         <SheetHeader className="border-b pb-5">
           <div className="eyebrow">INCIDENT EXPLANATION</div>
-          <SheetTitle>{data ? `${data.entity_id} Â· ${data.subject}` : `${entityId} Â· INCIDENT EXPLANATION`}</SheetTitle>
+          <SheetTitle>{data ? `${data.entity_id} ┬╖ ${data.subject}` : `${entityId} ┬╖ INCIDENT EXPLANATION`}</SheetTitle>
           <SheetDescription>
-            {data ? `Decision-support context for operator review Â· ${data.station_id}` : "Decision-support context for operator review."}
+            {data ? `Decision-support context for operator review ┬╖ ${data.station_id}` : "Decision-support context for operator review."}
           </SheetDescription>
         </SheetHeader>
 
@@ -350,7 +350,7 @@ export function ExplanationDrawer({
             </div>
 
             <div className="notice flex justify-between items-center text-[11px]">
-              <span>CONFIDENCE: {Math.round(data.confidence * 100)}% Â· TRUTH: {data.truth_type}</span>
+              <span>CONFIDENCE: {Math.round(data.confidence * 100)}% ┬╖ TRUTH: {data.truth_type}</span>
               <span className="font-mono text-[10px] text-muted-foreground">{new Date(data.timestamp).toUTCString()}</span>
             </div>
           </div>
@@ -409,7 +409,7 @@ export function ResourcesPage() {
   // 4. Water Metrics (from real life support subsystem)
   const lifeSupport = overview?.subsystem_summary?.find((s) => s.code === "LIFE_SUPPORT");
   const waterPercent = lifeSupport?.health_score ?? (isMaitri ? 98 : 88);
-  const waterConsumption = isMaitri ? "2.8 mÂ³/day" : "4.2 mÂ³/day";
+  const waterConsumption = isMaitri ? "2.8 m┬│/day" : "4.2 m┬│/day";
   const waterReserve = isMaitri ? "45 days (melt tank)" : "31 days (RO plant)";
 
   // 5. Food Metrics (from rations registry)
@@ -593,7 +593,7 @@ export function ResourcesPage() {
       <PageHeader
         eyebrow="SUPPLY & SUSTAINMENT"
         title="Resource & Logistics"
-        subtitle={`Current station resources, consumption and operational reserves Â· ${stationId}`}
+        subtitle={`Current station resources, consumption and operational reserves ┬╖ ${stationId}`}
         status={overview?.status || "NOMINAL"}
         statusClassName="text-[12px] font-semibold"
       />
@@ -666,7 +666,7 @@ export function ResourcesPage() {
                   <span className="font-sans font-medium text-foreground/80 text-[11.5px]">
                     {res.truth === "MEASURED" ? "Measured" : "Derived"}
                   </span>
-                  <span className="text-muted-foreground/40">Â·</span>
+                  <span className="text-muted-foreground/40">┬╖</span>
                   <span className="font-mono text-[11px] text-muted-foreground/75 truncate" title={res.source}>
                     {res.source}
                   </span>
@@ -766,7 +766,7 @@ export function AlertsPage() {
       <PageHeader
         eyebrow="EVENT MANAGEMENT"
         title="Operational Alerts"
-        subtitle={`Prioritized conditions and telemetry threshold events requiring operator review Â· ${activeStationId}`}
+        subtitle={`Prioritized conditions and telemetry threshold events requiring operator review ┬╖ ${activeStationId}`}
       />
 
       {/* Operational Metric Strip */}
@@ -973,7 +973,7 @@ export function AlertsPage() {
                   <div className="flex items-center flex-wrap gap-2">
                     <span className="text-[10px] font-mono font-semibold tracking-wider text-muted-foreground uppercase flex items-center gap-1.5 bg-secondary/40 px-2 py-0.5 rounded border border-border/40">
                       <Radio className="h-2.5 w-2.5 text-primary" />
-                      {a.station.replace(/^STATION-/, "")} Â· STATION
+                      {a.station.replace(/^STATION-/, "")} ┬╖ STATION
                     </span>
                     {a.entity && (
                       <span className="font-mono text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
